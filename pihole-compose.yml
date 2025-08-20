@@ -17,4 +17,4 @@ services:
     ports:
       - "53:53/tcp"
       - "53:53/udp"
-      - "8000:80/tcp"   # web UI on 8080
+      - "82:80/tcp"   # web UI on 8080

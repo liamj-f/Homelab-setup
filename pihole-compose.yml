@@ -9,12 +9,10 @@ services:
     environment:
       TZ: 'Europe/London'
       WEBPASSWORD: ${PIHOLE_WEBPASSWORD}
+      WEB_PORT: 80
       DNS1: 1.1.1.1
       DNS2: 8.8.8.8
     volumes:
       - ./etc-pihole:/etc/pihole
       - ./etc-dnsmasq.d:/etc/dnsmasq.d
-    ports:
-      - "53:53/tcp"
-      - "53:53/udp"
-      - "82:80/tcp"   # web UI on 8080
+

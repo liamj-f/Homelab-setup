@@ -30,8 +30,8 @@ services:
       DNS1: 1.1.1.1
       DNS2: 8.8.8.8
     volumes:
-      - ./pihole/etc-pihole:/etc/pihole
-      - ./pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+      - /data/compose/4/etc-pihole:/etc/pihole
+      - /data/compose/4/etc-dnsmasq.d:/etc/dnsmasq.d
 
   # Portainer
   portainer:

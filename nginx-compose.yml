@@ -12,3 +12,8 @@ services:
     volumes:
       - ./data:/data
       - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - npm_network
+networks:
+  npm_network:
+    driver: bridge

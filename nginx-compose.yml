@@ -20,3 +20,4 @@ volumes:
 networks:
   npm_network:
     driver: bridge
+    name: nginx_network

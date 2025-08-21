@@ -6,7 +6,7 @@ services:
     container_name: portainer
     restart: unless-stopped
     ports:
-      - "9000:9000"  # HTTP UI
+      - "83:9000"  # HTTP UI
       - "9443:9443"  # HTTPS UI
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

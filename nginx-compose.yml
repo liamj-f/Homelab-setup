@@ -13,11 +13,11 @@ services:
       - nginx_data:/data
       - ./letsencrypt:/etc/letsencrypt
     networks:
-      - npm_network
+      - nginx_network
 volumes:
   nginx_data:
     name: nginx_data
 networks:
-  npm_network:
+  nginx_network:
     driver: bridge
     name: nginx_network

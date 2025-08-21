@@ -16,6 +16,7 @@ services:
       - npm_network
 volumes:
   nginx_data:
+  name: nginx_data
 networks:
   npm_network:
     driver: bridge

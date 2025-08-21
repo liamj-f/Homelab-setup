@@ -16,3 +16,8 @@ services:
       - /data/compose/4/etc-pihole:/etc/pihole
       - /data/compose/4/etc-dnsmasq.d:/etc/dnsmasq.d
 
+volumes:
+  pihole_data:
+    name: pihole_data
+  dnsmasq_data:
+    name: dnsmasq_data

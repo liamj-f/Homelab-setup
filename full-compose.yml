@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+
+  # Nginx Proxy Manager
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - "80:80"     # HTTP for all proxied domains
+      - "443:443"   # HTTPS for all proxied domains
+      - "81:81"     # NPM admin UI
+    volumes:
+      - ./npm/data:/data
+      - ./npm/letsencrypt:/etc/letsencrypt
+    networks:
+      - npm_network
+
+  # Pi-hole
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    network_mode: "host"           # needed for DNS port 53
+    environment:
+      TZ: 'Europe/London'
+      FTLCONF_webserver_api_password: ${PIHOLE_WEBPASSWORD}
+      FTLCONF_webserver_port: 82
+      DNS1: 1.1.1.1
+      DNS2: 8.8.8.8
+    volumes:
+      - ./pihole/etc-pihole:/etc/pihole
+      - ./pihole/etc-dnsmasq.d:/etc/dnsmasq.d
+
+  # Portainer
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "83:9000"   # Host port 9000 → container 9000
+      - "9443:9443"   # Host port 9443 → container 9443
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./portainer/data:/data
+    networks:
+      - npm_network
+
+networks:
+  npm_network:
+    driver: bridge

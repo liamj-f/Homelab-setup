@@ -10,10 +10,12 @@ services:
       - "443:443"   # HTTPS
       - "81:81"     # Admin UI
     volumes:
-      - ./data:/data
+      - nginx_data:/data
       - ./letsencrypt:/etc/letsencrypt
     networks:
       - npm_network
+volumes:
+  nginx_data:
 networks:
   npm_network:
     driver: bridge

@@ -11,7 +11,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
-
+    networks:
+      - npm_network
+networks:
+  npm_network:
+    driver: bridge
 volumes:
   portainer_data:
     name: portainer_data

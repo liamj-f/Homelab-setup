@@ -13,8 +13,8 @@ services:
       DNS1: 1.1.1.1
       DNS2: 8.8.8.8
     volumes:
-      - /data/compose/4/etc-pihole:/etc/pihole
-      - /data/compose/4/etc-dnsmasq.d:/etc/dnsmasq.d
+      - pihole_data:/etc/pihole
+      - dnsmasq_data:/etc/dnsmasq.d
 
 volumes:
   pihole_data:

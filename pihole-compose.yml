@@ -15,7 +15,7 @@ services:
     volumes:
       - pihole_data:/etc/pihole
       - dnsmasq_data:/etc/dnsmasq.d
-
+      - ./custom-dns.conf:/etc/dnsmasq.d/99-custom.conf:ro
 volumes:
   pihole_data:
     name: pihole_data

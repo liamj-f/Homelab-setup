@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    ports:
+      - "8080:84"   # Web UI
+      - "8443:443"  # HTTPS if you set up TLS
+    volumes:
+      - /mnt/NextCloudTest:/var/www/html/data
+    environment:
+      - MYSQL_PASSWORD=${MySql_Password}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud_app
+      - MYSQL_HOST=db
+    depends_on:
+      - db
+    networks:
+      - nginx_network
+
+  db:
+    image: mariadb:latest
+    container_name: nextcloud-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MySql_RootPass}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${MySql_Password}
+    volumes:
+      - nextcloud_db_data:/var/lib/mysql
+    networks:
+      - nginx_network
+
+networks:
+  nginx_network:
+    external: true
+
+volumes:
+  nextcloud_db_data:
+    name: nextcloud_db_data
+    external: false

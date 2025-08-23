@@ -13,7 +13,7 @@ services:
       - nginx_data:/data
       - ./letsencrypt:/etc/letsencrypt
     environment:
-      PASSWORD_ADMIN: ${Admin_Passowrd}
+      PASSWORD_ADMIN: ${Admin_Password}
       USERNAME_ADMIN: ${Admin_User}
     extra_hosts:
       - "nginx.14monarch.local:192.168.0.2:81"

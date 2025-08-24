@@ -9,7 +9,7 @@ services:
       - "84:80"   # Web UI
       - "8443:443"  # HTTPS if you set up TLS
     volumes:
-      - /mnt/NextCloudTest:/var/www/html/data
+      - /mnt/NextCloudTest:/var/www/html
     environment:
       - MYSQL_PASSWORD=${MySql_Password}
       - MYSQL_DATABASE=nextcloudp pi ih

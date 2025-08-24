@@ -6,13 +6,13 @@ services:
     container_name: nextcloud
     restart: unless-stopped
     ports:
-      - "84:8080"   # Web UI
+      - "84:80"   # Web UI
       - "8443:443"  # HTTPS if you set up TLS
     volumes:
       - /mnt/NextCloudTest:/var/www/html/data
     environment:
       - MYSQL_PASSWORD=${MySql_Password}
-      - MYSQL_DATABASE=nextcloud
+      - MYSQL_DATABASE=nextcloudp pi ih
       - MYSQL_USER=nextcloud_app
       - MYSQL_HOST=db
     depends_on:
@@ -27,7 +27,7 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=${MySql_RootPass}
       - MYSQL_DATABASE=nextcloud
-      - MYSQL_USER=nextcloud
+      - MYSQL_USER=nextcloud_app
       - MYSQL_PASSWORD=${MySql_Password}
     volumes:
       - nextcloud_db_data:/var/lib/mysql

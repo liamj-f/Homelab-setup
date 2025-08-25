@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  github-runner:
+    image: myoung34/github-runner:latest
+    container_name: github-runner
+    restart: unless-stopped
+    environment:
+      REPO_URL: https://github.com/liamj-f/rpi4-docker
+      RUNNER_NAME: pi-docker-runner
+      RUNNER_WORKDIR: /tmp/github-runner
+      RUNNER_GROUP: default
+      LABELS: self-hosted,docker,pi
+      ACCESS_TOKEN: ${GITHUB_TOKEN}   # registration token or PAT
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./runner-data:/actions-runner  # persist runner config

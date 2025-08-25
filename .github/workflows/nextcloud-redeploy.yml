@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'nginx-compose.yml'
+      - 'nextcloud-compose.yml'
 jobs:
   deploy:
     runs-on: ubuntu-latest

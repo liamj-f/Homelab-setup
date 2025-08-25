@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   github-runner:
-    image: myoung34/github-runner:latest-arm64
+    image: myoung34/github-runner:ubuntu-focal
     container_name: github-runner
     restart: unless-stopped
     environment:

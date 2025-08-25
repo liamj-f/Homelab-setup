@@ -4,7 +4,7 @@ services:
   github-runner:
     image: myoung34/github-runner:latest
     container_name: github-runner
-    restart: unless-stopped
+    restart: no
     environment:
       REPO_URL: https://github.com/liamj-f/rpi4-docker
       RUNNER_NAME: pi4-runner

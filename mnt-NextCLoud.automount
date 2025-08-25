@@ -1,0 +1,8 @@
+[Unit]
+Description=Automount router USB share for Nextcloud
+
+[Automount]
+Where=/mnt/NextCloud
+
+[Install]
+WantedBy=multi-user.target

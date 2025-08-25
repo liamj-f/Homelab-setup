@@ -9,7 +9,8 @@ services:
       - "84:80"   # Web UI
       - "8443:443"  # HTTPS if you set up TLS
     volumes:
-      - /mnt/NextCloud:/var/www/html
+      - nextcloud_data:/var/www/html
+      - /mnt/NextCloud:/mnt/NextCLoud
     environment:
       - MYSQL_PASSWORD=${MySql_Password}
       - MYSQL_DATABASE=nextcloud
@@ -42,3 +43,6 @@ volumes:
   nextcloud_db_data:
     name: nextcloud_db_data
     external: false
+  nextcloud_data:
+    name: nextcloud_data
+    

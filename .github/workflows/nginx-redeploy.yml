@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'nginx/docker-compose.yml'
+      - 'nginx-compose.yml'
 
 jobs:
   deploy:

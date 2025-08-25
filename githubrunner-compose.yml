@@ -2,13 +2,17 @@ version: "3.9"
 
 services:
   github-runner:
-    image: summerwind/actions-runner:latest
+    image: myoung34/github-runner:latest
     container_name: github-runner
     restart: unless-stopped
     environment:
-      RUNNER_REPO: https://github.com/liamj-f/rpi4-docker
+      REPO_URL: https://github.com/liamj-f/rpi4-docker
       RUNNER_NAME: pi4-runner
-      LABELS: self-hosted,docker,pi
-      RUNNER_TOKEN: ${GITHUB_TOKEN}   # registration token or PAT
+      RUNNER_WORKDIR: /tmp/github-runner
+      RUNNER_GROUP: default
+      LABELS: self-hosted,arm64,pi
+      ACCESS_TOKEN: ${GITHUB_TOKEN}
     volumes:
-      - ./runner-data:/actions-runner  # persist runner config
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./runner-data:/actions-runner
+

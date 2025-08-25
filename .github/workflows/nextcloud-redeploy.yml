@@ -27,3 +27,11 @@ jobs:
         run: |
           curl -X POST \
             http://portainer.14monarch.local/api/stacks/webhooks/ee38b35e-35c4-4091-92b9-679a3e6cfc77
+      - name: Rescan files in external drive
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: liam-pi4
+          username: ${{ secrets.PI_USER }}
+          password: ${{ secrets.PI_PASSWORD }}
+          script: |
+            docker exec -u www-data nextcloud php occ files:scan --all

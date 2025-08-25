@@ -1,4 +1,4 @@
-name: Redeploy Nginx via Portainer GitOps
+name: Redeploy Pihole via Portainer GitOps
 
 on:
   push:

@@ -1,0 +1,14 @@
+[Unit]
+Description=Mount router USB share for Nextcloud
+After=network-online.target
+Wants=network-online.target
+
+[Mount]
+What=//192.168.0.1/I
+Where=/mnt/NextCloud
+Type=cifs
+Options=username=liamjf,password=${FileSharePassword},vers=2.0,uid=1000,gid=1000
+TimeoutSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -11,7 +11,7 @@ services:
       RUNNER_WORKDIR: /tmp/github-runner
       RUNNER_GROUP: default
       LABELS: self-hosted,arm64,pi
-      ACCESS_TOKEN: ${GITHUB_TOKEN}
+      ACCESS_TOKEN: ${{secrets.RUNNER_REG_TOKEN}}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./runner-data:/actions-runner

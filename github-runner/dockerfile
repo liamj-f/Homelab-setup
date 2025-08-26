@@ -1,14 +1,17 @@
 FROM ubuntu:20.04
 
-# Install deps
+# Install dependencies
 RUN apt-get update && \
     apt-get install -y curl tar git sudo && \
     rm -rf /var/lib/apt/lists/*
 
-# Set runner version
+# Runner version
 ENV RUNNER_VERSION=2.328.0
 
-# Download runner for ARM64 (aarch64)
+# Create work directory
+WORKDIR /actions-runner
+
+# Download and extract GitHub runner (arm64 build for Pi4)
 RUN curl -sSL -o actions-runner.tar.gz \
       https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz \
     && tar xzf actions-runner.tar.gz \

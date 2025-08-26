@@ -2,17 +2,14 @@ version: "3.9"
 
 services:
   github-runner:
-    image: tcardonne/github-runner:latest
+    build: ./github-runner        # uses Dockerfile + entrypoint.sh in ./github-runner/
     container_name: github-runner
     restart: unless-stopped
     environment:
       REPO_URL: https://github.com/liamj-f/rpi4-docker
+      RUNNER_TOKEN: ${RUNNER_TOKEN}         # set this in Portainer or an .env file
       RUNNER_NAME: pi4-runner
       RUNNER_WORKDIR: /tmp/github-runner
-      RUNNER_GROUP: default
       LABELS: self-hosted,arm64,pi
-      RUNNER_TOKEN: ${RUNNER_REG_TOKEN}
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./runner-data:/actions-runner
-
+      - ./runner-data:/actions-runner      # persist runner state

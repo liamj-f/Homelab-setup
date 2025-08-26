@@ -1,16 +1,23 @@
 FROM ubuntu:20.04
 
-# Install dependencies for GitHub runner + .NET 6
+# Install dependencies including .NET 6 runtime libs
 RUN apt-get update && apt-get install -y \
-    curl tar git sudo libicu67 libssl1.1 libkrb5-3 zlib1g libgcc-s1 \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    tar \
+    git \
+    sudo \
+    libicu63 \
+    libssl1.1 \
+    libkrb5-3 \
+    zlib1g \
+    libgcc-s1 \
+ && rm -rf /var/lib/apt/lists/*
 
 # Create runner user
 RUN useradd -m runner
-
 WORKDIR /actions-runner
 
-# Download runner
+# Download GitHub runner ARM64 v2.328.0
 ARG RUNNER_VERSION=2.328.0
 RUN curl -sSL -o actions-runner.tar.gz \
       https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz \

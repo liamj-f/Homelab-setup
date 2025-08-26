@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  github-runner:
+    build: .
+    container_name: github-runner
+    restart: always
+    environment:
+      REPO_URL: "https://github.com/liamj-f/rpi4-docker"
+      RUNNER_TOKEN: "${RUNNER_TOKEN}"   # set in Portainer as a secret/env var
+    volumes:
+      - runner_data:/runner_data
+    networks:
+      - nginx_network
+
+volumes:
+  runner_data:
+
+networks:
+  nginx_network:
+    external: true

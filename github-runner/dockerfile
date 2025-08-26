@@ -1,0 +1,14 @@
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y curl jq git sudo
+
+ARG RUNNER_VERSION=2.327.0
+RUN curl -L -o actions-runner.tar.gz \
+    https://github.com/actions/runner/releases/download/v2.328.0/actions-runner-linux-arm64-v2.328.0.tar.gz \
+ && tar xzf actions-runner.tar.gz \
+ && rm actions-runner.tar.gz
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

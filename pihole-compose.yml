@@ -10,7 +10,7 @@ services:
       TZ: 'Europe/London'
       FTLCONF_webserver_api_password: ${PIHOLE_WEBPASSWORD}
       FTLCONF_webserver_port: 82
-      FTLCONF_dns_listeningMode: 'ALL'       # Listen on all interfaces
+      FTLCONF_dns_listeningMode: 'single'       # Listen on both interfaces
       FTLCONF_dns_interface: 'eth0,wg0'     # Limit queries to these interfaces
       DNS1: 1.1.1.1
       DNS2: 8.8.8.8

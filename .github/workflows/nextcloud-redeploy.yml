@@ -19,8 +19,6 @@ jobs:
           sudo apt-get install -y wireguard resolvconf
       - name: Install systemd-resolved
         run: |
-          sudo apt-get update
-          sudo apt-get install -y systemd-resolved
           sudo systemctl start systemd-resolved
           sudo systemctl enable systemd-resolved
       - name: Write WireGuard config
@@ -41,10 +39,6 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show
-      - name: Check DNS setup
-        run: |
-          cat /etc/resolv.conf
-          resolvectl status
       - name: Configure split DNS
         run: |
           sudo resolvectl dns wg0 192.168.0.2   # your Pi-hole IP
@@ -53,6 +47,8 @@ jobs:
         run: |
           cat /etc/resolv.conf
           resolvectl status
+          resolvectl query portainer.14monarch.local
+          resolvectl query github.com
       - name: Call Portainer webhook
         run: |
           curl -X POST \

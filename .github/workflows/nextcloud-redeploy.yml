@@ -49,7 +49,7 @@ jobs:
           resolvectl status
           ping -c 1 192.168.0.2
           nc -vz 192.168.0.2 53
-
+          dig @192.168.0.2 portainer.14monarch.local +short
       - name: Call Portainer webhook
         run: |
           curl -X POST \

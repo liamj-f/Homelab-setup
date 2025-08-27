@@ -49,6 +49,10 @@ jobs:
         run: |
           sudo resolvectl dns wg0 192.168.0.2   # your Pi-hole IP
           sudo resolvectl domain wg0 '~local'   # only .local via wg0
+      - name: Check DNS setup
+        run: |
+          cat /etc/resolv.conf
+          resolvectl status
       - name: Call Portainer webhook
         run: |
           curl -X POST \

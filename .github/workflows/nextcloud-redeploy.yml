@@ -47,8 +47,9 @@ jobs:
         run: |
           cat /etc/resolv.conf
           resolvectl status
-          resolvectl query portainer.14monarch.local
-          resolvectl query github.com
+          ping -c 1 192.168.0.2
+          nc -vz 192.168.0.2 53
+
       - name: Call Portainer webhook
         run: |
           curl -X POST \

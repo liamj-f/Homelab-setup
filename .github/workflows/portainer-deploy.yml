@@ -38,7 +38,7 @@ jobs:
       - name: Copy compose file to Pi
         uses: appleboy/scp-action@v0.1.1
         with:
-          host: 192.138.0.2
+          host: 192.168.0.2
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           source: portainer-compose.yml

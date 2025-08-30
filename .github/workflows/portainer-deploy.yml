@@ -38,7 +38,7 @@ jobs:
       - name: Remove Swarm Stack
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: liam-pi4
+          host: portainer.14monarch.local
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
@@ -46,7 +46,7 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: liam-pi4
+          host: portainer.14monarch.local
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |

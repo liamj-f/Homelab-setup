@@ -38,7 +38,7 @@ jobs:
       - name: Copy compose file to Pi
         uses: appleboy/scp-action@v0.1.1
         with:
-          host: portainer.14monarch.local
+          host: liam-pi4
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           source: portainer-compose.yml
@@ -48,7 +48,7 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: portainer.14monarch.local
+          host: liam-pi4
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |

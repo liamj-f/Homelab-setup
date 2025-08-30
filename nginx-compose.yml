@@ -15,6 +15,12 @@ services:
     environment:
       PASSWORD_ADMIN: ${Admin_Password}
       USERNAME_ADMIN: ${Admin_User}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     extra_hosts:
        - "nginx.14monarch.local:192.168.0.2:81"
        - "pihole.14monarch.local:192.168.0.2:82"

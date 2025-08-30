@@ -1,4 +1,4 @@
-name: Redeploy Portaianer via Portainer GitOps
+name: Redeploy Portainer via Portainer GitOps
 
 on:
   push:
@@ -34,15 +34,7 @@ jobs:
       - name: Bring up VPN
         run: |
           sudo wg-quick up ./wg0.conf
-          sudo wg show
-      - name: Remove Swarm Stack
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: portainer.14monarch.local
-          username: ${{ secrets.PI_USER }}
-          password: ${{ secrets.PI_PASSWORD }}
-          script: |
-            docker stack rm portainer          
+          sudo wg show      
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:

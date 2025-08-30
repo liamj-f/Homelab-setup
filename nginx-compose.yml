@@ -16,10 +16,10 @@ services:
       PASSWORD_ADMIN: ${Admin_Password}
       USERNAME_ADMIN: ${Admin_User}
     extra_hosts:
-      - "nginx.14monarch.local:192.168.0.2:81"
-      - "pihole.14monarch.local:192.168.0.2:82"
-      - "portainer.14monarch.local:192.168.0.2:83"
-      - "nextcloud.14monarch.local:192.168.0.2:84"
+#      - "nginx.14monarch.local:192.168.0.2:81"
+#      - "pihole.14monarch.local:192.168.0.2:82"
+#      - "portainer.14monarch.local:192.168.0.2:83"
+#      - "nextcloud.14monarch.local:192.168.0.2:84"
     networks:
       - nginx_network
 volumes:

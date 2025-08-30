@@ -42,7 +42,8 @@ jobs:
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           source: portainer-compose.yml
-          target: ~/stacks/portainer/docker-compose.yml
+          target: ~/stacks/portainer/       
+          overwrite: true  
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0

@@ -11,6 +11,12 @@ services:
     volumes:
       - nextcloud_data:/var/www/html
       - /mnt/NextCloud:/mnt/NextCLoud
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/status.php || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     environment:
       - MYSQL_PASSWORD=${MySql_Password}
       - MYSQL_DATABASE=nextcloud

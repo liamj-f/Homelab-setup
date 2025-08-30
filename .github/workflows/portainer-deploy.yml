@@ -34,7 +34,15 @@ jobs:
       - name: Bring up VPN
         run: |
           sudo wg-quick up ./wg0.conf
-          sudo wg show     
+          sudo wg show
+      - name: Remove Swarm Stack
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: portainer.14monarch.local
+          username: ${{ secrets.PI_USER }}
+          password: ${{ secrets.PI_PASSWORD }}
+          script: |
+            docker stack rm portainer          
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -42,11 +50,16 @@ jobs:
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
-            cd ~/stacks/portainer
-            cat > docker-compose.yml <<'EOF'
-            $(cat portainer-compose.yml)
-            EOF
-            docker compose up -d
+           # ensure target directory exists
+           mkdir -p ~/stacks/portainer
+           cd ~/stacks/portainer
+
+           # write docker-compose.yml from GitHub repo
+           cat > docker-compose.yml <<'EOF'
+           $(cat ./portainer-compose.yml)
+           EOF
+           # deploy the stack
+           docker compose up -d
 #      - name: Call Portainer webhook
 #        run: |
 #          curl -X POST \

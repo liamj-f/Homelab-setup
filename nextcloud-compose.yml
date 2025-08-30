@@ -40,6 +40,12 @@ services:
       - nextcloud_db_data:/var/lib/mysql
     networks:
       - nginx_network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -pexample || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
 networks:
   nginx_network:

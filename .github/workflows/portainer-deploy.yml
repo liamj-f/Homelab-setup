@@ -35,16 +35,18 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show      
-      - name: Copy compose file to Pi
+      - name: Render Portainer compose
+        run: |
+          envsubst < portainer-compose.yml > portainer-compose.rendered.yml
+      - name: Copy rendered compose
         uses: appleboy/scp-action@v0.1.1
         with:
           host: 192.168.0.2
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
-          source: portainer-compose.yml
-          target: ~/stacks/portainer/       
-          overwrite: true  
-
+          source: portainer-compose.rendered.yml
+          target: ~/stacks/portainer/
+          overwrite: true
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -53,9 +55,7 @@ jobs:
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             cd ~/stacks/portainer
-            docker compose pull
-            docker compose up -d
-            docker compose ps
+            docker compose -f portainer-compose.rendered.yml up -d
 
             
 #      - name: Call Portainer webhook

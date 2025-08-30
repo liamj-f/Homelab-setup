@@ -53,7 +53,11 @@ jobs:
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             cd ~/stacks/portainer
+            docker compose pull
             docker compose up -d
+            docker compose ps
+
+            
 #      - name: Call Portainer webhook
 #        run: |
 #          curl -X POST \

@@ -35,6 +35,15 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show      
+      - name: Copy compose file to Pi
+        uses: appleboy/scp-action@v0.1.1
+        with:
+          host: portainer.14monarch.local
+          username: ${{ secrets.PI_USER }}
+          password: ${{ secrets.PI_PASSWORD }}
+          source: portainer-compose.yml
+          target: ~/stacks/portainer/docker-compose.yml
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -42,16 +51,8 @@ jobs:
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
-           # ensure target directory exists
-           mkdir -p ~/stacks/portainer
-           cd ~/stacks/portainer
-
-           # write docker-compose.yml from GitHub repo
-           cat > docker-compose.yml <<'EOF'
-           $(cat ./portainer-compose.yml)
-           EOF
-           # deploy the stack
-           docker compose up -d
+            cd ~/stacks/portainer
+            docker compose up -d
 #      - name: Call Portainer webhook
 #        run: |
 #          curl -X POST \

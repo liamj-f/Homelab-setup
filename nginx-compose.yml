@@ -16,7 +16,7 @@ services:
       PASSWORD_ADMIN: ${Admin_Password}
       USERNAME_ADMIN: ${Admin_User}
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost || exit 1"]
+      test: ["CMD", "/usr/bin/check-health"]
       interval: 30s
       timeout: 10s
       retries: 3

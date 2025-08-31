@@ -41,7 +41,7 @@ services:
     networks:
       - nginx_network
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -pexample || exit 1"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 30s
       timeout: 10s
       retries: 5

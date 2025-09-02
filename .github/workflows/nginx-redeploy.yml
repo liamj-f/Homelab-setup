@@ -9,6 +9,11 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+
+      NPM_NEW_EMAIL: liamjamesfagg+nginx@gmail.com
+      NPM_NEW_USERNAME: liam
+      NPM_NEW_PASSWORD: ${{ secrets.NPM_PASSWORD }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -38,21 +43,52 @@ jobs:
         run: |
           curl -X POST \
             http://192.168.0.2:83/api/stacks/webhooks/7426bee3-707e-4643-9066-9e3dedb565f8
-      - name: Get NPM auth token
-        id: get_token
+          
+      - name: Get initial token
+        id: token
         run: |
-          RESPONSE=$(curl -s -X POST "http://192.168.0.2:81/api/tokens" \
+          RESPONSE=$(curl -s -X POST "http://http://192.168.0.2:81/api/tokens" \
             -H "Content-Type: application/json" \
             -d '{"identity": "admin@example.com", "secret": "changeme"}')
-          echo "response=$RESPONSE"
-
           TOKEN=$(echo "$RESPONSE" | grep -oP '"token"\s*:\s*"\K[^"]+')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Get default user ID
+        id: user
+        run: |
+          RESPONSE=$(curl -s -X GET "http://http://192.168.0.2:81/api/users" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+            -H "Content-Type: application/json")
+          USER_ID=$(echo "$RESPONSE" | grep -oP '"id"\s*:\s*\K\d+' | head -n1)
+          echo "user_id=$USER_ID" >> $GITHUB_OUTPUT
+
+      - name: Update default user
+        run: |
+          curl -s -X PATCH "http://http://192.168.0.2:81/api/users/${{ steps.user.outputs.user_id }}" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+                  \"first_name\": \"liamj-f\",
+                  \"last_name\": \"\",
+                  \"email\": \"liamjamesfagg+nginx@gmail.com",
+                  \"password\": \"$NPM_NEW_PASSWORD\",
+                  \"username\": \"$NPM_NEW_USERNAME\"
+                }"
+
+      - name: Re-authenticate as new user
+        id: token2
+        run: |
+          RESPONSE=$(curl -s -X POST "http://http://192.168.0.2:81/api/tokens" \
+            -H "Content-Type: application/json" \
+            -d "{\"identity\":\"$NPM_NEW_EMAIL\",\"secret\":\"${{ secrets.NPM_PASSWORD }}\"}")
+          TOKEN=$(echo "$RESPONSE" | grep -oP '"token"\s*:\s*"\K[^"]+')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+        
 
 
       - name: Create Proxy Hosts
         run: |
-          TOKEN="${{ steps.get_token.outputs.token }}"
+          TOKEN="${{ steps.token2.outputs.token }}"
           declare -A hosts
           hosts["nginx.14monarch.local"]="192.168.0.2:81"
           hosts["pihole.14monarch.local"]="192.168.0.2:82"

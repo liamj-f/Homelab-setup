@@ -5,6 +5,9 @@ services:
     image: jc21/nginx-proxy-manager:latest
     container_name: nginx-proxy-manager
     restart: unless-stopped
+    environment:
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
+      INITIAL_ADMIN_PASSWORD:  ${INITIAL_ADMIN_PASSWORD}
     ports:
       - "80:80"     # HTTP
       - "443:443"   # HTTPS
@@ -12,21 +15,6 @@ services:
     volumes:
       - nginx_data:/data
       - ./letsencrypt:/etc/letsencrypt
-    environment:
-      PASSWORD_ADMIN: ${Admin_Password}
-      USERNAME_ADMIN: ${Admin_User}
-    healthcheck:
-      test: ["CMD", "/usr/bin/check-health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    extra_hosts:
-       - "nginx.14monarch.local:192.168.0.2:81"
-       - "pihole.14monarch.local:192.168.0.2:82"
-       - "portainer.14monarch.local:192.168.0.2:83"
-       - "nextcloud.14monarch.local:192.168.0.2:84"
-       - "tplink.14monarch.local:192.168.0.1:80
     networks:
       - nginx_network
 volumes:

@@ -9,11 +9,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-
-      NPM_NEW_EMAIL: liamjamesfagg+nginx@gmail.com
-      NPM_NEW_USERNAME: liam
-      NPM_NEW_PASSWORD: ${{ secrets.NPM_PASSWORD }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -47,7 +42,7 @@ jobs:
       - name: Authenticate as new user
         id: token
         run: |
-          RESPONSE=$(curl -s -X POST "http://http://192.168.0.2:81/api/tokens" \
+          RESPONSE=$(curl -s -X POST "http://192.168.0.2:81/api/tokens" \
             -H "Content-Type: application/json" \
             -d "{"identity":"${{ secrets.NGINX_EMAIL}}", "secret":"${{ secrets.NGINX_PASSWORD }}"}")
           TOKEN=$(echo "$RESPONSE" | grep -oP '"token"\s*:\s*"\K[^"]+')

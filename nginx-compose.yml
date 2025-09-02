@@ -5,6 +5,9 @@ services:
     image: jc21/nginx-proxy-manager:latest
     container_name: nginx-proxy-manager
     restart: unless-stopped
+    environment:
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
+      INITIAL_ADMIN_PASSWORD:  ${INITIAL_ADMIN_PASSWORD}
     ports:
       - "80:80"     # HTTP
       - "443:443"   # HTTPS

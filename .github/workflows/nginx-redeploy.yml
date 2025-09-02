@@ -37,4 +37,41 @@ jobs:
       - name: Call Portainer webhook
         run: |
           curl -X POST \
-            http://portainer.14monarch.local/api/stacks/webhooks/b3d425e0-b2ff-4ab2-8da4-ef7bdb49485c
+            http://192.168.0.2:83/api/stacks/webhooks/7426bee3-707e-4643-9066-9e3dedb565f8
+      - name: Get NPM auth token
+        id: get_token
+        run: |
+          RESPONSE=$(curl -s -X POST "http://192.168.0.2:81/api/tokens" \
+            -H "Content-Type: application/json" \
+            -d '{"identity": "admin@example.com", "secret": "changeme"}')
+          echo "response=$RESPONSE" >> $GITHUB_OUTPUT
+          TOKEN=$(echo $RESPONSE | jq -r .token)
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Create Proxy Hosts
+        run: |
+          TOKEN="${{ steps.get_token.outputs.token }}"
+          declare -A hosts
+          hosts["nginx.14monarch.local"]="192.168.0.2:81"
+          hosts["pihole.14monarch.local"]="192.168.0.2:82"
+          hosts["portainer.14monarch.local"]="192.168.0.2:83"
+          hosts["nextcloud.14monarch.local"]="192.168.0.2:84"
+          hosts["tplink.14monarch.local"]="192.168.0.1:80"
+
+          for domain in "${!hosts[@]}"; do
+            host="${hosts[$domain]}"
+            host_ip="${host%%:*}"
+            host_port="${host##*:}"
+
+            curl -s -X POST "http://192.168.0.2:81/api/nginx/proxy-hosts" \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "domain_names": ["'"$domain"'"],
+                "forward_host": "'"$host_ip"'",
+                "forward_port": '"$host_port"',
+                "scheme": "http",
+                "ssl_forced": false,
+                "enabled": true
+              }' | jq
+          done

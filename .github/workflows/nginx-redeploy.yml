@@ -44,9 +44,11 @@ jobs:
           RESPONSE=$(curl -s -X POST "http://192.168.0.2:81/api/tokens" \
             -H "Content-Type: application/json" \
             -d '{"identity": "admin@example.com", "secret": "changeme"}')
-          echo "response=$RESPONSE" >> $GITHUB_OUTPUT
-          TOKEN=$(echo $RESPONSE | jq -r .token)
+          echo "response=$RESPONSE"
+
+          TOKEN=$(echo "$RESPONSE" | grep -oP '"token"\s*:\s*"\K[^"]+')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
 
       - name: Create Proxy Hosts
         run: |

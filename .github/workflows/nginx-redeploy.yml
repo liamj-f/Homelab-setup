@@ -72,7 +72,7 @@ jobs:
                 "domain_names": ["'"$domain"'"],
                 "forward_host": "'"$host_ip"'",
                 "forward_port": '"$host_port"',
-                "scheme": "http",
+                "forward_scheme": "http",
                 "ssl_forced": false,
                 "enabled": true
               }' | jq

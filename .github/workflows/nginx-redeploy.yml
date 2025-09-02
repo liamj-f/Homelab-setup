@@ -49,7 +49,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X POST "http://http://192.168.0.2:81/api/tokens" \
             -H "Content-Type: application/json" \
-            -d "{"identity":""  "secret":"${{ secrets.NGINX_PASSWORD }}"}")
+            -d "{"identity":"${{ secrets.NGINX_EMAIL}}", "secret":"${{ secrets.NGINX_PASSWORD }}"}")
           TOKEN=$(echo "$RESPONSE" | grep -oP '"token"\s*:\s*"\K[^"]+')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
         

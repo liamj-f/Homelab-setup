@@ -3,7 +3,7 @@ name: Install Docker
 on:
   workflow_dispatch:
 jobs:
-  deploy:
+  install_docker:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -37,7 +37,9 @@ jobs:
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
-            for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do sudo apt-get remove $pkg; done
+            for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
+              sudo apt-get remove -y --allow-change-held-packages $pkg || true
+            done
       - name: Add Docker repository
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -63,3 +65,7 @@ jobs:
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  deploy_portainer: 
+    uses: liamj-f/rpi4-docker/.github/workflows/portainer-deploy.yml@v1
+    
+    

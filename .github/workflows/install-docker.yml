@@ -1,0 +1,53 @@
+name: Install Docker
+
+on:
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Install WireGuard
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wireguard resolvconf
+      - name: Write WireGuard config
+        run: |
+          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+      - name: Resolve DDNS and update wg0.conf
+        run: |
+          sudo apt-get update && sudo apt-get install -y dnsutils
+          ip=$(dig +short 14monarch.tplinkdns.com @8.8.8.8 | tail -n1)
+          if [ -z "$ip" ]; then
+          echo "❌ Failed to resolve 14monarch.tplinkdns.com"
+          exit 1
+          fi
+          echo "✅ Resolved 14monarch.tplinkdns.com to $ip"
+          sudo sed -i "s|14monarch.tplinkdns.com|$ip|" wg0.conf
+          echo "🔧 Updated wg0.conf to use $ip instead of DDNS"
+      - name: Bring up VPN
+        run: |
+          sudo wg-quick up ./wg0.conf
+          sudo wg show
+      - name: Uninstall old Docker
+        run: |
+          for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do sudo apt-get remove $pkg; done
+      - name: Add Docker repository
+        run:  |
+          # Add Docker's official GPG key:
+          sudo apt-get update
+          sudo apt-get install ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+          
+          # Add the repository to Apt sources:
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get update
+      - name: Install Docker packages
+        run: |
+          sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin

@@ -7,6 +7,7 @@ on:
     paths:
       - 'portainer-compose.yml'
   workflow_dispatch:
+  workflow_call:
 jobs:
   deploy:
     runs-on: ubuntu-latest

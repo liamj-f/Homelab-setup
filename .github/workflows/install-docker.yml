@@ -76,5 +76,6 @@ jobs:
             sudo systemctl status docker --no-pager
   deploy_portainer: 
     uses: liamj-f/rpi4-docker/.github/workflows/portainer-deploy.yml@ljf-docker-installation
+    secrets: inherit
     
     

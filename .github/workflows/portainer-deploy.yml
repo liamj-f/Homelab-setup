@@ -36,6 +36,14 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show      
+      - name: Create External resources if required
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 192.168.0.2
+          username: ${{ secrets.PI_USER }}
+          password: ${{ secrets.PI_PASSWORD }}
+          script: |
+            sudo docker network inspect nginx_network >/dev/null 2>&1 || sudo docker network create nginx_network
       - name: Render Portainer compose
         run: |
           envsubst < portainer-compose.yml > portainer-compose.rendered.yml

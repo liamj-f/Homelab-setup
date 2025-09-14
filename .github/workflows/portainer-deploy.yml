@@ -56,7 +56,7 @@ jobs:
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             cd ~/stacks/portainer
-            docker compose -f portainer-compose.rendered.yml up -d
+            sudo docker compose -f portainer-compose.rendered.yml up -d
 
             
 #      - name: Call Portainer webhook

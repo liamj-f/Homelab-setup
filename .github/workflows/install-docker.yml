@@ -79,11 +79,11 @@ jobs:
     needs: install_docker
     secrets: inherit
   deploy_pihole:
-    uses: liamj-f/rpi4-docker/.github/workflows/pihole-deploy.yml@main
+    uses: liamj-f/rpi4-docker/.github/workflows/pihole-redeploy.yml@main
     needs: deploy_portainer
     secrets: inherit
   deploy_nginx:
-    uses: liamj-f/rpi4-docker/.github/workflows/nginx-deploy.yml@main
+    uses: liamj-f/rpi4-docker/.github/workflows/nginx-redeploy.yml@main
     needs: deploy_pihole
     secrets: inherit
     

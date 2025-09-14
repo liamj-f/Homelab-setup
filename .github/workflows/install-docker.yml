@@ -3,7 +3,7 @@ name: Install Docker
 on:
   workflow_dispatch:
 jobs:
-  deploy:
+  install_docker:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -31,23 +31,51 @@ jobs:
           sudo wg-quick up ./wg0.conf
           sudo wg show
       - name: Uninstall old Docker
-        run: |
-          for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do sudo apt-get remove $pkg; done
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 192.168.0.2
+          username: ${{ secrets.PI_USER }}
+          password: ${{ secrets.PI_PASSWORD }}
+          script: |
+            for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
+              sudo apt-get remove -y --allow-change-held-packages $pkg || true
+            done
       - name: Add Docker repository
-        run:  |
-          # Add Docker's official GPG key:
-          sudo apt-get update
-          sudo apt-get install ca-certificates curl
-          sudo install -m 0755 -d /etc/apt/keyrings
-          sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-          sudo chmod a+r /etc/apt/keyrings/docker.asc
-          
-          # Add the repository to Apt sources:
-          echo \
-            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
-            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 192.168.0.2
+          username: ${{ secrets.PI_USER }}
+          password: ${{ secrets.PI_PASSWORD }}
+          script: |
+            sudo apt-get update
+            sudo apt-get install ca-certificates curl
+            sudo install -m 0755 -d /etc/apt/keyrings
+            sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+            sudo chmod a+r /etc/apt/keyrings/docker.asc
+            echo \
+              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+              $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
             sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-          sudo apt-get update
+            sudo apt-get update
       - name: Install Docker packages
-        run: |
-          sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 192.168.0.2
+          username: ${{ secrets.PI_USER }}
+          password: ${{ secrets.PI_PASSWORD }}
+          script: |
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      - name: Ensure Docker is running
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 192.168.0.2
+          username: ${{ secrets.PI_USER }}
+          password: ${{ secrets.PI_PASSWORD }}
+          script: |
+            sudo systemctl enable --now docker
+            sudo systemctl status docker --no-pager
+  deploy_portainer: 
+    uses: liamj-f/rpi4-docker/.github/workflows/portainer-deploy.yml@main
+    secrets: inherit
+    
+    

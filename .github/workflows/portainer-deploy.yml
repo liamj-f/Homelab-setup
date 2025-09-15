@@ -77,9 +77,44 @@ jobs:
           curl -s -X POST "192.168.0.2:83/api//users/admin/init" \
           -H "Content-Type: application/json" \
           -d "{\"Username\": \"${{ secrets.PORTAINER_USER }}\", \"Password\": \"${{ secrets.PORTAINER_PASSWORD }}\"}"
-      - name: Create portainer environment
+
+      - name: Authenticate with Portainer
+        id: auth
+        run: |
+          RESPONSE=$(curl -s -X POST "192.168.0.2:83/api/auth" \
+            -H "Content-Type: application/json" \
+            -d "{\"Username\": \"${{ secrets.PORTAINER_USER }}\", \"Password\": \"${{ secrets.PORTAINER_PASSWORD }}\"}")
+          TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Check if Local Docker Environment Exists
+        id: check_env
+        run: |
+         ENDPOINTS=$(curl -s -X GET "192.168.0.2:83/api/endpoints" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+         EXISTS=$(echo "$ENDPOINTS" | grep -c 'unix:///var/run/docker.sock')
+         if [ "$EXISTS" -gt 0 ]; then
+           echo "Local Docker environment already exists."
+           echo "env_exists=true" >> $GITHUB_OUTPUT
+         else
+          echo "env_exists=false" >> $GITHUB_OUTPUT
+         fi
+
+      - name: Create Local Docker Environment
+        if: steps.check_env.outputs.env_exists == 'false'
+        run: |
+          curl -s -X POST "192.168.0.2:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "Name": "Local Docker",
+              "EndpointType": 1,
+              "URL": "unix:///var/run/docker.sock",
+              "GroupID": 1,
+              "PublicURL": "",
+              "TLS": false
+          }'
       
-          
 #      - name: Call Portainer webhook
 #        run: |
 #          curl -X POST \

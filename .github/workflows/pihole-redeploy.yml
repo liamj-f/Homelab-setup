@@ -80,6 +80,9 @@ jobs:
               "Webhook": true
               }
             }'
+
+            echo "API Response: $RESPONSE"
+            echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
       - name: Get Webhook URL
         id: get_webhook
         run: |

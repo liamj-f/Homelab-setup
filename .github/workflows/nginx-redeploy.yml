@@ -48,9 +48,9 @@ jobs:
       - name: Check if Stack Exists
         id: check_stack
         run: |
-          STACKS=$(curl -s -X GET "192.168.0.2:83/api/stacks" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || true)
-          EXISTS=$(echo "$STACKS" | grep -c '"Name":"nginx"')
+          STACKS=$(curl -s --fail -X GET "http://192.168.0.2:83/api/stacks" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
+          EXISTS=$(echo "$STACKS" | grep -c '"Name":"Nginx"' || true)
           echo "stack_exists=$EXISTS" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub

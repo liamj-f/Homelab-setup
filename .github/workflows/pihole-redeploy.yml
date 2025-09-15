@@ -71,7 +71,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "Name": "nginx",
+              "Name": "pihole",
               "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
               "RepositoryReferenceName": "refs/heads/main",
               "ComposeFilePath": "pihole-compose.yml",

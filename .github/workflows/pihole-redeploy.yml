@@ -72,7 +72,6 @@ jobs:
             }'
 
       - name: Trigger Webhook if Stack Exists
-        if: steps.check_stack.outputs.stack_exists != '0'
         run: |
           echo "Triggering webhook..."
           STACKS=$(curl -s -X GET "${{ secrets.PORTAINER_URL }}/api/stacks" \

@@ -86,7 +86,7 @@ jobs:
       - name: Get Webhook URL
         id: get_webhook
         run: |
-          STACKS=$(curl -s -X GET "http://192.168.0.2:83/api/stacks" \
+          STACKS=$(curl -v -s -X GET "http://192.168.0.2:83/api/stacks" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
 
           WEBHOOK_URL=$(echo "$STACKS" | grep -o '"Webhook":[^,]*' | grep 'Pihole' -A1 | head -n1 | grep -o 'http[^"]*')

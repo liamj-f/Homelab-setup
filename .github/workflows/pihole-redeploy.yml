@@ -39,7 +39,7 @@ jobs:
       - name: Authenticate to Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -s -X POST "192.168.0.2:83/api/auth" \
+          RESPONSE=$(curl -X POST "192.168.0.2:83/api/auth" \
             -H "Content-Type: application/json" \
             -d "{\"Username\": \"${{ secrets.PORTAINER_USER }}\", \"Password\": \"${{ secrets.PORTAINER_PASSWORD }}\"}")
           TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
@@ -48,7 +48,7 @@ jobs:
       - name: Check if Stack Exists
         id: check_stack
         run: |
-          STACKS=$(curl -s --fail -X GET "http://192.168.0.2:83/api/stacks" \
+          STACKS=$(curl --fail -X GET "http://192.168.0.2:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
           EXISTS=$(echo "$STACKS" | grep -c '"Name":"Pihole"' || true)
           echo "stack_exists=$EXISTS" >> $GITHUB_OUTPUT
@@ -57,7 +57,7 @@ jobs:
         if: steps.check_stack.outputs.stack_exists == '0'
         run: |
           echo "Creating stack from GitHub..."
-          curl -s -X POST "192.168.0.2:83/api/stacks?type=1&method=repository&endpointId=1" \
+          curl -X POST "192.168.0.2:83/api/stacks?type=1&method=repository&endpointId=1" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
@@ -71,10 +71,10 @@ jobs:
               }
             }'
 
-      - name: Trigger Webhook if Stack Exists
+      - name: Trigger Webhook
         run: |
           echo "Triggering webhook..."
-          STACKS=$(curl -s -X GET "${{ secrets.PORTAINER_URL }}/api/stacks" \
+          STACKS=$(curl -X GET "192.168.0.2:83/api/stacks" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           WEBHOOK_ID=$(echo "$STACKS" | grep -oP '"WebhookID":"\K[^"]+' | head -n 1)
           curl -s -X POST "192.168.0.2:83/api/stacks/webhooks/$WEBHOOK_ID"

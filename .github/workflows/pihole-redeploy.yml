@@ -67,7 +67,7 @@ jobs:
         if: steps.check_stack.outputs.stack_exists == '0'
         run: |
           echo "Creating stack from GitHub..."
-          RESPONSE=$(curl -v -s -S -X POST "192.168.0.2:83/api/stacks?type=1&method=repository&endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          RESPONSE=$(curl -v -s -S -X POST "192.168.0.2:83/api/stacks?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{

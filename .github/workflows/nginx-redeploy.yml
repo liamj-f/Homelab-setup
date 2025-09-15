@@ -78,9 +78,9 @@ jobs:
           STACKS=$(curl -s -X GET "${{ secrets.PORTAINER_URL }}/api/stacks" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           WEBHOOK_ID=$(echo "$STACKS" | grep -oP '"WebhookID":"\K[^"]+' | head -n 1)
-          curl -s -X POST "${{ secrets.PORTAINER_URL }}/api/stacks/webhooks/$WEBHOOK_ID"
+          curl -s -X POST "192.168.0.2:83/api/stacks/webhooks/$WEBHOOK_ID"
 
-      - name: Authenticate as new user
+      - name: Authenticate as nginx user
         id: token
         run: |
           RESPONSE=$(curl -s -X POST "http://192.168.0.2:81/api/tokens" \

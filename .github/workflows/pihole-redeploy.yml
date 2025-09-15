@@ -54,6 +54,7 @@ jobs:
           echo "stack_exists=$EXISTS" >> $GITHUB_OUTPUT
 
       - name: Get Portainer EndpointId
+        if: steps.check_stack.outputs.stack_exists == '0'
         id: endpoint
         run: |
           RESPONSE=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \

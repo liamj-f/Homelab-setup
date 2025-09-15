@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
   workflow_call:
 jobs:
-  deploy:
+  Deploy_Portainer_Container:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -65,8 +65,21 @@ jobs:
           script: |
             cd ~/stacks/portainer
             sudo docker compose -f portainer-compose.rendered.yml up -d
-
-            
+      - name: Check if Admin is Initialized
+        id: check_admin
+        run: |
+          RESPONSE=$(curl -s "192.168.0.2:83/api/status")
+          echo "$RESPONSE" | grep '"adminInitialized":false' && echo "admin_initialized=false" >> $GITHUB_OUTPUT || echo "admin_initialized=true" >> $GITHUB_OUTPUT
+      - name: Initialize Admin Account
+        if: steps.check_admin.outputs.admin_initialized == 'false'
+        run: |
+          echo "Initializing Portainer admin account..."
+          curl -s -X POST "192.168.0.2:83/api//users/admin/init" \
+          -H "Content-Type: application/json" \
+          -d "{\"Username\": \"${{ secrets.PORTAINER_USER }}\", \"Password\": \"${{ secrets.PORTAINER_PASSWORD }}\"}"
+      - name: Create portainer environment
+      
+          
 #      - name: Call Portainer webhook
 #        run: |
 #          curl -X POST \

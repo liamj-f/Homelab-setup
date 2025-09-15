@@ -61,7 +61,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "Name": "my-stack",
+              "Name": "nginx",
               "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
               "RepositoryReferenceName": "refs/heads/main",
               "ComposeFilePath": "nginx-compose.yml",

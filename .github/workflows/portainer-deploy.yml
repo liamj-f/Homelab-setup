@@ -36,7 +36,7 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show      
-      - name: Create External resources if required
+      - name: Create Nginx_Network if required
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: 192.168.0.2

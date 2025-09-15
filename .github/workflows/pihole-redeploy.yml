@@ -35,7 +35,48 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show
-      - name: Call Portainer webhook
+          
+      - name: Authenticate to Portainer
+        id: auth
         run: |
-          curl -X POST \
-            http://portainer.14monarch.local/api/stacks/webhooks/6c6c5bb3-cc71-4f25-b44b-6cc25cefcf22
+          RESPONSE=$(curl -s -X POST "192.168.0.2:83/api/auth" \
+            -H "Content-Type: application/json" \
+            -d "{\"Username\": \"${{ secrets.PORTAINER_USER }}\", \"Password\": \"${{ secrets.PORTAINER_PASSWORD }}\"}")
+          TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Check if Stack Exists
+        id: check_stack
+        run: |
+          STACKS=$(curl -s -X GET "192.168.0.2:83/api/stacks" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+          EXISTS=$(echo "$STACKS" | grep -c '"Name":"Pihole"')
+          echo "stack_exists=$EXISTS" >> $GITHUB_OUTPUT
+
+      - name: Create Stack from GitHub
+        if: steps.check_stack.outputs.stack_exists == '0'
+        run: |
+          echo "Creating stack from GitHub..."
+          curl -s -X POST "192.168.0.2:83/api/stacks?type=1&method=repository&endpointId=1" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "Name": "nginx",
+              "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
+              "RepositoryReferenceName": "refs/heads/main",
+              "ComposeFilePath": "pihole-compose.yml",
+              "RepositoryAuthentication": false,
+              "AutoUpdate": {
+              "Webhook": true
+              }
+            }'
+
+      - name: Trigger Webhook if Stack Exists
+        if: steps.check_stack.outputs.stack_exists != '0'
+        run: |
+          echo "Triggering webhook..."
+          STACKS=$(curl -s -X GET "${{ secrets.PORTAINER_URL }}/api/stacks" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+          WEBHOOK_ID=$(echo "$STACKS" | grep -oP '"WebhookID":"\K[^"]+' | head -n 1)
+          curl -s -X POST "192.168.0.2:83/api/stacks/webhooks/$WEBHOOK_ID"
+

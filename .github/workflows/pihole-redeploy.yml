@@ -77,7 +77,10 @@ jobs:
                "ComposeFilePath": "pihole-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
-                              "Webhook": {}
+                              "forcePullImage": true,
+                              "forceUpdate": true,
+                              "interval": "72h",
+                              "Webhook": "e56041a2-75f6-4a10-85dc-c69424de631e"
                              },
                "Env": [],
                "Prune": true,

@@ -50,7 +50,7 @@ jobs:
         run: |
           STACKS=$(curl --fail -X GET "http://192.168.0.2:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
-          EXISTS=$(echo "$STACKS" | grep -c '"Name":"Pihole"' || true)
+          EXISTS=$(echo "$STACKS" | grep -c '"Name":"pihole"' || true)
           echo "stack_exists=$EXISTS" >> $GITHUB_OUTPUT
 
       - name: Get Portainer EndpointId

@@ -125,30 +125,30 @@ jobs:
       - name: Check if Local Docker Environment Exists
         id: check_env
         run: |
-         ENDPOINTS=$(curl -s -X GET "192.168.0.2:83/api/endpoints" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-         EXISTS=$(echo "$ENDPOINTS" | grep -c 'unix:///var/run/docker.sock' || true)
-         if [ "$EXISTS" -gt 0 ]; then
-           echo "Local Docker environment already exists."
-           echo "env_exists=true" >> $GITHUB_OUTPUT
-         else
-          echo "env_exists=false" >> $GITHUB_OUTPUT
-         fi
+         curl -s -X GET "192.168.0.2:83/api/endpoints" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" | jq .
+#         EXISTS=$(echo "$ENDPOINTS" | grep -c 'unix:///var/run/docker.sock' || true)
+#         if [ "$EXISTS" -gt 0 ]; then
+#           echo "Local Docker environment already exists."
+#           echo "env_exists=true" >> $GITHUB_OUTPUT
+#         else
+#          echo "env_exists=false" >> $GITHUB_OUTPUT
+#         fi
 
-      - name: Create Local Docker Environment
-        if: steps.check_env.outputs.env_exists == 'false'
-        run: |
-          curl -s -X POST "192.168.0.2:83/api/endpoints" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "Name": "local",
-              "EndpointType": 1,
-              "URL": "unix:///var/run/docker.sock",
-              "GroupID": 1,
-              "PublicURL": "",
-              "TLS": false
-          }'
+#      - name: Create Local Docker Environment
+#        if: steps.check_env.outputs.env_exists == 'false'
+#        run: |
+#          curl -s -X POST "192.168.0.2:83/api/endpoints" \
+#            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+#            -H "Content-Type: application/json" \
+#            -d '{
+#              "Name": "local",
+#              "EndpointType": 1,
+#              "URL": "unix:///var/run/docker.sock",
+#              "GroupID": 1,
+#              "PublicURL": "",
+#              "TLS": false
+#          }'
       
 #      - name: Call Portainer webhook
 #        run: |

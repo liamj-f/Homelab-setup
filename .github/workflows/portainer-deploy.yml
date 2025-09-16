@@ -43,7 +43,13 @@ jobs:
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
-            sudo docker network inspect nginx_network >/dev/null 2>&1 || sudo docker network create nginx_network
+            sudo docker network inspect nginx_network >/dev/null 2>&1 || \
+            sudo docker network create \
+            --label com.docker.compose.network=nginx_network \
+            --driver bridge \
+            --opt com.docker.network.bridge.name=nginx_network \
+            nginx_network
+
       - name: Render Portainer compose
         run: |
           envsubst < portainer-compose.yml > portainer-compose.rendered.yml

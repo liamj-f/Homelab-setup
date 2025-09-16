@@ -41,7 +41,10 @@ jobs:
         run: |
           RESPONSE=$(curl -X POST "192.168.0.2:83/api/auth" \
             -H "Content-Type: application/json" \
-            -d "{"Username\": \"${{ secrets.PORTAINER_USER }}\", \"Password\": \"${{ secrets.PORTAINER_PASSWORD }}\"}")
+            -d '{
+                 "Username":"${{ secrets.PORTAINER_USER }}", 
+                 "Password":"${{ secrets.PORTAINER_PASSWORD }}"
+                }')
           TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 

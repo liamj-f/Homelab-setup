@@ -45,16 +45,24 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Check if Stack Exists
-        id: check_stack
+      - name: Get Stack ID (if exists)
+        id: get_stack_id
         run: |
-          STACKS=$(curl --fail -X GET "http://192.168.0.2:83/api/stacks" \
+          STACKS=$(curl --fail -s -X GET "http://192.168.0.2:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
-          EXISTS=$(echo "$STACKS" | grep -c '"Name":"Nginx"' || true)
-          echo "stack_exists=$EXISTS" >> $GITHUB_OUTPUT
+
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="pihole") | .Id')
+          
+          if [ -z "$STACK_ID" ]; then
+            echo "Stack not found."
+            echo "stack_id=0" >> $GITHUB_OUTPUT
+          else
+            echo "Stack found with ID: $STACK_ID"
+            echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
+          fi
 
       - name: Get Portainer EndpointId
-        if: steps.check_stack.outputs.stack_exists == '0'
+        if: steps.get_stack_id.outputs.stack_id == '0'
         id: endpoint
         run: |
           RESPONSE=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
@@ -63,7 +71,7 @@ jobs:
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub
-        if: steps.check_stack.outputs.stack_exists == '0'
+        if: steps.get_stack_id.outputs.stack_id == '0'
         run: |
           echo "Creating stack from GitHub..."
           RESPONSE=$(curl -v -s -S -X POST "http://192.168.0.2:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
@@ -96,6 +104,29 @@ jobs:
 
             echo "API Response: $RESPONSE"
             echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
+            
+      - name: Update Stack
+        run: |
+          curl -s -X GET "http://192.168.0.2:83/api/stacks" \
+          -H "Authorization: Bearer  ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "stackName": "nginx",
+               "PullImage": true,
+               "RepositoryReferenceName": "refs/heads/main",
+               "repositoryAuthentication": false,
+               "Env": [
+                       {
+                       "name":"INITIAL_ADMIN_EMAIL",
+                       "value":"${{ secrets.NGINX_EMAIL }}"
+                       },
+                       {
+                       "name":"INITIAL_ADMIN_PASSWORD",
+                       "value":"${{ secrets.NGINX_PASSWORD }}"
+                       }
+                       ],
+               "Prune": true
+              }')          
 
       - name: Trigger Stack Webhook
         run: |

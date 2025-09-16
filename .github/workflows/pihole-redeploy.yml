@@ -81,7 +81,12 @@ jobs:
                               "forceUpdate": true,
                               "Webhook": "e56041a2-75f6-4a10-85dc-c69424de631e"
                              },
-               "Env": [],
+               "Env": [
+                       {
+                        "name":"PIHOLE_WEBPASSWORD",
+                        "value":"${{ secrets.PORTAINER_PASSWORD }}"
+                        }
+               ],
                "Prune": true,
                "StackFileVersion": "3"
               }')

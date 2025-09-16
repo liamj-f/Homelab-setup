@@ -103,7 +103,7 @@ jobs:
         if: steps.check_admin.outputs.admin_initialized == 'false'
         run: |
           echo "Initializing Portainer admin account..."
-          curl -s -X POST "192.168.0.2:83/api//users/admin/init" \
+          curl -s -X POST "192.168.0.2:83/api/users/admin/init" \
           -H "Content-Type: application/json" \
           -d '{
               "Username": "${{ secrets.PORTAINER_USER }}", 

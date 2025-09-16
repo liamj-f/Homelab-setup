@@ -99,19 +99,6 @@ jobs:
             echo "Admin account is not initialized."
             echo "admin_initialized=false" >> $GITHUB_OUTPUT
           fi  
-      - name: Check if Portainer Admin Is Initialized
-        id: check_admin
-        needs: deploy_portainer
-        run: |
-          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.0.2:83/api/users/admin/check)
-
-          if [ "$STATUS_CODE" -eq 204 ]; then
-            echo "Admin account is already initialized."
-            echo "admin_initialized=true" >> $GITHUB_OUTPUT
-          else
-            echo "Admin account is not initialized."
-            echo "admin_initialized=false" >> $GITHUB_OUTPUT
-          fi
           
       - name: Initialize Admin Account
         if: steps.check_admin.outputs.admin_initialized == 'false'

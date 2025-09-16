@@ -67,19 +67,23 @@ jobs:
         if: steps.check_stack.outputs.stack_exists == '0'
         run: |
           echo "Creating stack from GitHub..."
-          RESPONSE=$(curl -v -s -S -X POST "192.168.0.2:83/api/stacks?method=repository&endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "Name": "pihole",
-              "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
-              "RepositoryReferenceName": "refs/heads/main",
-              "ComposeFilePath": "pihole-compose.yml",
-              "RepositoryAuthentication": false,
-              "AutoUpdate": {
-              "Webhook": true
-              }
-            }')
+          RESPONSE=$(curl -v -s -S -X POST "http://192.168.0.2:83/api/stacks/create/repository" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "Name": "pihole",
+               "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
+               "RepositoryReferenceName": "refs/heads/main",
+               "ComposeFilePath": "pihole-compose.yml",
+               "RepositoryAuthentication": false,
+               "AutoUpdate": {
+                              "Webhook": true
+                             },
+               "Env": [],
+               "Prune": true,
+               "StackFileVersion": "3",
+               "EndpointID": '${{ steps.endpoint.outputs.endpoint_id }}'
+              }')
 
             echo "API Response: $RESPONSE"
             echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT

@@ -63,6 +63,7 @@ jobs:
           target: ~/stacks/portainer/
           overwrite: true
       - name: Deploy via SSH
+        id: deploy_portainer
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: 192.168.0.2
@@ -74,6 +75,7 @@ jobs:
             
       - name: Check if Portainer Admin Is Initialized
         id: check_admin
+        needs: deploy_portainer
         run: |
           STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.0.2:83/api/users/admin/check)
 

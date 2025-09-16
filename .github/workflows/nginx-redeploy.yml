@@ -108,6 +108,7 @@ jobs:
             echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
             
       - name: Update Stack
+        if: steps.get_stack_id.outputs.stack_id != '0'
         run: |
           curl -s -X GET "http://192.168.0.2:83/api/stacks" \
           -H "Authorization: Bearer  ${{ steps.auth.outputs.token }}" \

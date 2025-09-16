@@ -144,7 +144,7 @@ jobs:
             -d '{
                  "identity":"${{ secrets.NGINX_EMAIL }}",
                  "secret":"${{ secrets.NGINX_PASSWORD }}"
-                 }'
+                 }')
           TOKEN=$(echo "$RESPONSE" | grep -oP '"token"\s*:\s*"\K[^"]+')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
         

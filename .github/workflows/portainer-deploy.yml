@@ -72,7 +72,33 @@ jobs:
           script: |
             cd ~/stacks/portainer
             sudo docker compose -f portainer-compose.rendered.yml up -d
-            
+      - name: Check if Portainer Admin Is Initialized
+        id: check_admin
+        run: |
+          echo "Waiting for Portainer API to be ready..."
+          STATUS_CODE=000
+          for i in {1..20}; do
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.0.2:83/api/users/admin/check || echo "000")
+          if [ "$STATUS_CODE" -ne 000 ]; then
+            echo "Portainer API is responding (HTTP $STATUS_CODE)"
+          break
+          fi
+          echo "Attempt $i: Portainer not ready yet... retrying in 5s"
+          sleep 5
+          done
+
+          if [ "$STATUS_CODE" -eq 000 ]; then
+            echo "Portainer API did not respond after multiple retries. Failing job."
+          exit 1
+          fi
+
+          if [ "$STATUS_CODE" -eq 204 ]; then
+            echo "Admin account is already initialized."
+            echo "admin_initialized=true" >> $GITHUB_OUTPUT
+          else
+            echo "Admin account is not initialized."
+            echo "admin_initialized=false" >> $GITHUB_OUTPUT
+          fi  
       - name: Check if Portainer Admin Is Initialized
         id: check_admin
         needs: deploy_portainer

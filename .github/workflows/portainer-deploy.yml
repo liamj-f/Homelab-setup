@@ -120,7 +120,10 @@ jobs:
                 }')
           TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
-
+      - name: Check Status
+        run: |
+          curl -s -X get "192.168.0.2:83/api/status"
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" | jq .          
       - name: Check if Local Docker Environment Exists
         id: check_env
         run: |

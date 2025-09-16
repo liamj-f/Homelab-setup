@@ -74,7 +74,7 @@ jobs:
                "Name": "pihole",
                "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
                "RepositoryReferenceName": "refs/heads/main",
-               "ComposeFilePath": "pihole-compose.yml",
+               "ComposeFile": "pihole-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,

@@ -107,7 +107,7 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{
               "Username": "${{ secrets.PORTAINER_USER }}", 
-              "Password": "${{ secrets.PORTAINER_PASSWORD }}
+              "Password": "${{ secrets.PORTAINER_PASSWORD }}"
               }'
 
       - name: Authenticate with Portainer

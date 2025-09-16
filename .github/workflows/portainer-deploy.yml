@@ -74,7 +74,7 @@ jobs:
       - name: Check if Admin is Initialized
         id: check_admin
         run: |
-          RESPONSE=$(curl -s "192.168.0.2:83/api/status")
+          RESPONSE=$(curl -s "192.168.0.2:83/api/users/admin/check")
           echo "$RESPONSE" | grep '"adminInitialized":false' && echo "admin_initialized=false" >> $GITHUB_OUTPUT || echo "admin_initialized=true" >> $GITHUB_OUTPUT
       - name: Initialize Admin Account
         if: steps.check_admin.outputs.admin_initialized == 'false'

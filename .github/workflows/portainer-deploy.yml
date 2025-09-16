@@ -1,5 +1,4 @@
-name: Redeploy Portainer via Portainer GitOps
-
+name: Redeploy Portainer via Docker Compose
 on:
   push:
     branches:

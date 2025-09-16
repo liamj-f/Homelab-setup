@@ -66,36 +66,32 @@ jobs:
         if: steps.check_stack.outputs.stack_exists == '0'
         run: |
           echo "Creating stack from GitHub..."
-          curl -X POST "192.168.0.2:83/api/stacks?type=1&method=repository&endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "Name": "nginx",
-              "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
-              "RepositoryReferenceName": "refs/heads/main",
-              "ComposeFilePath": "nginx-compose.yml",
-              "RepositoryAuthentication": false,
-              "AutoUpdate": {
-              "Webhook": true
-              }
-            }'
+          RESPONSE=$(curl -v -s -S -X POST "http://192.168.0.2:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "Name": "nginx",
+               "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
+               "RepositoryReferenceName": "refs/heads/main",
+               "ComposeFile": "nginx-compose.yml",
+               "RepositoryAuthentication": false,
+               "AutoUpdate": {
+                              "forcePullImage": true,
+                              "forceUpdate": true,
+                              "Webhook": "e0ac1738-d609-4ef9-9865-2c73be74fbc0"
+                             },
+               "Env": [],
+               "Prune": true,
+               "StackFileVersion": "3"
+              }')
 
-      - name: Get Webhook URL
-        id: get_webhook
-        run: |
-          STACKS=$(curl -s -X GET "http://192.168.0.2:83/api/stacks" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-
-          WEBHOOK_URL=$(echo "$STACKS" | grep -o '"Webhook":[^,]*' | grep 'Nginx' -A1 | head -n1 | grep -o 'http[^"]*')
-          WEBHOOK_UUID=$(echo "$WEBHOOK_URL" | grep -o '[^/]*$')
-
-          echo "webhook_url=$WEBHOOK_URL" >> $GITHUB_OUTPUT
-          echo "webhook_uuid=$WEBHOOK_UUID" >> $GITHUB_OUTPUT
+            echo "API Response: $RESPONSE"
+            echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
 
       - name: Trigger Stack Webhook
         run: |
           echo "Triggering stack redeploy via webhook..."
-          curl -s -X POST "${{ steps.get_webhook.outputs.webhook_url }}"
+          curl -s -X POST "http://192.168.0.2:83/api/stacks/webhooks/e0ac1738-d609-4ef9-9865-2c73be74fbc0"
 
       - name: Authenticate as nginx user
         id: token

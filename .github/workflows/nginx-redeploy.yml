@@ -83,11 +83,11 @@ jobs:
                "Env": [
                        {
                        "name":"INITIAL_ADMIN_EMAIL",
-                       "value":"${{ secrets.NGINX_EMAIL }}
+                       "value":"${{ secrets.NGINX_EMAIL }}"
                        },
                        {
                        "name":"INITIAL_ADMIN_PASSWORD",
-                       "value":"${{ secrets.NGINX_PASSWORD }}
+                       "value":"${{ secrets.NGINX_PASSWORD }}"
                        }
                ],
                "Prune": true,

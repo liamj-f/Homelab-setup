@@ -80,7 +80,16 @@ jobs:
                               "forceUpdate": true,
                               "Webhook": "e0ac1738-d609-4ef9-9865-2c73be74fbc0"
                              },
-               "Env": [],
+               "Env": [
+                       {
+                       "name":"INITIAL_ADMIN_EMAIL",
+                       "value":"${{ secrets.NGINX_EMAIL }}
+                       },
+                       {
+                       "name":"INITIAL_ADMIN_PASSWORD",
+                       "value":"${{ secrets.NGINX_PASSWORD }}
+                       }
+               ],
                "Prune": true,
                "StackFileVersion": "3"
               }')

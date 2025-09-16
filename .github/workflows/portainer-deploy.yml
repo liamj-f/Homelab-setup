@@ -142,7 +142,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "Name": "Local Docker",
+              "Name": "local",
               "EndpointType": 1,
               "URL": "unix:///var/run/docker.sock",
               "GroupID": 1,

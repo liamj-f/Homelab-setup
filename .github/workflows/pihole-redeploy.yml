@@ -77,7 +77,7 @@ jobs:
                "ComposeFilePath": "pihole-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
-                              "Webhook": true
+                              "Webhook": "true"
                              },
                "Env": [],
                "Prune": true,

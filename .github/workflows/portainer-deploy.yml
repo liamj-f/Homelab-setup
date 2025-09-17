@@ -131,29 +131,29 @@ jobs:
           fi
           
 
-      - name: Create nginx_network if required
-        run: |
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
-            "http://192.168.0.2:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/nginx_network" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -H "Content-Type: application/json")
-      
-          if [ "$RESPONSE" -ne 200 ]; then
-            echo "nginx_network not found, creating..."
-            curl -s -X POST "http://192.168.0.2:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/create" \
-              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-              -H "Content-Type: application/json" \
-              -d '{
-                "Name": "nginx_network",
-                "Driver": "bridge",
-                "Labels": {
-                  "com.docker.compose.network": "nginx_network",
-                  "com.docker.compose.project": "nginx"
-                }
-              }'
-          else
-            echo "nginx_network already exists."
-          fi
+#      - name: Create nginx_network if required
+#        run: |
+#          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
+#            "http://192.168.0.2:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/nginx_network" \
+#            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+#            -H "Content-Type: application/json")
+#      
+#          if [ "$RESPONSE" -ne 200 ]; then
+#            echo "nginx_network not found, creating..."
+#            curl -s -X POST "http://192.168.0.2:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/create" \
+#              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+#              -H "Content-Type: application/json" \
+#              -d '{
+#                "Name": "nginx_network",
+#                "Driver": "bridge",
+#                "Labels": {
+#                  "com.docker.compose.network": "nginx_network",
+#                  "com.docker.compose.project": "nginx"
+#                }
+#              }'
+#          else
+#            echo "nginx_network already exists."
+#          fi
 
       
 

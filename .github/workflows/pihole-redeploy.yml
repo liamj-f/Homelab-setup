@@ -145,7 +145,7 @@ jobs:
           curl -X PATCH "http://192.168.0.2:82/api/config" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-          -H 'accept: application/json'\
+          -H 'accept: application/json' \
           -H 'content-type: application/json' \
           -d '{
               "config":{

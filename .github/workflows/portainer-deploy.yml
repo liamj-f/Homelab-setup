@@ -51,6 +51,7 @@ jobs:
       - name: Render Portainer compose
         run: |
           envsubst < portainer-compose.yml > portainer-compose.rendered.yml
+          
       - name: Copy rendered compose
         uses: appleboy/scp-action@v0.1.1
         with:
@@ -60,6 +61,7 @@ jobs:
           source: portainer-compose.rendered.yml
           target: ~/stacks/portainer/
           overwrite: true
+          
       - name: Deploy via SSH
         id: deploy_portainer
         uses: appleboy/ssh-action@v1.2.0
@@ -70,6 +72,7 @@ jobs:
           script: |
             cd ~/stacks/portainer
             sudo docker compose -f portainer-compose.rendered.yml up -d
+            
       - name: Check if Portainer Admin Is Initialized
         id: check_admin
         run: |
@@ -120,54 +123,36 @@ jobs:
                 }')
           TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          
       - name: Check Status
         run: |
           curl -s -X get "192.168.0.2:83/api/status" \
-           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" | jq .          
+           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" | jq .
+           
       - name: Check if Local Docker Environment Exists
         id: check_env
         run: |
-         curl -s -X GET "192.168.0.2:83/api/endpoints" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" | jq .
-#         EXISTS=$(echo "$ENDPOINTS" | grep -c 'unix:///var/run/docker.sock' || true)
-#         if [ "$EXISTS" -gt 0 ]; then
-#           echo "Local Docker environment already exists."
-#           echo "env_exists=true" >> $GITHUB_OUTPUT
-#         else
-#          echo "env_exists=false" >> $GITHUB_OUTPUT
-#         fi
+          ENDPOINTS=$(curl -s -X GET "192.168.0.2:83/api/endpoints" \
+           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
 
-      - name: Create Local Docker Environment
-#        if: steps.check_env.outputs.env_exists == 'false'
-        run: |
-          curl -s -X POST "192.168.0.2:83/api/endpoints" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "Name": "local",
-              "EndpointType": 1,
-              "URL": "unix:///var/run/docker.sock",
-              "GroupID": 1,
-              "PublicURL": "",
-              "TLS": false
-               "EdgeCheckinInterval": 5
-          }' | jq .
-
-      - name: Create Local Docker Environment (2)
+          echo "$ENDPOINTS" | jq .
+          COUNT=$(echo "$ENDPOINTS" | jq 'length')
+          if [ "$COUNT" -gt 0 ]; then
+            echo "Local Docker environment already exists."
+            echo "env_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "No endpoints found."
+            echo "env_exists=false" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Create Local Docker Environment 
+        if: steps.check_env.outputs.env_exists == 'false'
         run: | 
           curl -s -X POST http://192.168.0.2:83/api/endpoints \
            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
            -F "Name=local" \
            -F "EndpointCreationType=1" \
            -F "ContainerEngine=docker"
-#           -F "URL=unix:///var/run/docker.sock" \
-#           -F "GroupID=1" \
-#           -F "TLS=false" \
-#           -F "TLSSkipVerify=true" \
-#           -F "TLSSkipClientVerify=true" \
 
       
-#      - name: Call Portainer webhook
-#        run: |
-#          curl -X POST \
-#            http://portainer.14monarch.local/api/stacks/webhooks/xxxxxx
+

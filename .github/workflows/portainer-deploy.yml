@@ -132,21 +132,23 @@ jobs:
       - name: Check if Local Docker Environment Exists
         id: check_env
         run: |
-          ENDPOINTS=$(curl -s -X GET "192.168.0.2:83/api/endpoints" \
-           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-
+          ENDPOINTS=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+      
           echo "$ENDPOINTS" | jq .
-          COUNT=$(echo "$ENDPOINTS" | jq 'length')
-          if [ "$COUNT" -gt 0 ]; then
-            echo "Local Docker environment already exists."
-            echo "env_exists=true" >> $GITHUB_OUTPUT
+      
+          ID=$(echo "$ENDPOINTS" | jq -r '.[] | select(.URL=="unix:///var/run/docker.sock") | .Id')
+      
+          if [ -z "$ID" ]; then
+            echo "No local Docker endpoint found."
+            echo "endpoint_id=0" >> $GITHUB_OUTPUT
           else
-            echo "No endpoints found."
-            echo "env_exists=false" >> $GITHUB_OUTPUT
+            echo "Found local Docker endpoint with ID: $ID"
+            echo "endpoint_id=$ID" >> $GITHUB_OUTPUT
           fi
           
       - name: Create Local Docker Environment 
-        if: steps.check_env.outputs.env_exists == 'false'
+        if: steps.check_env.outputs.endpoint_id == '0'
         run: | 
           curl -s -X POST http://192.168.0.2:83/api/endpoints \
            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \

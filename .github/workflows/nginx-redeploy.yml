@@ -139,14 +139,32 @@ jobs:
       - name: Authenticate as nginx user
         id: token
         run: |
-          RESPONSE=$(curl -X POST "http://192.168.0.2:81/api/tokens" \
-            -H "Content-Type: application/json" \
-            -d '{
-                 "identity":"${{ secrets.NGINX_EMAIL }}",
-                 "secret":"${{ secrets.NGINX_PASSWORD }}"
-                 }')
-          TOKEN=$(echo "$RESPONSE" | grep -oP '"token"\s*:\s*"\K[^"]+')
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          RETRIES=20
+          TOKEN=""
+          for i in $(seq 1 $RETRIES); do
+            RESPONSE=$(curl -s -X POST "http://192.168.0.2:81/api/tokens" \
+              -H "Content-Type: application/json" \
+              -d '{
+                   "identity":"${{ secrets.NGINX_EMAIL }}",
+                   "secret":"${{ secrets.NGINX_PASSWORD }}"
+                   }')
+        
+            TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
+            
+            if [ -n "$TOKEN" ]; then
+              echo "Successfully obtained token."
+              echo "token=$TOKEN" >> $GITHUB_OUTPUT
+              break
+            else
+              echo "Token not available yet, retrying in 5 seconds... ($i/20)"
+              sleep 5
+            fi
+          done
+        
+          if [ -z "$TOKEN" ]; then
+            echo "Failed to obtain token after $RETRIES attempts."
+            exit 1
+          fi
         
       - name: Create Proxy Hosts
         run: |

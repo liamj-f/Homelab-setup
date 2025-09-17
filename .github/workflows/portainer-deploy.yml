@@ -151,7 +151,7 @@ jobs:
               "PublicURL": "",
               "TLS": false
                "EdgeCheckinInterval": 5
-          }'
+          }' | jq .
       
 #      - name: Call Portainer webhook
 #        run: |

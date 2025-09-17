@@ -136,8 +136,8 @@ jobs:
           -d '{
                "password": "${{ secrets.PORTAINER_PASSWORD }}"
                }')
-          echo "csrf=$(echo "$RESPONSE" | jq -r '.csrf')" >> $GITHUB_OUTPUT
-          echo "sid=$(echo "$RESPONSE" | jq -r '.sid')" >> $GITHUB_OUTPUT
+          echo "csrf=$(echo "$RESPONSE" | jq -r '.session.csrf')" >> $GITHUB_OUTPUT
+          echo "sid=$(echo "$RESPONSE" | jq -r '.session.sid')" >> $GITHUB_OUTPUT
 
 
       - name: Add DNS records to pihole via API

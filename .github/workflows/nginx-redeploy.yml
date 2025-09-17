@@ -53,7 +53,7 @@ jobs:
           STACKS=$(curl --fail -s -X GET "http://192.168.0.2:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
 
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="pihole") | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="nginx") | .Id')
           
           if [ -z "$STACK_ID" ]; then
             echo "Stack not found."
@@ -129,7 +129,7 @@ jobs:
                        }
                        ],
                "Prune": true
-              }')          
+              }'          
 
       - name: Trigger Stack Webhook
         run: |

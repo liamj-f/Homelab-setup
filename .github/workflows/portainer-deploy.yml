@@ -152,6 +152,20 @@ jobs:
               "TLS": false
                "EdgeCheckinInterval": 5
           }' | jq .
+
+      - name: Create Local Docker Environment (2)
+        run: | 
+          curl -s -X POST http://192.168.0.2:83/api/endpoints \
+           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+           -F "Name=local" \
+           -F "EndpointCreationType=1" \
+           -F "ContainerEngine=docker"
+#           -F "URL=unix:///var/run/docker.sock" \
+#           -F "GroupID=1" \
+#           -F "TLS=false" \
+#           -F "TLSSkipVerify=true" \
+#           -F "TLSSkipClientVerify=true" \
+
       
 #      - name: Call Portainer webhook
 #        run: |

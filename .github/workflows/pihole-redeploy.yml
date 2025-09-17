@@ -136,8 +136,9 @@ jobs:
           -d '{
                "password": "${{ secrets.PIHOLE_PASSWORD }}"
                }')
-          CSRF=$(echo "$RESPONSE" | jq -r '.csrf') >> $GITHUB_OUTPUT
-          SID=$(echo "$RESPONSE" | jq -r '.sid') >> $GITHUB_OUTPUT
+          echo "csrf=$(echo "$RESPONSE" | jq -r '.csrf')" >> $GITHUB_OUTPUT
+          echo "sid=$(echo "$RESPONSE" | jq -r '.sid')" >> $GITHUB_OUTPUT
+
 
       - name: Add DNS records to pihole via API
         run: |
@@ -159,7 +160,7 @@ jobs:
                               "192.168.0.2 pihole.14monarch.local",
                               "192.168.0.2 nginx.14monarch.local",
                               "192.168.0.2 portainer.14monarch.local",
-                              "192.168.0.2 nextcloud.14monarch.local",
+                              "192.168.0.2 nextcloud.14monarch.local"
                               ]
                           }
                         }

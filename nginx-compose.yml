@@ -24,3 +24,4 @@ networks:
   nginx_network:
     driver: bridge
     name: nginx_network
+    external: true

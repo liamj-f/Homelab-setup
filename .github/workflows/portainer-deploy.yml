@@ -138,7 +138,7 @@ jobs:
 #         fi
 
       - name: Create Local Docker Environment
-        if: steps.check_env.outputs.env_exists == 'false'
+#        if: steps.check_env.outputs.env_exists == 'false'
         run: |
           curl -s -X POST "192.168.0.2:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \

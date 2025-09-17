@@ -123,9 +123,19 @@ jobs:
                "Prune": true
               }'          
 
-
       - name: Trigger Stack Webhook
         run: |
           echo "Triggering stack redeploy via webhook..."
           curl -s -X POST "http://192.168.0.2:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e"
+
+      - name: Authenticate with Pi-hole API
+        id: pihole_auth
+        run: |
+          RESPONSE=$(curl -s -X POST "http://192.168.0.2:82/api/auth" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "password": "${{ secrets.PIHOLE_PASSWORD }}"
+               }')
+          SID=$(echo "$RESPONSE" | jq -r '.sid') >> $GITHUB_OUTPUT
+
 

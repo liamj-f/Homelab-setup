@@ -34,19 +34,6 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show      
-      - name: Create Nginx_Network if required
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: 192.168.0.2
-          username: ${{ secrets.PI_USER }}
-          password: ${{ secrets.PI_PASSWORD }}
-          script: |
-            sudo docker network inspect nginx_network >/dev/null 2>&1 || \
-            sudo docker network create \
-            --label com.docker.compose.network=nginx_network \
-            --driver bridge \
-            --opt com.docker.network.bridge.name=nginx_network \
-            nginx_network
 
       - name: Render Portainer compose
         run: |
@@ -73,7 +60,7 @@ jobs:
             cd ~/stacks/portainer
             sudo docker compose -f portainer-compose.rendered.yml up -d
             
-      - name: Check if Portainer Admin Is Initialized
+      - name: Create Admin Account if required
         id: check_admin
         run: |
           echo "Waiting for Portainer API to be ready..."
@@ -92,25 +79,17 @@ jobs:
             echo "Portainer API did not respond after multiple retries. Failing job."
           exit 1
           fi
-
           if [ "$STATUS_CODE" -eq 204 ]; then
             echo "Admin account is already initialized."
-            echo "admin_initialized=true" >> $GITHUB_OUTPUT
           else
-            echo "Admin account is not initialized."
-            echo "admin_initialized=false" >> $GITHUB_OUTPUT
+            echo "Admin account is not initialized. Creating..."
+            curl -s -X POST "192.168.0.2:83/api/users/admin/init" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "Username": "${{ secrets.PORTAINER_USER }}", 
+                 "Password": "${{ secrets.PORTAINER_PASSWORD }}"
+                 }'
           fi  
-          
-      - name: Initialize Admin Account
-        if: steps.check_admin.outputs.admin_initialized == 'false'
-        run: |
-          echo "Initializing Portainer admin account..."
-          curl -s -X POST "192.168.0.2:83/api/users/admin/init" \
-          -H "Content-Type: application/json" \
-          -d '{
-              "Username": "${{ secrets.PORTAINER_USER }}", 
-              "Password": "${{ secrets.PORTAINER_PASSWORD }}"
-              }'
 
       - name: Authenticate with Portainer
         id: auth
@@ -129,7 +108,7 @@ jobs:
           curl -s -X get "192.168.0.2:83/api/status" \
            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" | jq .
            
-      - name: Check if Local Docker Environment Exists
+      - name: Create Local Docker Environment if required
         id: check_env
         run: |
           ENDPOINTS=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
@@ -140,21 +119,41 @@ jobs:
           ID=$(echo "$ENDPOINTS" | jq -r '.[] | select(.URL=="unix:///var/run/docker.sock") | .Id')
       
           if [ -z "$ID" ]; then
-            echo "No local Docker endpoint found."
-            echo "endpoint_id=0" >> $GITHUB_OUTPUT
+            echo "No local Docker endpoint found. Creating..."
+            curl -s -X POST http://192.168.0.2:83/api/endpoints \
+              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+              -F "Name=local" \
+              -F "EndpointCreationType=1" \
+              -F "ContainerEngine=docker"
           else
             echo "Found local Docker endpoint with ID: $ID"
             echo "endpoint_id=$ID" >> $GITHUB_OUTPUT
           fi
           
-      - name: Create Local Docker Environment 
-        if: steps.check_env.outputs.endpoint_id == '0'
-        run: | 
-          curl -s -X POST http://192.168.0.2:83/api/endpoints \
-           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-           -F "Name=local" \
-           -F "EndpointCreationType=1" \
-           -F "ContainerEngine=docker"
+
+      - name: Create nginx_network if required
+        run: |
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
+            "http://192.168.0.2:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/nginx_network" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json")
+      
+          if [ "$RESPONSE" -ne 200 ]; then
+            echo "nginx_network not found, creating..."
+            curl -s -X POST "http://192.168.0.2:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/create" \
+              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "Name": "nginx_network",
+                "Driver": "bridge",
+                "Labels": {
+                  "com.docker.compose.network": "nginx_network",
+                  "com.docker.compose.project": "nginx"
+                }
+              }'
+          else
+            echo "nginx_network already exists."
+          fi
 
       
 

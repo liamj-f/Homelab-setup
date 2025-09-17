@@ -137,20 +137,21 @@ jobs:
 #          echo "env_exists=false" >> $GITHUB_OUTPUT
 #         fi
 
-#      - name: Create Local Docker Environment
-#        if: steps.check_env.outputs.env_exists == 'false'
-#        run: |
-#          curl -s -X POST "192.168.0.2:83/api/endpoints" \
-#            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-#            -H "Content-Type: application/json" \
-#            -d '{
-#              "Name": "local",
-#              "EndpointType": 1,
-#              "URL": "unix:///var/run/docker.sock",
-#              "GroupID": 1,
-#              "PublicURL": "",
-#              "TLS": false
-#          }'
+      - name: Create Local Docker Environment
+        if: steps.check_env.outputs.env_exists == 'false'
+        run: |
+          curl -s -X POST "192.168.0.2:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "Name": "local",
+              "EndpointType": 1,
+              "URL": "unix:///var/run/docker.sock",
+              "GroupID": 1,
+              "PublicURL": "",
+              "TLS": false
+               "EdgeCheckinInterval": 5
+          }'
       
 #      - name: Call Portainer webhook
 #        run: |

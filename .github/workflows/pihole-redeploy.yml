@@ -139,26 +139,30 @@ jobs:
           CSRF=$(echo "$RESPONSE" | jq -r '.csrf') >> $GITHUB_OUTPUT
           SID=$(echo "$RESPONSE" | jq -r '.sid') >> $GITHUB_OUTPUT
 
-#      - name: Add DNS records to pihole via API
-#        run: |
-#          curl -X PATCH "http://192.168.0.2:82/api/config" \
-#          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
-#          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-#          -H 'accept: application/json'\
-#          -H 'content-type: application/json' \
-#          -d '{
-#              "config":{
-#                  "dns":{
-#                      "piholePTR":"None",
-#                      "hosts":[
-#                              "192.168.0.1 tplink.14monarch.local",
-#                              "192.168.0.2 pihole.14monarch.local",
-#                              "192.168.0.2 nginx.14monarch.local",
-#                              "192.168.0.2 portainer.14monarch.local",
-#                              "192.168.0.2 nextcloud.14monarch.local",
-#                              ]
-#                          }
-#                        }
-#                }'
+      - name: Add DNS records to pihole via API
+        run: |
+          curl -X PATCH "http://192.168.0.2:82/api/config" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json'\
+          -H 'content-type: application/json' \
+          -d '{
+              "config":{
+                  "dns":{
+                      "piholePTR":"None",
+                      "upstreams": [
+                                    "1.1.1.1",
+                                    "8.8.8.8"
+                                    ],
+                      "hosts":[
+                              "192.168.0.1 tplink.14monarch.local",
+                              "192.168.0.2 pihole.14monarch.local",
+                              "192.168.0.2 nginx.14monarch.local",
+                              "192.168.0.2 portainer.14monarch.local",
+                              "192.168.0.2 nextcloud.14monarch.local",
+                              ]
+                          }
+                        }
+                }'
 
 

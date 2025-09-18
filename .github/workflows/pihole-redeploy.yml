@@ -136,7 +136,7 @@ jobs:
               -d '{
                   "password": "${{ secrets.PORTAINER_PASSWORD }}"
                   }' )
-
+          echo "$RESPONSE"
           CSRF=$(echo "$RESPONSE" | jq -r '.session.csrf')
           SID=$(echo "$RESPONSE" | jq -r '.session.sid')
           echo "sid=$SID" >> $GITHUB_OUTPUT

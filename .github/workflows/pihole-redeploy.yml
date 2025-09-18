@@ -134,7 +134,7 @@ jobs:
           echo "Waiting for Pihole API to be ready..."
           STATUS_CODE=000
           for i in {1..20}; do
-            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.0.2:82/api/aut || echo "000")
+            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.0.2:82/api/auth || echo "000")
             if [ "$STATUS_CODE" -ne 000 ]; then
               echo "Pihole API is responding (HTTP $STATUS_CODE)"
               break

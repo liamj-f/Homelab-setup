@@ -105,7 +105,7 @@ jobs:
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          curl -s -X POST "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          curl -s -X PUT "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{

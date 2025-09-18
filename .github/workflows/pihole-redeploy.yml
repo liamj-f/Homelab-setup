@@ -128,7 +128,7 @@ jobs:
 #          echo "$RESPONSE"
 
       - name: Pihole Api Auth
-        id: pihoole_auth
+        id: pihole_auth
         run: |
           sleep 20
           RESPONSE=$(curl -s -X POST "http://192.168.0.2:82/api/auth" \
@@ -141,54 +141,6 @@ jobs:
           SID=$(echo "$RESPONSE" | jq -r '.session.sid')
           echo "sid=$SID" >> $GITHUB_OUTPUT
           echo "csrf=$CSRF" >> $GITHUB_OUTPUT         
-
-#      - name: Retry Pihole auth until success
-#        id: pihole_auth
-#        run: |
-#          echo "Waiting for Pi-hole API to be ready..."
-#          for i in {1..20}; do
-#            RESPONSE=$(curl -s -w "%{http_code}" -o response.json -X POST "http://192.168.0.2:82/api/auth" \
-#              -H "Content-Type: application/json" \
-#              -d '{
-#                  "password": "${{ secrets.PORTAINER_PASSWORD }}"
-#                  }' || echo "000")
-#      
-#            HTTP_CODE=$(tail -c 3 <<< "$RESPONSE")
-#      
-#            if [[ "$HTTP_CODE" == "000" ]]; then
-#              echo "Attempt $i: Pi-hole API not reachable. Retrying in 5s..."
-#              sleep 5
-#              continue
-#            fi
-#      
-#            if [[ "$HTTP_CODE" =~ ^4 ]]; then
-#              echo "Received HTTP $HTTP_CODE. Failing job."
-#              cat response.json
-#              exit 1
-#            fi
-#      
-#            if [[ "$HTTP_CODE" =~ ^2 ]]; then
-#              echo "Pi-hole API is responding (HTTP $HTTP_CODE)"
-#              break
-#            fi
-#      
-#            echo "Attempt $i: Unexpected HTTP $HTTP_CODE. Retrying in 5s..."
-#            sleep 5
-#          done
-#      
-#          # Extract session tokens
-#          CSRF=$(jq -r '.session.csrf' response.json)
-#          SID=$(jq -r '.session.sid' response.json)
-#      
-#          if [[ -z "$SID" || -z "$CSRF" || "$SID" == "null" || "$CSRF" == "null" ]]; then
-#            echo "Failed to authenticate with Pi-hole API. Response:"
-#            cat response.json
-#            exit 1
-#          fi
-#      
-#          # Export to GitHub Actions outputs
-#          echo "sid=$SID" >> $GITHUB_OUTPUT
-#          echo "csrf=$CSRF" >> $GITHUB_OUTPUT
           
       - name: Add DNS records to Pihole via API
         run: |

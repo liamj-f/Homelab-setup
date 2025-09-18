@@ -122,12 +122,13 @@ jobs:
                        ],
                "Prune": true
               }'          
-
-      - name: Trigger Stack Webhook
+    
+      - name: Trigger stack redeploy via webhook
         run: |
           echo "Triggering stack redeploy via webhook..."
-          curl -s -X POST "http://192.168.0.2:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e"
-      
+          RESPONSE=$(curl -s -w "HTTP %{http_code}" -X POST "http://192.168.0.2:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e")
+          echo "$RESPONSE"
+
       - name: Authenticate with Pihole API
         run: |
           sleep 20

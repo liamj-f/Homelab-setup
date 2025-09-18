@@ -133,13 +133,16 @@ jobs:
         id: pihole_auth
         run: |
           echo "Waiting for Pihole API to be ready..."
-          STATUS_CODE=000
+          STATUS_CODE="000"
           for i in {1..20}; do
-            STATUS_CODE=$(curl -sovk /dev/null -w "%{http_code}" http://192.168.0.2:82/api/auth || echo "000")
-            if [ "$STATUS_CODE" -ne 000 ]; then
-              echo "Pihole API is responding (HTTP $STATUS_CODE)"
-              break
-            fi
+            STATUS_CODE=$(curl -sovk /dev/null -w "%{http_code}" http://192.168.0.2:82/api/auth)
+          if [ $? -ne 0 ]; then
+           STATUS_CODE="000"
+          fi
+          if [ "$STATUS_CODE" -ne 000 ]; then
+            echo "Pihole API is responding (HTTP $STATUS_CODE)"
+            break
+          fi
             echo "Attempt $i: Pihole not ready yet... retrying in 5s"
             sleep 5
           done

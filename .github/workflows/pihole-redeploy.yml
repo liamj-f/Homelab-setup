@@ -127,35 +127,44 @@ jobs:
         run: |
           echo "Triggering stack redeploy via webhook..."
           curl -s -X POST "http://192.168.0.2:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e"
-
+      
       - name: Authenticate with Pihole API
-        id: pihole_auth
         run: |
-          echo "Waiting for Pihole API to be ready..."
-          STATUS_CODE=000
-          for i in {1..20}; do
-            STATUS_CODE=$(curl -sovk /dev/null -w "%{http_code}" http://192.168.0.2:82/api/auth || echo "000")
-            if [ "$STATUS_CODE" -ne 000 ]; then
-              echo "Pihole API is responding (HTTP $STATUS_CODE)"
-              break
-            fi
-            echo "Attempt $i: Pihole not ready yet... retrying in 5s"
-            sleep 5
-          done
-      
-          if [ "$STATUS_CODE" -eq 000 ]; then
-            echo "Pihole API did not respond after multiple retries. Failing job."
-            exit 1
-          fi
-      
-          RESPONSE=$(curl -s -X POST "http://192.168.0.2:82/api/auth" \
+          sleep 20
+          curl -vk -X POST "http://192.168.0.2:82/api/auth" \
             -H "Content-Type: application/json" \
             -d '{
                  "password": "${{ secrets.PORTAINER_PASSWORD }}"
-               }')
-      
-          echo "csrf=$(echo "$RESPONSE" | jq -r '.session.csrf')" >> $GITHUB_OUTPUT
-          echo "sid=$(echo "$RESPONSE" | jq -r '.session.sid')" >> $GITHUB_OUTPUT
+               }'
+
+#      - name: Authenticate with Pihole API
+#        id: pihole_auth
+#        run: |
+#          echo "Waiting for Pihole API to be ready..."
+#          STATUS_CODE=000
+#          for i in {1..20}; do
+#            STATUS_CODE=$(curl -sovk /dev/null -w "%{http_code}" http://192.168.0.2:82/api/auth || echo "000")
+#            if [ "$STATUS_CODE" -ne 000 ]; then
+#              echo "Pihole API is responding (HTTP $STATUS_CODE)"
+#              break
+#            fi
+#            echo "Attempt $i: Pihole not ready yet... retrying in 5s"
+#            sleep 5
+#          done
+#      
+#          if [ "$STATUS_CODE" -eq 000 ]; then
+#            echo "Pihole API did not respond after multiple retries. Failing job."
+#            exit 1
+#          fi
+#      
+#          RESPONSE=$(curl -s -X POST "http://192.168.0.2:82/api/auth" \
+#            -H "Content-Type: application/json" \
+#            -d '{
+#                 "password": "${{ secrets.PORTAINER_PASSWORD }}"
+#               }')
+#      
+#          echo "csrf=$(echo "$RESPONSE" | jq -r '.session.csrf')" >> $GITHUB_OUTPUT
+#          echo "sid=$(echo "$RESPONSE" | jq -r '.session.sid')" >> $GITHUB_OUTPUT
 
       - name: Add DNS records to Pihole via API
         run: |

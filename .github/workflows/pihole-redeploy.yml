@@ -64,7 +64,7 @@ jobs:
           fi
 
       - name: Get Portainer EndpointId
-        if: ${{ steps.get_stack_id.outputs.stack_id }} == '0'
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         id: endpoint
         run: |
           RESPONSE=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
@@ -73,7 +73,7 @@ jobs:
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub
-        if: ${{ steps.get_stack_id.outputs.stack_id }} == '0'
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
           echo "Creating stack from GitHub..."
           RESPONSE=$(curl -v -s -S -X POST "http://192.168.0.2:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
@@ -104,7 +104,7 @@ jobs:
             echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
 
       - name: Update Stack
-        if: ${{ steps.get_stack_id.outputs.stack_id }} != '0'
+        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
           curl -s -X GET "http://192.168.0.2:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \

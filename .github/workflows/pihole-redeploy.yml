@@ -106,11 +106,10 @@ jobs:
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          curl -s -X GET "http://192.168.0.2:83/api/stacks" \
+          curl -s -X POST "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "stackName": "pihole",
                "PullImage": true,
                "RepositoryReferenceName": "refs/heads/main",
                "repositoryAuthentication": false,
@@ -123,11 +122,11 @@ jobs:
                "Prune": true
               }'          
     
-      - name: Trigger stack redeploy via webhook
-        run: |
-          echo "Triggering stack redeploy via webhook..."
-          RESPONSE=$(curl -s -w "HTTP %{http_code}" -X POST "http://192.168.0.2:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e")
-          echo "$RESPONSE"
+#      - name: Trigger stack redeploy via webhook
+#        run: |
+#          echo "Triggering stack redeploy via webhook..."
+#          RESPONSE=$(curl -s -w "HTTP %{http_code}" -X POST "http://192.168.0.2:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e")
+#          echo "$RESPONSE"
 
       - name: Authenticate with Pihole API
         id: pihole_auth

@@ -134,9 +134,9 @@ jobs:
           for i in {1..20}; do
             RESPONSE=$(curl -s -w "%{http_code}" -o response.json -X POST "http://192.168.0.2:82/api/auth" \
               -H "Content-Type: application/json" \
-              -d "{
+              -d '{
                   "password": "${{ secrets.PIHOLE_PASSWORD }}"
-                  }" || echo "000")
+                  }' || echo "000")
       
             HTTP_CODE=$(tail -c 3 <<< "$RESPONSE")
       

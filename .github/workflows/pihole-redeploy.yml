@@ -64,7 +64,6 @@ jobs:
           fi
 
       - name: Get Portainer EndpointId
-        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         id: endpoint
         run: |
           RESPONSE=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \

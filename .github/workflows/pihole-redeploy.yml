@@ -134,24 +134,30 @@ jobs:
         run: |
           echo "Waiting for Pihole API to be ready..."
           STATUS_CODE="000"
+	  
           for i in {1..20}; do
-            STATUS_CODE=$(curl -sovk /dev/null -w "%{http_code}" http://192.168.0.2:82/api/auth)
-          if [ $? -ne 0 ]; then
-           STATUS_CODE="000"
-          fi
-          if [ "$STATUS_CODE" -ne 000 ]; then
-            echo "Pihole API is responding (HTTP $STATUS_CODE)"
-            break
-          fi
+            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.0.2:82/api/auth)
+            CURL_EXIT=$?
+          
+            if [ $CURL_EXIT -ne 0 ]; then
+              echo "Curl failed (exit code $CURL_EXIT). Setting STATUS_CODE=000"
+              STATUS_CODE="000"
+            fi
+          
+            if [ "$STATUS_CODE" != "000" ]; then
+              echo "Pihole API is responding (HTTP $STATUS_CODE)"
+              break
+            fi
+          
             echo "Attempt $i: Pihole not ready yet... retrying in 5s"
             sleep 5
           done
-      
-          if [ "$STATUS_CODE" -eq 000 ]; then
+          
+          if [ "$STATUS_CODE" = "000" ]; then
             echo "Pihole API did not respond after multiple retries. Failing job."
             exit 1
           fi
-      
+          
           RESPONSE=$(curl -s -X POST "http://192.168.0.2:82/api/auth" \
             -H "Content-Type: application/json" \
             -d '{

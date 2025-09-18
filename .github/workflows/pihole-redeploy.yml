@@ -135,7 +135,7 @@ jobs:
             RESPONSE=$(curl -s -w "%{http_code}" -o response.json -X POST "http://192.168.0.2:82/api/auth" \
               -H "Content-Type: application/json" \
               -d '{
-                  "password": "${{ secrets.PIHOLE_PASSWORD }}"
+                  "password": "${{ secrets.PORTAINER_PASSWORD }}"
                   }' || echo "000")
       
             HTTP_CODE=$(tail -c 3 <<< "$RESPONSE")

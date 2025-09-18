@@ -153,7 +153,7 @@ jobs:
             RESPONSE=$(curl -s -X POST "http://192.168.0.2:82/api/auth" \
               -H "Content-Type: application/json" \
               -d "{
-                "password": "${{ secrets.PIHOLE_PASSWORD }}"
+                "password": "${{ secrets.PORTAINER_PASSWORD }}"
                 }")
         
             echo "csrf=$(echo "$RESPONSE" | jq -r '.session.csrf')" >> $GITHUB_OUTPUT

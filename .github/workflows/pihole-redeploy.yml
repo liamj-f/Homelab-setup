@@ -81,7 +81,7 @@ jobs:
           -d '{
                "Name": "pihole",
                "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
-               "RepositoryReferenceName": "refs/heads/main",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "pihole-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
@@ -110,7 +110,7 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{
                "PullImage": true,
-               "RepositoryReferenceName": "refs/heads/main",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
                "Env": [
                        {

@@ -87,7 +87,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
                  "Username": "${{ secrets.PORTAINER_USER }}", 
-                 "Password": "${{ secrets.PORTAINER_PASSWORD }}"
+                 "Password": "${{ secrets.PI_PASSWORD }}"
                  }'
           fi  
 
@@ -98,7 +98,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d  '{
                 "Username": "${{ secrets.PORTAINER_USER }}", 
-                "Password": "${{ secrets.PORTAINER_PASSWORD }}"
+                "Password": "${{ secrets.PI_PASSWORD }}"
                 }')
           TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT

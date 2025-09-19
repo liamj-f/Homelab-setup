@@ -7,6 +7,11 @@ on:
       - 'nginx-compose.yml'
   workflow_dispatch:
   workflow_call:
+    inputs:
+      branch_name:
+        required: true
+        type: string
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -16,13 +21,12 @@ jobs:
       - name: Install WireGuard
         run: |
           sudo apt-get update
-          sudo apt-get install -y wireguard resolvconf
+          sudo apt-get install -y wireguard resolvconf dnsutils
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
       - name: Resolve DDNS and update wg0.conf
         run: |
-          sudo apt-get update && sudo apt-get install -y dnsutils
           ip=$(dig +short 14monarch.tplinkdns.com @8.8.8.8 | tail -n1)
           if [ -z "$ip" ]; then
           echo "❌ Failed to resolve 14monarch.tplinkdns.com"
@@ -35,20 +39,115 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show
-      - name: Call Portainer webhook
-        run: |
-          curl -X POST \
-            http://192.168.0.2:83/api/stacks/webhooks/7426bee3-707e-4643-9066-9e3dedb565f8
 
-      - name: Authenticate as new user
+      - name: Authenticate to Portainer
+        id: auth
+        run: |
+          RESPONSE=$(curl -X POST "192.168.0.2:83/api/auth" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "Username":"${{ secrets.PORTAINER_USER }}",
+                 "Password":"${{ secrets.PI_PASSWORD }}"
+                 }')
+          TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Get Stack ID (if exists)
+        id: get_stack_id
+        run: |
+          STACKS=$(curl --fail -s -X GET "http://192.168.0.2:83/api/stacks" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
+
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="nginx") | .Id')
+          
+          if [ -z "$STACK_ID" ]; then
+            echo "Stack not found."
+            echo "stack_id=0" >> $GITHUB_OUTPUT
+          else
+            echo "Stack found with ID: $STACK_ID"
+            echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get Portainer EndpointId
+        id: endpoint
+        run: |
+          RESPONSE=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+          ENDPOINT_ID=$(echo "$RESPONSE" | grep -oP '"Id":[0-9]+' | head -n1 | cut -d: -f2)
+          echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
+
+      - name: Create Stack from GitHub
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
+        run: |
+          echo "Creating stack from GitHub..."
+          RESPONSE=$(curl -v -s -S -X POST "http://192.168.0.2:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "Name": "nginx",
+               "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
+               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "ComposeFile": "nginx-compose.yml",
+               "RepositoryAuthentication": false,
+               "AutoUpdate": {
+                              "forcePullImage": true,
+                              "forceUpdate": true,
+                              "Webhook": "e0ac1738-d609-4ef9-9865-2c73be74fbc0"
+                             },
+               "Env": [
+                       {
+                       "name":"INITIAL_ADMIN_EMAIL",
+                       "value":"${{ secrets.NGINX_EMAIL }}"
+                       },
+                       {
+                       "name":"INITIAL_ADMIN_PASSWORD",
+                       "value":"${{ secrets.PI_PASSWORD }}"
+                       }
+               ],
+               "Prune": true,
+               "StackFileVersion": "3"
+              }')
+
+            echo "API Response: $RESPONSE"
+            echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
+
+      - name: Update Stack
+        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+        run: |
+          curl -s -X PUT "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "PullImage": true,
+               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "repositoryAuthentication": false,
+               "Env": [
+                       {
+                       "name":"INITIAL_ADMIN_EMAIL",
+                       "value":"${{ secrets.NGINX_EMAIL }}"
+                       },
+                       {
+                       "name":"INITIAL_ADMIN_PASSWORD",
+                       "value":"${{ secrets.PI_PASSWORD }}"
+                       }
+                       ],
+               "Prune": true
+              }'               
+
+      - name: Authenticate as nginx user
         id: token
         run: |
-          RESPONSE=$(curl -s -X POST "http://192.168.0.2:81/api/tokens" \
-            -H "Content-Type: application/json" \
-            -d "{\"identity\":\"${{ secrets.NGINX_EMAIL }}\",\"secret\":\"${{ secrets.NGINX_PASSWORD }}\"}")
-          TOKEN=$(echo "$RESPONSE" | grep -oP '"token"\s*:\s*"\K[^"]+')
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          sleep 20
+            RESPONSE=$(curl -s -X POST "http://192.168.0.2:81/api/tokens" \
+              -H "Content-Type: application/json" \
+              -d '{
+                   "identity":"${{ secrets.NGINX_EMAIL }}",
+                   "secret":"${{ secrets.PI_PASSWORD }}"
+                   }')
         
+            TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
+            echo "token=$TOKEN" >> $GITHUB_OUTPUT
+            
       - name: Create Proxy Hosts
         run: |
           TOKEN="${{ steps.token.outputs.token }}"

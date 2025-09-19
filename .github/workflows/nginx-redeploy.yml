@@ -42,7 +42,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
                  "Username":"${{ secrets.PORTAINER_USER }}",
-                 "Password":"${{ secrets.PORTAINER_PASSWORD }}"
+                 "Password":"${{ secrets.PI_PASSWORD }}"
                  }')
           TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
@@ -96,7 +96,7 @@ jobs:
                        },
                        {
                        "name":"INITIAL_ADMIN_PASSWORD",
-                       "value":"${{ secrets.NGINX_PASSWORD }}"
+                       "value":"${{ secrets.PI_PASSWORD }}"
                        }
                ],
                "Prune": true,
@@ -123,7 +123,7 @@ jobs:
                        },
                        {
                        "name":"INITIAL_ADMIN_PASSWORD",
-                       "value":"${{ secrets.NGINX_PASSWORD }}"
+                       "value":"${{ secrets.PI_PASSWORD }}"
                        }
                        ],
                "Prune": true
@@ -137,7 +137,7 @@ jobs:
               -H "Content-Type: application/json" \
               -d '{
                    "identity":"${{ secrets.NGINX_EMAIL }}",
-                   "secret":"${{ secrets.NGINX_PASSWORD }}"
+                   "secret":"${{ secrets.PI_PASSWORD }}"
                    }')
         
             TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')

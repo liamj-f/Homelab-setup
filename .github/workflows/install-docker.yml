@@ -11,13 +11,12 @@ jobs:
       - name: Install WireGuard
         run: |
           sudo apt-get update
-          sudo apt-get install -y wireguard resolvconf
+          sudo apt-get install -y wireguard resolvconf dnsutils
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
       - name: Resolve DDNS and update wg0.conf
         run: |
-          sudo apt-get update && sudo apt-get install -y dnsutils
           ip=$(dig +short 14monarch.tplinkdns.com @8.8.8.8 | tail -n1)
           if [ -z "$ip" ]; then
           echo "❌ Failed to resolve 14monarch.tplinkdns.com"
@@ -78,12 +77,19 @@ jobs:
     uses: liamj-f/rpi4-docker/.github/workflows/portainer-deploy.yml@main
     needs: install_docker
     secrets: inherit
+    with:
+      branch_name: ${{ github.ref }}
   deploy_pihole:
     uses: liamj-f/rpi4-docker/.github/workflows/pihole-redeploy.yml@main
     needs: deploy_portainer
     secrets: inherit
+    with:
+      branch_name: ${{ github.ref }}    
   deploy_nginx:
     uses: liamj-f/rpi4-docker/.github/workflows/nginx-redeploy.yml@main
-    needs: deploy_pihole
+    needs: deploy_portainer
     secrets: inherit
+    with:
+      branch_name: ${{ github.ref }}    
+
     

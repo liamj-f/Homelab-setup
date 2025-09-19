@@ -1,5 +1,4 @@
-name: Redeploy Portainer via Portainer GitOps
-
+name: Redeploy Portainer via Docker Compose
 on:
   push:
     branches:
@@ -8,8 +7,13 @@ on:
       - 'portainer-compose.yml'
   workflow_dispatch:
   workflow_call:
+    inputs:
+      branch_name:
+        required: true
+        type: string
+
 jobs:
-  deploy:
+  Deploy_Portainer_Container:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -17,13 +21,12 @@ jobs:
       - name: Install WireGuard
         run: |
           sudo apt-get update
-          sudo apt-get install -y wireguard resolvconf
+          sudo apt-get install -y wireguard resolvconf dnsutils
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
       - name: Resolve DDNS and update wg0.conf
         run: |
-          sudo apt-get update && sudo apt-get install -y dnsutils
           ip=$(dig +short 14monarch.tplinkdns.com @8.8.8.8 | tail -n1)
           if [ -z "$ip" ]; then
           echo "❌ Failed to resolve 14monarch.tplinkdns.com"
@@ -36,9 +39,11 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show      
+
       - name: Render Portainer compose
         run: |
           envsubst < portainer-compose.yml > portainer-compose.rendered.yml
+          
       - name: Copy rendered compose
         uses: appleboy/scp-action@v0.1.1
         with:
@@ -48,7 +53,9 @@ jobs:
           source: portainer-compose.rendered.yml
           target: ~/stacks/portainer/
           overwrite: true
+          
       - name: Deploy via SSH
+        id: deploy_portainer
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: 192.168.0.2
@@ -56,10 +63,102 @@ jobs:
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             cd ~/stacks/portainer
-            docker compose -f portainer-compose.rendered.yml up -d
-
+            sudo docker compose -f portainer-compose.rendered.yml up -d
             
-#      - name: Call Portainer webhook
+      - name: Create Admin Account if required
+        id: check_admin
+        run: |
+          echo "Waiting for Portainer API to be ready..."
+          STATUS_CODE=000
+          for i in {1..20}; do
+            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.0.2:83/api/users/admin/check || echo "000")
+            if [ "$STATUS_CODE" -ne 000 ]; then
+              echo "Portainer API is responding (HTTP $STATUS_CODE)"
+            break
+            fi
+            echo "Attempt $i: Portainer not ready yet... retrying in 5s"
+            sleep 5
+          done
+
+          if [ "$STATUS_CODE" -eq 000 ]; then
+            echo "Portainer API did not respond after multiple retries. Failing job."
+          exit 1
+          fi
+          if [ "$STATUS_CODE" -eq 204 ]; then
+            echo "Admin account is already initialized."
+          else
+            echo "Admin account is not initialized. Creating..."
+            curl -s -X POST "192.168.0.2:83/api/users/admin/init" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "Username": "${{ secrets.PORTAINER_USER }}", 
+                 "Password": "${{ secrets.PI_PASSWORD }}"
+                 }'
+          fi  
+
+      - name: Authenticate with Portainer
+        id: auth
+        run: |
+          RESPONSE=$(curl -s -X POST "192.168.0.2:83/api/auth" \
+            -H "Content-Type: application/json" \
+            -d  '{
+                "Username": "${{ secrets.PORTAINER_USER }}", 
+                "Password": "${{ secrets.PI_PASSWORD }}"
+                }')
+          TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          
+      - name: Check Status
+        run: |
+          curl -s -X get "192.168.0.2:83/api/status" \
+           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" | jq .
+           
+      - name: Create Local Docker Environment if required
+        id: check_env
+        run: |
+          ENDPOINTS=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+      
+          echo "$ENDPOINTS" | jq .
+      
+          ID=$(echo "$ENDPOINTS" | jq -r '.[] | select(.URL=="unix:///var/run/docker.sock") | .Id')
+      
+          if [ -z "$ID" ]; then
+            echo "No local Docker endpoint found. Creating..."
+            curl -s -X POST http://192.168.0.2:83/api/endpoints \
+              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+              -F "Name=local" \
+              -F "EndpointCreationType=1" \
+              -F "ContainerEngine=docker"
+          else
+            echo "Found local Docker endpoint with ID: $ID"
+            echo "endpoint_id=$ID" >> $GITHUB_OUTPUT
+          fi
+          
+
+#      - name: Create nginx_network if required
 #        run: |
-#          curl -X POST \
-#            http://portainer.14monarch.local/api/stacks/webhooks/xxxxxx
+#          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
+#            "http://192.168.0.2:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/nginx_network" \
+#            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+#            -H "Content-Type: application/json")
+#      
+#          if [ "$RESPONSE" -ne 200 ]; then
+#            echo "nginx_network not found, creating..."
+#            curl -s -X POST "http://192.168.0.2:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/create" \
+#              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+#              -H "Content-Type: application/json" \
+#              -d '{
+#                "Name": "nginx_network",
+#                "Driver": "bridge",
+#                "Labels": {
+#                  "com.docker.compose.network": "nginx_network",
+#                  "com.docker.compose.project": "nginx"
+#                }
+#              }'
+#          else
+#            echo "nginx_network already exists."
+#          fi
+
+      
+

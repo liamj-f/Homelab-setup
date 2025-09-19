@@ -23,8 +23,7 @@ networks:
   nginx_network:
     driver: bridge
     name: nginx_network
-    external: true
 volumes:
   portainer_data:
     name: portainer_data
-    external: true
+    

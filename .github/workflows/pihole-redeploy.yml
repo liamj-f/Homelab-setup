@@ -42,7 +42,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
                  "Username":"${{ secrets.PORTAINER_USER }}", 
-                 "Password":"${{ secrets.PORTAINER_PASSWORD }}"
+                 "Password":"${{ secrets.PI_PASSWORD }}"
                 }')
           TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
@@ -92,7 +92,7 @@ jobs:
                "Env": [
                        {
                         "name":"PIHOLE_WEBPASSWORD",
-                        "value":"${{ secrets.PORTAINER_PASSWORD }}"
+                        "value":"${{ secrets.PI_PASSWORD }}"
                         }
                ],
                "Prune": true,
@@ -115,7 +115,7 @@ jobs:
                "Env": [
                        {
                         "name":"PIHOLE_WEBPASSWORD",
-                        "value":"${{ secrets.PORTAINER_PASSWORD }}"
+                        "value":"${{ secrets.PI_PASSWORD }}"
                         }
                        ],
                "Prune": true
@@ -136,7 +136,7 @@ jobs:
               -d '{
                   "password": "${{ secrets.PORTAINER_PASSWORD }}"
                   }' )
-          echo "$RESPONSE"
+
           CSRF=$(echo "$RESPONSE" | jq -r '.session.csrf')
           SID=$(echo "$RESPONSE" | jq -r '.session.sid')
           echo "sid=$SID" >> $GITHUB_OUTPUT

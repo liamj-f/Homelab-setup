@@ -74,15 +74,15 @@ jobs:
             sudo systemctl enable --now docker
             sudo systemctl status docker --no-pager
   deploy_portainer: 
-    uses: liamj-f/rpi4-docker/.github/workflows/portainer-deploy.yml@${{ github.ref }}
+    uses: liamj-f/rpi4-docker/.github/workflows/portainer-deploy.yml@${{ github.ref_name }}
     needs: install_docker
     secrets: inherit
   deploy_pihole:
-    uses: liamj-f/rpi4-docker/.github/workflows/pihole-redeploy.yml@${{ github.ref }}
+    uses: liamj-f/rpi4-docker/.github/workflows/pihole-redeploy.yml@${{ github.ref_name }}
     needs: deploy_portainer
     secrets: inherit
   deploy_nginx:
-    uses: liamj-f/rpi4-docker/.github/workflows/nginx-redeploy.yml@${{ github.ref }}
+    uses: liamj-f/rpi4-docker/.github/workflows/nginx-redeploy.yml@${{ github.ref_name }}
     needs: deploy_pihole
     secrets: inherit
     

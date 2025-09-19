@@ -11,6 +11,7 @@ on:
       branch_name:
         required: true
         type: string
+        
 jobs:
   deploy:
     runs-on: ubuntu-latest

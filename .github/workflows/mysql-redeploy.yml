@@ -92,7 +92,7 @@ jobs:
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "e0ac1738-d609-4ef9-9865-2c73be74fbc0"
+                              "Webhook": "d8e18d38-8ade-45b9-a226-7487d6780865"
                              },
                "Env": [
                        {

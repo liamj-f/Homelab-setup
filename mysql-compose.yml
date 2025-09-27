@@ -1,0 +1,20 @@
+version: '3.1'
+services:
+  db:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+  adminer:
+    image: adminer:latest  # Adminer is multi-arch, works on arm64
+    container_name: adminer
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    ports:
+      - "85:8080"
+
+volumes:
+  mysql_data:

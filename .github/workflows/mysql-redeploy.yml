@@ -84,7 +84,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "nginx",
+               "Name": "mysql",
                "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
                "RepositoryReferenceName": "${{ inputs.branch_name }}",
                "ComposeFile": "mysql-compose.yml",

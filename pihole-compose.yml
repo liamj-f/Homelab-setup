@@ -19,6 +19,7 @@ services:
         192.168.0.2 portainer.14monarch.local
         192.168.0.2 nginx.14monarch.local
         192.168.0.2 nextcloud.14monarch.local
+        192.168.0.2 adminer.14monarch.local
     volumes:
       - pihole_data:/etc/pihole
       - dnsmasq_data:/etc/dnsmasq.d

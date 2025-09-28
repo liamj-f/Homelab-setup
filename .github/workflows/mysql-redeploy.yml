@@ -133,10 +133,10 @@ jobs:
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             # Wait for MySQL to be ready
-            sudo docker exec mysql sh -c 'until mysqladmin ping -uroot --password="${MYSQL_ROOT_PASSWORD}" --silent; do
+            sudo docker exec mysql sh -c "until mysqladmin ping -uroot --password="${{ secrets.MYSQL_ROOT_PASSWORD }}" --silent; do
               echo "Waiting for MySQL to be ready..."
               sleep 3
-            done'
+            done"
             
             sudo docker exec -i mysql \
             mysql -uroot --password="${{ secrets.MYSQL_ROOT_PASSWORD }}"  -e " \

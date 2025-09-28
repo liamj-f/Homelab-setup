@@ -132,7 +132,7 @@ jobs:
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
-            docker exec -i mysql \
+            sudo docker exec -i mysql \
             mysql -uroot --password="${{ secrets.MYSQL_ROOT_PASSWORD }}"  -e " \
               CREATE USER IF NOT EXISTS '${{ secrets.PORTAINER_USER }}'@'%' IDENTIFIED BY '${{ secrets.PI_PASSWORD }}'; \
               GRANT ALL PRIVILEGES ON *.* TO '${{ secrets.PORTAINER_USER }}'@'%' with grant option; \

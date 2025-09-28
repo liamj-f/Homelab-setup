@@ -124,4 +124,17 @@ jobs:
                        }
                        ],
                "Prune": true
-              }'               
+              }'
+      - name: Deploy new user
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 192.168.0.2
+          username: ${{ secrets.PI_USER }}
+          password: ${{ secrets.PI_PASSWORD }}
+          script: |
+            docker exec -i mysql \
+            mysql -uroot -p$MYSQL_ROOT_PASSWORD \
+            -e "CREATE USER 'Liam' IDENTIFIED BY '${{ secrets.PI_PASSWORD }}'; \
+            GRANT ALL PRIVILEGES ON *.* TO 'Liam' with grant option; \
+            FLUSH PRIVILEGES;"
+          

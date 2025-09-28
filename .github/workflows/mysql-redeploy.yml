@@ -100,7 +100,7 @@ jobs:
                        "value":"${{ secrets.MYSQL_ROOT_PASSWORD }}"
                        }
                ],
-               "Prune": "true",
+               "Prune": true,
                "StackFileVersion": "3"
               }')
 
@@ -123,7 +123,7 @@ jobs:
                        "value":"${{ secrets.MYSQL_ROOT_PASSWORD }}"
                        }
                        ],
-               "Prune": "true"
+               "Prune": true
               }'
       - name: Deploy new user
         uses: appleboy/ssh-action@v1.2.0

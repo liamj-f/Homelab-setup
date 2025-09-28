@@ -100,7 +100,7 @@ jobs:
                        "value":"${{ secrets.MYSQL_ROOT_PASSWORD }}"
                        }
                ],
-               "Prune": true,
+               "Prune": "true",
                "StackFileVersion": "3"
               }')
 
@@ -123,7 +123,7 @@ jobs:
                        "value":"${{ secrets.MYSQL_ROOT_PASSWORD }}"
                        }
                        ],
-               "Prune": true
+               "Prune": "true"
               }'
       - name: Deploy new user
         uses: appleboy/ssh-action@v1.2.0
@@ -133,8 +133,8 @@ jobs:
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             docker exec -i mysql \
-            mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} \
-            -e "CREATE USER IFN OT EXISTS '${{ secrets.PORTAINER_USER }}'@'%'; IDENTIFIED BY '${{ secrets.PI_PASSWORD }}'; \
-            GRANT ALL PRIVILEGES ON *.* TO '${{ secrets.PORTAINER_USER }}'@'%'; with grant option; \
-            FLUSH PRIVILEGES;"
+            mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }}  -e " \
+              CREATE USER IF NOT EXISTS '${{ secrets.PORTAINER_USER }}'@'%' IDENTIFIED BY '${{ secrets.PI_PASSWORD }}'; \
+              GRANT ALL PRIVILEGES ON *.* TO '${{ secrets.PORTAINER_USER }}'@'%' with grant option; \
+              FLUSH PRIVILEGES;"
           

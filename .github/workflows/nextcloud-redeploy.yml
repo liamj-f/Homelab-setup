@@ -1,7 +1,6 @@
 name: Redeploy Nextloud via Portainer GitOps
-
+#ToDo:
 # create the mount points and automount
-# Then create the default nextcloud admin user
 # then rescan files if the database isn't intact.
 
 on:

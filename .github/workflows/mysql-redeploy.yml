@@ -132,8 +132,14 @@ jobs:
           username: ${{ secrets.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
+            # Wait for MySQL to be ready
+            sudo docker exec mysql sh -c 'until mysqladmin ping -uroot --password="${MYSQL_ROOT_PASSWORD}" --silent; do
+              echo "Waiting for MySQL to be ready..."
+              sleep 3
+            done'
+            
             sudo docker exec -i mysql \
-            mysql -h127.0.0.1 -uroot --password="${{ secrets.MYSQL_ROOT_PASSWORD }}"  -e " \
+            mysql -uroot --password="${{ secrets.MYSQL_ROOT_PASSWORD }}"  -e " \
               CREATE USER IF NOT EXISTS '${{ secrets.PORTAINER_USER }}'@'%' IDENTIFIED BY '${{ secrets.PI_PASSWORD }}'; \
               GRANT ALL PRIVILEGES ON *.* TO '${{ secrets.PORTAINER_USER }}'@'%' with grant option; \
               FLUSH PRIVILEGES;"

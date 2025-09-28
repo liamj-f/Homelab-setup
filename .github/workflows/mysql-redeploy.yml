@@ -73,7 +73,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | grep -oP '"Id":[0-9]+' | head -n1 | cut -d: -f2)
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub
@@ -134,7 +134,7 @@ jobs:
           script: |
             docker exec -i mysql \
             mysql -uroot -p$MYSQL_ROOT_PASSWORD \
-            -e "CREATE USER IFN OT EXISTS 'Liam' IDENTIFIED BY '${{ secrets.PI_PASSWORD }}'; \
-            GRANT ALL PRIVILEGES ON *.* TO 'Liam' with grant option; \
+            -e "CREATE USER IFN OT EXISTS 'Liam'@'%'; IDENTIFIED BY '${{ secrets.PI_PASSWORD }}'; \
+            GRANT ALL PRIVILEGES ON *.* TO 'Liam'@'%'; with grant option; \
             FLUSH PRIVILEGES;"
           

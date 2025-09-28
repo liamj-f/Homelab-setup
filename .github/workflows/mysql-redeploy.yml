@@ -73,7 +73,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | grep -oP '"Id":[0-9]+' | head -n1 | cut -d: -f2)
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub
@@ -124,4 +124,23 @@ jobs:
                        }
                        ],
                "Prune": true
-              }'               
+              }'
+      - name: Deploy new user
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: 192.168.0.2
+          username: ${{ secrets.PI_USER }}
+          password: ${{ secrets.PI_PASSWORD }}
+          script: |
+            # Wait for MySQL to be ready
+            sudo docker exec mysql sh -c "until mysqladmin ping -uroot --password='${{ secrets.MYSQL_ROOT_PASSWORD }}' --silent; do
+              echo 'Waiting for MySQL to be ready...'
+              sleep 3
+            done"
+            
+            sudo docker exec -i mysql \
+            mysql -uroot --password="${{ secrets.MYSQL_ROOT_PASSWORD }}"  -e " \
+              CREATE USER IF NOT EXISTS '${{ secrets.PORTAINER_USER }}'@'%' IDENTIFIED BY '${{ secrets.PI_PASSWORD }}'; \
+              GRANT ALL PRIVILEGES ON *.* TO '${{ secrets.PORTAINER_USER }}'@'%' with grant option; \
+              FLUSH PRIVILEGES;"
+          

@@ -91,5 +91,10 @@ jobs:
     secrets: inherit
     with:
       branch_name: ${{ github.ref }}    
-
+  deploy_mysql:
+    uses: liamj-f/rpi4-docker/.github/workflows/mysql-redeploy.yml@main
+    needs: deploy_portainer
+    secrets: inherit
+    with:
+      branch_name: ${{ github.ref }}   
     

@@ -73,7 +73,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | grep -oP '"Id":[0-9]+' | head -n1 | cut -d: -f2)
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub
@@ -152,12 +152,13 @@ jobs:
         run: |
           TOKEN="${{ steps.token.outputs.token }}"
           declare -A hosts
+          hosts["tplink.14monarch.local"]="192.168.0.1:80"
           hosts["nginx.14monarch.local"]="192.168.0.2:81"
           hosts["pihole.14monarch.local"]="192.168.0.2:82"
           hosts["portainer.14monarch.local"]="192.168.0.2:83"
-          hosts["nextcloud.14monarch.local"]="192.168.0.2:84"
-          hosts["tplink.14monarch.local"]="192.168.0.1:80"
-
+          hosts["adminer.14monarch.local"]="192.168.0.2:84"
+          hosts["nextcloud.14monarch.local"]="192.168.0.2:85"
+          
           for domain in "${!hosts[@]}"; do
             host="${hosts[$domain]}"
             host_ip="${host%%:*}"

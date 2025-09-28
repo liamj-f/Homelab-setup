@@ -5,6 +5,12 @@ services:
     container_name: mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     volumes:
       - mysql_data:/var/lib/mysql
   adminer:
@@ -12,9 +18,12 @@ services:
     container_name: adminer
     restart: unless-stopped
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     ports:
       - "85:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080"]
 
 volumes:
   mysql_data:

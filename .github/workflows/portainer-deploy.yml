@@ -105,7 +105,7 @@ jobs:
                 "Username": "${{ secrets.PORTAINER_USER }}", 
                 "Password": "${{ secrets.PI_PASSWORD }}"
                 }')
-          TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
+          TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
           
       - name: Check Status

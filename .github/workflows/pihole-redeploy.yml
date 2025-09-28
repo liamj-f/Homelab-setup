@@ -49,7 +49,7 @@ jobs:
                  "Username":"${{ secrets.PORTAINER_USER }}", 
                  "Password":"${{ secrets.PI_PASSWORD }}"
                 }')
-          TOKEN=$(echo "$RESPONSE" | grep -oP '(?<="jwt":")[^"]+')
+          TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)
@@ -73,7 +73,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | grep -oP '"Id":[0-9]+' | head -n1 | cut -d: -f2)
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub

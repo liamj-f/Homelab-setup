@@ -45,8 +45,8 @@ jobs:
         run: |
           docker exec mysql mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} -e "\
             CREATE DATABASE IF NOT EXISTS nextcloud; \
-            CREATE USER IF NOT EXISTS 'nextcloud_app'@'%' IDENTIFIED BY '${{ secrets.MYSQL_PASSWORD }}'; \
-            GRANT ALL PRIVILEGES ON nextcloud.* TO 'ncuser'@'%'; \
+            CREATE USER IF NOT EXISTS 'nextcloud_app'@'%' IDENTIFIED BY '${{ secrets.NEXTCLOUD_APP_PASSWORD }}'; \
+            GRANT ALL PRIVILEGES ON nextcloud.* TO 'nextcloud_app'@'%'; \
             FLUSH PRIVILEGES;"
       - name: Authenticate to Portainer
         id: auth
@@ -117,7 +117,7 @@ jobs:
                        },
                        {
                         "name":"MYSQL_PASSWORD",
-                        "value":"${{ secrets.PI_PASSWORD }}"
+                        "value":"${{ secrets.NEXTCLOUD_APP_PASSWORD }}"
                         }
                        ],
                ],
@@ -153,7 +153,7 @@ jobs:
                        },
                        {
                         "name":"MYSQL_PASSWORD",
-                        "value":"${{ secrets.PI_PASSWORD }}"
+                        "value":"${{ secrets.NEXTCLOUD_APP_PASSWORD }}"
                         }
                        ],
                "Prune": true

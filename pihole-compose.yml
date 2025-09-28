@@ -10,16 +10,17 @@ services:
       TZ: 'Europe/London'
       FTLCONF_webserver_api_password: ${PIHOLE_WEBPASSWORD}
       FTLCONF_webserver_port: 82
-      FTLCONF_dns_listeningMode: 'single'       # Listen on both interfaces
-      FTLCONF_dns_interface: 'eth0,wg0'     # Limit queries to these interfaces
-      FTLCONF_dns_upstreams: '1.1.1.1;8.8.8.8'
-      FTLCONF_dns_hosts: |
-        192.168.0.1 tplink.14monarch.local
-        192.168.0.2 pihole.14monarch.local
-        192.168.0.2 portainer.14monarch.local
-        192.168.0.2 nginx.14monarch.local
-        192.168.0.2 nextcloud.14monarch.local
-        192.168.0.2 adminer.14monarch.local
+#      Commenting out a lot of these settings as deploying them via the api in .github/workflows/pihole-redeploy.yml prevents them being locked out.      
+#      FTLCONF_dns_listeningMode: 'single'       # Listen on both interfaces
+#      FTLCONF_dns_interface: 'eth0,wg0'     # Limit queries to these interfaces
+#      FTLCONF_dns_upstreams: '1.1.1.1;8.8.8.8'
+#      FTLCONF_dns_hosts: |
+#        192.168.0.1 tplink.14monarch.local
+#        192.168.0.2 pihole.14monarch.local
+#        192.168.0.2 portainer.14monarch.local
+#        192.168.0.2 nginx.14monarch.local
+#        192.168.0.2 nextcloud.14monarch.local
+#        192.168.0.2 adminer.14monarch.local
     volumes:
       - pihole_data:/etc/pihole
       - dnsmasq_data:/etc/dnsmasq.d

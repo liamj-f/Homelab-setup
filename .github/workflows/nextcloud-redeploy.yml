@@ -116,7 +116,15 @@ jobs:
                        {
                         "name":"MYSQL_PASSWORD",
                         "value":"${{ secrets.NEXTCLOUD_APP_PASSWORD }}"
-                        }
+                        },
+                       {
+                        "name":"NEXTCLOUD_ADMIN_USER",
+                        "value":"${{ secrets.PORTAINER_USER }}"
+                       },
+                       {
+                        "name":"NEXTCLOUD_ADMIN_PASSWORD",
+                        "value":"${{ secrets.PI_PASSWORD }}"
+                       }
                        ],
                ],
                "Prune": true,
@@ -152,8 +160,17 @@ jobs:
                        {
                         "name":"MYSQL_PASSWORD",
                         "value":"${{ secrets.NEXTCLOUD_APP_PASSWORD }}"
-                        }
+                        },
+                       {
+                        "name":"NEXTCLOUD_ADMIN_USER",
+                        "value":"${{ secrets.PORTAINER_USER }}"
+                       },
+                       {
+                        "name":"NEXTCLOUD_ADMIN_PASSWORD",
+                        "value":"${{ secrets.PI_PASSWORD }}"
+                       }
                        ],
+               ],
                "Prune": true
               }'          
     

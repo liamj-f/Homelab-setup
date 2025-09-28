@@ -134,7 +134,7 @@ jobs:
           script: |
             docker exec -i mysql \
             mysql -uroot -p$MYSQL_ROOT_PASSWORD \
-            -e "CREATE USER IFN OT EXISTS 'Liam'@'%'; IDENTIFIED BY '${{ secrets.PI_PASSWORD }}'; \
-            GRANT ALL PRIVILEGES ON *.* TO 'Liam'@'%'; with grant option; \
+            -e "CREATE USER IFN OT EXISTS '${{ secrets.PORTAINER_USER }}'@'%'; IDENTIFIED BY '${{ secrets.PI_PASSWORD }}'; \
+            GRANT ALL PRIVILEGES ON *.* TO '${{ secrets.PORTAINER_USER }}'@'%'; with grant option; \
             FLUSH PRIVILEGES;"
           

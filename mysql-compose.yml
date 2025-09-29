@@ -13,6 +13,8 @@ services:
       start_period: 30s
     volumes:
       - mysql_data:/var/lib/mysql
+    ports:
+      - "192.168.0.2:3306:3306"
   adminer:
     image: adminer:latest  # Adminer is multi-arch, works on arm64
     container_name: adminer

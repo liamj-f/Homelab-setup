@@ -175,5 +175,29 @@ jobs:
                           }
                         }
                 }'
-
+      - name: Add Blocklists to Pihole via API
+        run: |
+          curl -X POST "http://192.168.0.2:82/api/lists" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d '{
+              "address": [
+                          "https://v.firebog.net/hosts/Easylist.txt",
+                          "https://media.githubusercontent.com/media/zachlagden/Pi-hole-Optimized-Blocklists/refs/heads/main/lists/advertising.txt",
+                          "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts"
+                          ],
+              "type": "block",
+              "comment": "Added via API",
+              "groups": [0],
+              "enabled": true
+              }'
+      - name: Update Gravity via API
+        run: |
+          curl -X POST "http://192.168.0.2:82/api/action/gravity" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
 

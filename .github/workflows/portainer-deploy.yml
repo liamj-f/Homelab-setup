@@ -87,7 +87,7 @@ jobs:
             curl -s -X POST "${{ vars.PI_HOST_IP }}:83/api/users/admin/init" \
             -H "Content-Type: application/json" \
             -d '{
-                 "Username": "${{ secrets.PORTAINER_USER }}", 
+                 "Username": "${{ vars.PORTAINER_USER }}", 
                  "Password": "${{ secrets.PI_PASSWORD }}"
                  }'
           fi  
@@ -98,7 +98,7 @@ jobs:
           RESPONSE=$(curl -s -X POST "${{ vars.PI_HOST_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
             -d  '{
-                "Username": "${{ secrets.PORTAINER_USER }}", 
+                "Username": "${{ vars.PORTAINER_USER }}", 
                 "Password": "${{ secrets.PI_PASSWORD }}"
                 }')
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')

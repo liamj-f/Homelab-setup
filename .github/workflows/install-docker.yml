@@ -19,6 +19,12 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show
+
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+          
       - name: Uninstall old Docker
         uses: appleboy/ssh-action@master
         with:

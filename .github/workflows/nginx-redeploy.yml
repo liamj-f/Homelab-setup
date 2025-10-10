@@ -22,21 +22,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y wireguard 
-        # resolvconf  
-        #  dnsutils
+
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
-#      - name: Resolve DDNS and update wg0.conf
-#        run: |
-#          ip=$(dig +short 14monarch.tplinkdns.com @8.8.8.8 | tail -n1)
-#          if [ -z "$ip" ]; then
-#          echo "❌ Failed to resolve 14monarch.tplinkdns.com"
-#          exit 1
-#          fi
-#          echo "✅ Resolved 14monarch.tplinkdns.com to $ip"
-#          sudo sed -i "s|14monarch.tplinkdns.com|$ip|" wg0.conf
-#          echo "🔧 Updated wg0.conf to use $ip instead of DDNS"
+
       - name: Bring up VPN
         run: |
           sudo wg-quick up ./wg0.conf
@@ -178,3 +168,7 @@ jobs:
                 "enabled": true
               }' | jq
           done
+      - name: Bring down VPN
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show

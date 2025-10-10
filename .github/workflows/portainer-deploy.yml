@@ -21,34 +21,30 @@ jobs:
       - name: Install WireGuard
         run: |
           sudo apt-get update
-          sudo apt-get install -y wireguard resolvconf dnsutils
+          sudo apt-get install -y wireguard 
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
-      - name: Resolve DDNS and update wg0.conf
-        run: |
-          ip=$(dig +short 14monarch.tplinkdns.com @8.8.8.8 | tail -n1)
-          if [ -z "$ip" ]; then
-          echo "❌ Failed to resolve 14monarch.tplinkdns.com"
-          exit 1
-          fi
-          echo "✅ Resolved 14monarch.tplinkdns.com to $ip"
-          sudo sed -i "s|14monarch.tplinkdns.com|$ip|" wg0.conf
-          echo "🔧 Updated wg0.conf to use $ip instead of DDNS"
+
       - name: Bring up VPN
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show      
+          
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
       - name: Render Portainer compose
         run: |
           envsubst < portainer-compose.yml > portainer-compose.rendered.yml
           
       - name: Copy rendered compose
-        uses: appleboy/scp-action@v0.1.1
+        uses: appleboy/scp-action@vmaster
         with:
-          host: 192.168.0.2
-          username: ${{ secrets.PI_USER }}
+          host: ${{ vars.PI_HOST_IP }}
+          username: ${{ vars.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           source: portainer-compose.rendered.yml
           target: ~/stacks/portainer/
@@ -56,10 +52,10 @@ jobs:
           
       - name: Deploy via SSH
         id: deploy_portainer
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@master
         with:
-          host: 192.168.0.2
-          username: ${{ secrets.PI_USER }}
+          host: ${{ vars.PI_HOST_IP }}
+          username: ${{ vars.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             cd ~/stacks/portainer
@@ -71,7 +67,7 @@ jobs:
           echo "Waiting for Portainer API to be ready..."
           STATUS_CODE=000
           for i in {1..20}; do
-            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.0.2:83/api/users/admin/check || echo "000")
+            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ vars.PI_HOST_IP }}:83/api/users/admin/check || echo "000")
             if [ "$STATUS_CODE" -ne 000 ]; then
               echo "Portainer API is responding (HTTP $STATUS_CODE)"
             break
@@ -88,10 +84,10 @@ jobs:
             echo "Admin account is already initialized."
           else
             echo "Admin account is not initialized. Creating..."
-            curl -s -X POST "192.168.0.2:83/api/users/admin/init" \
+            curl -s -X POST "${{ vars.PI_HOST_IP }}:83/api/users/admin/init" \
             -H "Content-Type: application/json" \
             -d '{
-                 "Username": "${{ secrets.PORTAINER_USER }}", 
+                 "Username": "${{ vars.PORTAINER_USER }}", 
                  "Password": "${{ secrets.PI_PASSWORD }}"
                  }'
           fi  
@@ -99,10 +95,10 @@ jobs:
       - name: Authenticate with Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -s -X POST "192.168.0.2:83/api/auth" \
+          RESPONSE=$(curl -s -X POST "${{ vars.PI_HOST_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
             -d  '{
-                "Username": "${{ secrets.PORTAINER_USER }}", 
+                "Username": "${{ vars.PORTAINER_USER }}", 
                 "Password": "${{ secrets.PI_PASSWORD }}"
                 }')
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
@@ -110,13 +106,13 @@ jobs:
           
       - name: Check Status
         run: |
-          curl -s -X get "192.168.0.2:83/api/status" \
+          curl -s -X get "${{ vars.PI_HOST_IP }}:83/api/status" \
            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" | jq .
            
       - name: Create Local Docker Environment if required
         id: check_env
         run: |
-          ENDPOINTS=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
+          ENDPOINTS=$(curl -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
       
           echo "$ENDPOINTS" | jq .
@@ -125,7 +121,7 @@ jobs:
       
           if [ -z "$ID" ]; then
             echo "No local Docker endpoint found. Creating..."
-            curl -s -X POST http://192.168.0.2:83/api/endpoints \
+            curl -s -X POST http://${{ vars.PI_HOST_IP }}:83/api/endpoints \
               -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
               -F "Name=local" \
               -F "EndpointCreationType=1" \
@@ -139,13 +135,13 @@ jobs:
 #      - name: Create nginx_network if required
 #        run: |
 #          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
-#            "http://192.168.0.2:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/nginx_network" \
+#            "http://${{ vars.PI_HOST_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/nginx_network" \
 #            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
 #            -H "Content-Type: application/json")
 #      
 #          if [ "$RESPONSE" -ne 200 ]; then
 #            echo "nginx_network not found, creating..."
-#            curl -s -X POST "http://192.168.0.2:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/create" \
+#            curl -s -X POST "http://${{ vars.PI_HOST_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/create" \
 #              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
 #              -H "Content-Type: application/json" \
 #              -d '{
@@ -159,6 +155,9 @@ jobs:
 #          else
 #            echo "nginx_network already exists."
 #          fi
-
+      - name: Bring down VPN
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show   
       
 

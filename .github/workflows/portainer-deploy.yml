@@ -43,7 +43,7 @@ jobs:
       - name: Copy rendered compose
         uses: appleboy/scp-action@vmaster
         with:
-          host: 192.168.0.2
+          host: ${{ vars.PI_HOST_IP }}
           username: ${{ vars.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           source: portainer-compose.rendered.yml

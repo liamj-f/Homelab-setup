@@ -20,24 +20,21 @@ jobs:
       - name: Install WireGuard
         run: |
           sudo apt-get update
-          sudo apt-get install -y wireguard resolvconf dnsutils
+          sudo apt-get install -y wireguard 
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
-      - name: Resolve DDNS and update wg0.conf
-        run: |
-          ip=$(dig +short 14monarch.tplinkdns.com @8.8.8.8 | tail -n1)
-          if [ -z "$ip" ]; then
-          echo "❌ Failed to resolve 14monarch.tplinkdns.com"
-          exit 1
-          fi
-          echo "✅ Resolved 14monarch.tplinkdns.com to $ip"
-          sudo sed -i "s|14monarch.tplinkdns.com|$ip|" wg0.conf
-          echo "🔧 Updated wg0.conf to use $ip instead of DDNS"
+
       - name: Bring up VPN
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show
+          
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+          
       - name: Create Nextcloud DB + User
         run: |
           docker exec mysql mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} -e "\
@@ -45,13 +42,14 @@ jobs:
             CREATE USER IF NOT EXISTS 'nextcloud_app'@'%' IDENTIFIED BY '${{ secrets.NEXTCLOUD_APP_PASSWORD }}'; \
             GRANT ALL PRIVILEGES ON nextcloud.* TO 'nextcloud_app'@'%'; \
             FLUSH PRIVILEGES;"
+            
       - name: Authenticate to Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -X POST "192.168.0.2:83/api/auth" \
+          RESPONSE=$(curl -X POST "${{ secrets.PI_HOST_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
             -d '{
-                 "Username":"${{ secrets.PORTAINER_USER }}", 
+                 "Username":"${{ vars.PORTAINER_USER }}", 
                  "Password":"${{ secrets.PI_PASSWORD }}"
                 }')
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
@@ -60,7 +58,7 @@ jobs:
       - name: Get Stack ID (if exists)
         id: get_stack_id
         run: |
-          STACKS=$(curl --fail -s -X GET "http://192.168.0.2:83/api/stacks" \
+          STACKS=$(curl --fail -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
 
           STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="nextcloud") | .Id')
@@ -76,7 +74,7 @@ jobs:
       - name: Get Portainer EndpointId
         id: endpoint
         run: |
-          RESPONSE=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
+          RESPONSE=$(curl -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
@@ -85,7 +83,7 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
           echo "Creating stack from GitHub..."
-          RESPONSE=$(curl -v -s -S -X POST "http://192.168.0.2:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.PI_HOST_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -118,7 +116,7 @@ jobs:
                         },
                        {
                         "name":"NEXTCLOUD_ADMIN_USER",
-                        "value":"${{ secrets.PORTAINER_USER }}"
+                        "value":"${{ vars.PORTAINER_USER }}"
                        },
                        {
                         "name":"NEXTCLOUD_ADMIN_PASSWORD",
@@ -136,7 +134,7 @@ jobs:
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          curl -s -X PUT "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          curl -s -X PUT "http://${{ vars.PI_HOST_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -162,7 +160,7 @@ jobs:
                         },
                        {
                         "name":"NEXTCLOUD_ADMIN_USER",
-                        "value":"${{ secrets.PORTAINER_USER }}"
+                        "value":"${{ vars.PORTAINER_USER }}"
                        },
                        {
                         "name":"NEXTCLOUD_ADMIN_PASSWORD",
@@ -180,10 +178,14 @@ jobs:
 #          echo "$RESPONSE"
 
       - name: Rescan files in external drive
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@master
         with:
-          host: liam-pi4
-          username: ${{ secrets.PI_USER }}
+          host: ${{ vars.PI_HOST_IP }}
+          username: ${{ vars.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             docker exec -u www-data nextcloud php occ files:scan --all
+      - name: Bring down VPN
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show   

@@ -1,4 +1,4 @@
-name: Redeploy mysql via Portainer GitOps
+name: Redeploy MySQL via Portainer GitOps
 on:
   push:
     branches:

@@ -58,7 +58,7 @@ jobs:
       - name: Get Stack ID (if exists)
         id: get_stack_id
         run: |
-          STACKS=$(curl --fail -s -X GET "http://${{ secrets.PI_HOST_IP }}:83/api/stacks" \
+          STACKS=$(curl --fail -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
 
           STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="nextcloud") | .Id')

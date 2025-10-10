@@ -31,6 +31,36 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show
+
+      - name: Check WireGuard interface
+        run: |
+          ip addr show wg0
+          ip link show wg0
+  
+      - name: Check routing table
+        run: ip route
+  
+      - name: Ping VPN peer
+        run: ping -c 4 192.168.0.1
+        continue-on-error: true
+  
+      - name: Test DNS resolution
+        run: nslookup github.com
+        continue-on-error: true
+  
+      - name: Force DNS to Cloudflare (fallback)
+        if: failure()
+        run: echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+  
+      - name: Test external connectivity
+        run: curl -I https://github.com
+        continue-on-error: true
+  
+      - name: SSH into VPN peer
+        run: |
+          sshpass -p "${{ secrets.PI_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ vars.PI_USER }}@${{ vars.PI_HOST_IP }} "hostname && uptime"
+        continue-on-error: true
+        
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf

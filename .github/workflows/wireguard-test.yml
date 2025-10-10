@@ -5,7 +5,7 @@ on:
       - "*"
   workflow_dispatch:
 jobs:
-  install_docker:
+  Wireguard_test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo

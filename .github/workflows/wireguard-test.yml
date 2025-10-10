@@ -31,10 +31,19 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show
+ 
+      - name: Check resolv.conf symlink
+        run: ls -l /etc/resolv.conf
+  
       - name: Force DNS to Cloudflare
         run: |
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
           sudo systemctl restart systemd-resolved || true
+
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
       - name: Check WireGuard interface
         run: |

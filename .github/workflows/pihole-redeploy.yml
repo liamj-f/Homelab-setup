@@ -32,13 +32,18 @@ jobs:
           sudo wg-quick up ./wg0.conf
           sudo wg show
           
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+          
       - name: Authenticate to Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -X POST "192.168.0.2:83/api/auth" \
+          RESPONSE=$(curl -X POST "${{ vars.PI_HOST_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
             -d '{
-                 "Username":"${{ secrets.PORTAINER_USER }}", 
+                 "Username":"${{ vars.PORTAINER_USER }}", 
                  "Password":"${{ secrets.PI_PASSWORD }}"
                 }')
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
@@ -47,7 +52,7 @@ jobs:
       - name: Get Stack ID (if exists)
         id: get_stack_id
         run: |
-          STACKS=$(curl --fail -s -X GET "http://192.168.0.2:83/api/stacks" \
+          STACKS=$(curl --fail -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
 
           STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="pihole") | .Id')
@@ -63,7 +68,7 @@ jobs:
       - name: Get Portainer EndpointId
         id: endpoint
         run: |
-          RESPONSE=$(curl -s -X GET "http://192.168.0.2:83/api/endpoints" \
+          RESPONSE=$(curl -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
@@ -72,7 +77,7 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
           echo "Creating stack from GitHub..."
-          RESPONSE=$(curl -v -s -S -X POST "http://192.168.0.2:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.PI_HOST_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -102,7 +107,7 @@ jobs:
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          curl -s -X PUT "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          curl -s -X PUT "http://${{ vars.PI_HOST_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -128,7 +133,7 @@ jobs:
         id: pihole_auth
         run: |
           sleep 20
-          RESPONSE=$(curl -s -X POST "http://192.168.0.2:82/api/auth" \
+          RESPONSE=$(curl -s -X POST "http://${{ vars.PI_HOST_IP }}:82/api/auth" \
               -H "Content-Type: application/json" \
               -d '{
                   "password": "${{ secrets.PI_PASSWORD }}"
@@ -141,7 +146,7 @@ jobs:
           
       - name: Add DNS records to Pihole via API
         run: |
-          curl -X PATCH "http://192.168.0.2:82/api/config" \
+          curl -X PATCH "http://${{ vars.PI_HOST_IP }}:82/api/config" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
@@ -156,11 +161,11 @@ jobs:
                                     ],
                       "hosts":[
                               "192.168.0.1 tplink.14monarch.local",
-                              "192.168.0.2 pihole.14monarch.local",
-                              "192.168.0.2 nginx.14monarch.local",
-                              "192.168.0.2 portainer.14monarch.local",
-                              "192.168.0.2 nextcloud.14monarch.local",
-                              "192.168.0.2 adminer.14monarch.local"
+                              "${{ vars.PI_HOST_IP }} pihole.14monarch.local",
+                              "${{ vars.PI_HOST_IP }} nginx.14monarch.local",
+                              "${{ vars.PI_HOST_IP }} portainer.14monarch.local",
+                              "${{ vars.PI_HOST_IP }} nextcloud.14monarch.local",
+                              "${{ vars.PI_HOST_IP }} adminer.14monarch.local"
                               ],
                       "interface": "eth0,wg0",
                       "listeningMode": "single"
@@ -169,7 +174,7 @@ jobs:
                 }'
       - name: Add Blocklists to Pihole via API
         run: |
-          curl -X POST "http://192.168.0.2:82/api/lists" \
+          curl -X POST "http://${{ vars.PI_HOST_IP }}:82/api/lists" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
@@ -187,7 +192,7 @@ jobs:
               }'
       - name: Update Gravity via API
         run: |
-          curl -X POST "http://192.168.0.2:82/api/action/gravity" \
+          curl -X POST "http://${{ vars.PI_HOST_IP }}:82/api/action/gravity" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \

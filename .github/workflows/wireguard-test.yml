@@ -31,6 +31,10 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show
+      - name: Force DNS to Cloudflare
+        run: |
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+          sudo systemctl restart systemd-resolved || true
 
       - name: Check WireGuard interface
         run: |

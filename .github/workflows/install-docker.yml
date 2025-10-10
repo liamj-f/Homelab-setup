@@ -20,20 +20,20 @@ jobs:
           sudo wg-quick up ./wg0.conf
           sudo wg show
       - name: Uninstall old Docker
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@master
         with:
-          host: 192.168.0.2
-          username: ${{ secrets.PI_USER }}
+          host: ${{ vars.PI_HOST_IP }}
+          username: ${{ vars.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
               sudo apt-get remove -y --allow-change-held-packages $pkg || true
             done
       - name: Add Docker repository
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@master
         with:
-          host: 192.168.0.2
-          username: ${{ secrets.PI_USER }}
+          host: ${{ vars.PI_HOST_IP }}
+          username: ${{ vars.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             sudo apt-get update
@@ -47,18 +47,18 @@ jobs:
             sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
             sudo apt-get update
       - name: Install Docker packages
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@master
         with:
-          host: 192.168.0.2
-          username: ${{ secrets.PI_USER }}
+          host: ${{ vars.PI_HOST_IP }}
+          username: ${{ vars.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
       - name: Ensure Docker is running
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@master
         with:
-          host: 192.168.0.2
-          username: ${{ secrets.PI_USER }}
+          host: ${{ vars.PI_HOST_IP }}
+          username: ${{ vars.PI_USER }}
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             sudo systemctl enable --now docker

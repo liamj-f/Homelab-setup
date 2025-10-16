@@ -2,7 +2,7 @@ version: "3.8"
 services:
   pihole-api-scanner:
     build: 
-      context: ./pihole
+      context: .
       dockerfile: scanner_DOCKERFILE
     container_name: pihole-api-scanner
     restart: unless-stopped

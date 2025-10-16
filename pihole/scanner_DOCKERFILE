@@ -5,4 +5,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 COPY ./scanner_api.py /app/scanner_api.py
 WORKDIR /app
-CMD ["python","/app/scanner_api_auth.py"]
+CMD ["python","/app/scanner_api.py"]

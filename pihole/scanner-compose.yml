@@ -1,0 +1,15 @@
+version: "3.8"
+services:
+  pihole-api-scanner:
+    build: .
+    container_name: pihole-api-scanner
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - LAN_SUBNET=192.168.0.0/24
+      - PIHOLE_HOST=192.168.0.2
+      - PIHOLE_PORT=82
+      - PI_PASSWORD=${PI_PASSWORD}     # set from your secret store
+      - PI_HOST_IP=192.168.0.2
+      - SCAN_INTERVAL=300
+      - DRY_RUN=1

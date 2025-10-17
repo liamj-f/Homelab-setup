@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
-Pi-hole dynamic hostname sync using /admin/api/config/hosts (v6+).
+Pi-hole hostname scanner using modern /admin/api/config/hosts (v6+).
 
 Features:
 - Ping sweep of LAN_SUBNET
-- Reverse DNS, mDNS, NetBIOS name resolution
-- Session auth via /api/auth
-- Add/update hostnames with PUT /config/hosts
-- Delete stale hosts with DELETE /config/hosts
+- Reverse DNS, mDNS, NetBIOS resolution
+- PUT /config/hosts for adding/updating
+- DELETE /config/hosts for stale entries
 - DRY_RUN support
-- Safe loop with exception handling and subprocess timeouts
+- Safe loop with exception handling
 """
 
 import os
@@ -26,7 +25,7 @@ from datetime import datetime, timedelta
 # ---------------------------
 PIHOLE_HOST = os.getenv("PIHOLE_HOST", "pihole.local")
 PIHOLE_PORT = os.getenv("PIHOLE_PORT", "80")
-PI_PASSWORD = os.getenv("PI_PASSWORD")  # for /api/auth
+PI_PASSWORD = os.getenv("PI_PASSWORD")  # session auth
 LAN_SUBNET = os.getenv("LAN_SUBNET", "192.168.0.0/24")
 PI_HOST_IP = os.getenv("PI_HOST_IP")  # do not delete
 SCAN_INTERVAL = int(os.getenv("SCAN_INTERVAL", "300"))
@@ -130,7 +129,7 @@ class PiHoleAPI:
 
     def _auth_session(self):
         if not PI_PASSWORD:
-            log("[!] PI_PASSWORD must be set for session auth")
+            log("[!] PI_PASSWORD must be set")
             raise SystemExit(1)
         try:
             r = self.session.post(AUTH_URL, json={"password": PI_PASSWORD}, timeout=10)
@@ -177,23 +176,22 @@ class PiHoleAPI:
 # Main scan logic
 # ---------------------------
 def run_scan(api):
-    active_ips = set(scan_network(LAN_SUBNET))
+    alive_ips = set(scan_network(LAN_SUBNET))
     nbtscan_map = run_nbtscan(LAN_SUBNET)
     found = {}
-    for ip in active_ips:
+    for ip in alive_ips:
         name = resolve_reverse(ip) or nbtscan_map.get(ip) or resolve_mdns(ip)
         if name:
             found[ip] = name.rstrip(".")
 
-    log(f"[i] Resolved {len(found)} hostnames out of {len(active_ips)} alive hosts")
+    log(f"[i] Resolved {len(found)} hostnames out of {len(alive_ips)} alive hosts")
 
     # Add/update hosts
     for ip, hostname in found.items():
         api.put_host(hostname, ip)
 
-    # Prune stale hosts (optional: implement your own stale detection)
-    # Example: delete hosts in a fixed list not in active_ips (except PI_HOST_IP)
-    # Skipped here for simplicity
+    # Optional: prune stale hosts not in active IPs (except PI_HOST_IP)
+    # Implement your own stale detection if desired
 
 # ---------------------------
 # Main loop

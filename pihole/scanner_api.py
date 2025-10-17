@@ -24,7 +24,7 @@ SCAN_INTERVAL = int(os.getenv("SCAN_INTERVAL", "300"))
 DRY_RUN = os.getenv("DRY_RUN", "0") == "1"
 
 BASE = f"http://{PIHOLE_HOST}:{PIHOLE_PORT}"
-API_URL = f"{BASE}/admin/api.php"
+API_URL = f"{BASE}/api"
 AUTH_URL = f"{BASE}/api/auth"             # per your snippet
 
 # Utilities: network scan

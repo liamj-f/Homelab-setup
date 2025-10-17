@@ -147,30 +147,37 @@ class PiHoleAPI:
             h["X-CSRF-Token"] = self.csrf
         return h
 
-    def put_host(self, hostname, ip):
-        url = f"{CONFIG_HOSTS_URL}/{hostname}"
-        data = {"ip": ip}
-        if DRY_RUN:
-            log(f"[DRY RUN] Would PUT {hostname} -> {ip}")
-            return
-        try:
-            r = self.session.put(url, json=data, headers=self._headers(), timeout=10)
-            r.raise_for_status()
-            log(f"[+] PUT {hostname} -> {ip}")
-        except Exception as e:
-            log(f"[!] Failed PUT {hostname}: {e}")
+def put_host(self, hostname, ip):
+    url = f"{CONFIG_HOSTS_URL}/{hostname}"
+    data = {"ip": ip}
+    log(f"[DEBUG] PUT URL: {url} | Body: {data}")   # <-- log the full request
+    if DRY_RUN:
+        log(f"[DRY RUN] Would PUT {hostname} -> {ip}")
+        return
+    try:
+        r = self.session.put(url, json=data, headers=self._headers(), timeout=10)
+        r.raise_for_status()
+        log(f"[+] PUT {hostname} -> {ip}")
+    except Exception as e:
+        log(f"[!] Failed PUT {hostname}: {e}")
+        if hasattr(e, "response") and e.response is not None:
+            log(f"[DEBUG] Response: {e.response.status_code} {e.response.text[:300]}")
 
-    def delete_host(self, hostname):
-        url = f"{CONFIG_HOSTS_URL}/{hostname}"
-        if DRY_RUN:
-            log(f"[DRY RUN] Would DELETE {hostname}")
-            return
-        try:
-            r = self.session.delete(url, headers=self._headers(), timeout=10)
-            r.raise_for_status()
-            log(f"[-] DELETE {hostname}")
-        except Exception as e:
-            log(f"[!] Failed DELETE {hostname}: {e}")
+def delete_host(self, hostname):
+    url = f"{CONFIG_HOSTS_URL}/{hostname}"
+    log(f"[DEBUG] DELETE URL: {url}")   # <-- log the full request
+    if DRY_RUN:
+        log(f"[DRY RUN] Would DELETE {hostname}")
+        return
+    try:
+        r = self.session.delete(url, headers=self._headers(), timeout=10)
+        r.raise_for_status()
+        log(f"[-] DELETE {hostname}")
+    except Exception as e:
+        log(f"[!] Failed DELETE {hostname}: {e}")
+        if hasattr(e, "response") and e.response is not None:
+            log(f"[DEBUG] Response: {e.response.status_code} {e.response.text[:300]}")
+
 
 # ---------------------------
 # Main scan logic

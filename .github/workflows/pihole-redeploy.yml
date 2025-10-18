@@ -1,226 +1,203 @@
-#!/usr/bin/env python3
-"""
-Pi-hole hostname scanner using modern /admin/api/config/hosts (v6+).
+name: Redeploy Pihole via Portainer GitOps
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'pihole-compose.yml'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      branch_name:
+        required: true
+        type: string
+        
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Install WireGuard
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wireguard
+          
+      - name: Write WireGuard config
+        run: |
+          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
 
-Features:
-- Ping sweep of LAN_SUBNET
-- Reverse DNS, mDNS, NetBIOS resolution
-- PUT /config/hosts for adding/updating
-- DELETE /config/hosts for stale entries
-- DRY_RUN support
-- Safe loop with exception handling
-"""
+      - name: Bring up VPN
+        run: |
+          sudo wg-quick up ./wg0.conf
+          sudo wg show
+          
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+          
+      - name: Authenticate to Portainer
+        id: auth
+        run: |
+          RESPONSE=$(curl -X POST "${{ vars.PI_HOST_IP }}:83/api/auth" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "Username":"${{ vars.PORTAINER_USER }}", 
+                 "Password":"${{ secrets.PI_PASSWORD }}"
+                }')
+          TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-import os
-import time
-import socket
-import requests
-import subprocess
-import traceback
-from ipaddress import ip_network
-from datetime import datetime, timedelta
+      - name: Get Stack ID (if exists)
+        id: get_stack_id
+        run: |
+          STACKS=$(curl --fail -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/stacks" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
 
-# ---------------------------
-# Configuration
-# ---------------------------
-PIHOLE_HOST = os.getenv("PIHOLE_HOST", "pihole.local")
-PIHOLE_PORT = os.getenv("PIHOLE_PORT", "80")
-PI_PASSWORD = os.getenv("PI_PASSWORD")  # session auth
-LAN_SUBNET = os.getenv("LAN_SUBNET", "192.168.0.0/24")
-PI_HOST_IP = os.getenv("PI_HOST_IP")  # do not delete
-SCAN_INTERVAL = int(os.getenv("SCAN_INTERVAL", "300"))
-DRY_RUN = os.getenv("DRY_RUN", "0") == "1"
-PING_TIMEOUT = float(os.getenv("PING_TIMEOUT", "1.0"))
-MDNS_TIMEOUT = int(os.getenv("MDNS_TIMEOUT", "2"))
-NBTSCAN_TIMEOUT = int(os.getenv("NBTSCAN_TIMEOUT", "25"))
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="pihole") | .Id')
+          
+          if [ -z "$STACK_ID" ]; then
+            echo "Stack not found."
+            echo "stack_id=0" >> $GITHUB_OUTPUT
+          else
+            echo "Stack found with ID: $STACK_ID"
+            echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
+          fi
 
-BASE = f"http://{PIHOLE_HOST}:{PIHOLE_PORT}"
-AUTH_URL = f"{BASE}/api/auth"
-CONFIG_HOSTS_URL = f"{BASE}/admin/api/config/hosts"
+      - name: Get Portainer EndpointId
+        id: endpoint
+        run: |
+          RESPONSE=$(curl -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
+          echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
-# ---------------------------
-# Logging
-# ---------------------------
-def log(msg):
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{ts}] {msg}", flush=True)
+      - name: Create Stack from GitHub
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
+        run: |
+          echo "Creating stack from GitHub..."
+          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.PI_HOST_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "Name": "pihole",
+               "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
+               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "ComposeFile": "pihole-compose.yml",
+               "RepositoryAuthentication": false,
+               "AutoUpdate": {
+                              "forcePullImage": true,
+                              "forceUpdate": true,
+                              "Webhook": "e56041a2-75f6-4a10-85dc-c69424de631e"
+                             },
+               "Env": [
+                       {
+                        "name":"PIHOLE_WEBPASSWORD",
+                        "value":"${{ secrets.PI_PASSWORD }}"
+                        }
+               ],
+               "Prune": true,
+               "StackFileVersion": "3"
+              }')
 
-# ---------------------------
-# Utilities
-# ---------------------------
-def run_subprocess(cmd, timeout=None):
-    try:
-        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=timeout).decode().strip()
-        return out
-    except subprocess.TimeoutExpired:
-        log(f"[!] subprocess timeout: {' '.join(cmd)}")
-    except subprocess.CalledProcessError:
-        pass
-    except FileNotFoundError:
-        log(f"[!] command not found: {cmd[0]}")
-    return None
+            echo "API Response: $RESPONSE"
+            echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
 
-def ping_host(ip):
-    try:
-        res = subprocess.run(
-            ["ping", "-c", "1", "-W", str(int(PING_TIMEOUT)), ip],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=PING_TIMEOUT + 1
-        )
-        return res.returncode == 0
-    except Exception:
-        return False
+      - name: Update Stack
+        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+        run: |
+          curl -s -X PUT "http://${{ vars.PI_HOST_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "PullImage": true,
+               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "repositoryAuthentication": false,
+               "Env": [
+                       {
+                        "name":"PIHOLE_WEBPASSWORD",
+                        "value":"${{ secrets.PI_PASSWORD }}"
+                        }
+                       ],
+               "Prune": true
+              }'          
+    
+#      - name: Trigger stack redeploy via webhook
+#        run: |
+#          echo "Triggering stack redeploy via webhook..."
+#          RESPONSE=$(curl -s -w "HTTP %{http_code}" -X POST "http://192.168.0.2:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e")
+#          echo "$RESPONSE"
 
-def scan_network(subnet):
-    net = ip_network(subnet)
-    alive = []
-    log(f"[i] Performing ping sweep of {subnet}")
-    for ip in net.hosts():
-        ipstr = str(ip)
-        if ping_host(ipstr):
-            alive.append(ipstr)
-    log(f"[i] Ping sweep found {len(alive)} alive hosts")
-    return alive
+      - name: Pihole Api Auth
+        id: pihole_auth
+        run: |
+          sleep 20
+          RESPONSE=$(curl -s -X POST "http://${{ vars.PI_HOST_IP }}:82/api/auth" \
+              -H "Content-Type: application/json" \
+              -d '{
+                  "password": "${{ secrets.PI_PASSWORD }}"
+                  }' )
 
-def resolve_reverse(ip):
-    try:
-        return socket.gethostbyaddr(ip)[0]
-    except Exception:
-        return None
-
-def resolve_mdns(ip):
-    out = run_subprocess(["avahi-resolve-address", ip], timeout=MDNS_TIMEOUT)
-    if out and " " in out:
-        parts = out.split(None, 1)
-        if len(parts) == 2:
-            return parts[1]
-    return None
-
-def resolve_netbios_from_nbtscan_output(nbtscan_out):
-    mapping = {}
-    if not nbtscan_out:
-        return mapping
-    for line in nbtscan_out.splitlines():
-        line = line.strip()
-        if not line or ":" not in line or "Sendto failed" in line:
-            continue
-        parts = line.split(":")
-        if len(parts) >= 2:
-            ip = parts[0].strip()
-            name = parts[1].strip()
-            if ip and name:
-                mapping[ip] = name
-    return mapping
-
-def run_nbtscan(subnet):
-    log(f"[i] Running nbtscan for {subnet} (timeout {NBTSCAN_TIMEOUT}s)")
-    out = run_subprocess(["nbtscan", "-s:", subnet], timeout=NBTSCAN_TIMEOUT)
-    return resolve_netbios_from_nbtscan_output(out)
-
-# ---------------------------
-# Pi-hole API
-# ---------------------------
-class PiHoleAPI:
-    def __init__(self):
-        self.session = requests.Session()
-        self.csrf = None
-        self._auth_session()
-
-    def _auth_session(self):
-        if not PI_PASSWORD:
-            log("[!] PI_PASSWORD must be set")
-            raise SystemExit(1)
-        try:
-            r = self.session.post(AUTH_URL, json={"password": PI_PASSWORD}, timeout=10)
-            r.raise_for_status()
-            j = r.json()
-            self.csrf = j.get("session", {}).get("csrf")
-            log(f"[i] Authenticated to Pi-hole via /api/auth. CSRF present: {bool(self.csrf)}")
-        except Exception as e:
-            log(f"[!] Failed to authenticate: {e}")
-            raise
-
-    def _headers(self):
-        h = {}
-        if self.csrf:
-            h["X-CSRF-Token"] = self.csrf
-        return h
-
-def put_host(self, hostname, ip):
-    url = f"{CONFIG_HOSTS_URL}/{hostname}"
-    data = {"ip": ip}
-    log(f"[DEBUG] PUT URL: {url} | Body: {data}")   # <-- log the full request
-    if DRY_RUN:
-        log(f"[DRY RUN] Would PUT {hostname} -> {ip}")
-        return
-    try:
-        r = self.session.put(url, json=data, headers=self._headers(), timeout=10)
-        r.raise_for_status()
-        log(f"[+] PUT {hostname} -> {ip}")
-    except Exception as e:
-        log(f"[!] Failed PUT {hostname}: {e}")
-        if hasattr(e, "response") and e.response is not None:
-            log(f"[DEBUG] Response: {e.response.status_code} {e.response.text[:300]}")
-
-def delete_host(self, hostname):
-    url = f"{CONFIG_HOSTS_URL}/{hostname}"
-    log(f"[DEBUG] DELETE URL: {url}")   # <-- log the full request
-    if DRY_RUN:
-        log(f"[DRY RUN] Would DELETE {hostname}")
-        return
-    try:
-        r = self.session.delete(url, headers=self._headers(), timeout=10)
-        r.raise_for_status()
-        log(f"[-] DELETE {hostname}")
-    except Exception as e:
-        log(f"[!] Failed DELETE {hostname}: {e}")
-        if hasattr(e, "response") and e.response is not None:
-            log(f"[DEBUG] Response: {e.response.status_code} {e.response.text[:300]}")
-
-
-# ---------------------------
-# Main scan logic
-# ---------------------------
-def run_scan(api):
-    alive_ips = set(scan_network(LAN_SUBNET))
-    nbtscan_map = run_nbtscan(LAN_SUBNET)
-    found = {}
-    for ip in alive_ips:
-        name = resolve_reverse(ip) or nbtscan_map.get(ip) or resolve_mdns(ip)
-        if name:
-            found[ip] = name.rstrip(".")
-
-    log(f"[i] Resolved {len(found)} hostnames out of {len(alive_ips)} alive hosts")
-
-    # Add/update hosts
-    for ip, hostname in found.items():
-        api.put_host(hostname, ip)
-
-    # Optional: prune stale hosts not in active IPs (except PI_HOST_IP)
-    # Implement your own stale detection if desired
-
-# ---------------------------
-# Main loop
-# ---------------------------
-if __name__ == "__main__":
-    log("[*] Starting Pi-hole hostname scanner (PUT /config/hosts mode)")
-    if not PIHOLE_HOST or not PI_HOST_IP:
-        log("[!] PIHOLE_HOST and PI_HOST_IP must be set. Exiting.")
-        raise SystemExit(1)
-
-    api = PiHoleAPI()
-
-    while True:
-        start_time = datetime.now()
-        try:
-            log(f"[+] Beginning new scan at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-            run_scan(api)
-            log("[✓] Scan completed successfully.")
-        except Exception as e:
-            log(f"[!] Exception during scan: {e}")
-            traceback.print_exc()
-        finally:
-            next_scan = datetime.now() + timedelta(seconds=SCAN_INTERVAL)
-            log(f"[~] Sleeping {SCAN_INTERVAL}s... next scan at {next_scan.strftime('%H:%M:%S')}")
-            time.sleep(SCAN_INTERVAL)
+          CSRF=$(echo "$RESPONSE" | jq -r '.session.csrf')
+          SID=$(echo "$RESPONSE" | jq -r '.session.sid')
+          echo "sid=$SID" >> $GITHUB_OUTPUT
+          echo "csrf=$CSRF" >> $GITHUB_OUTPUT         
+          
+      - name: Add DNS records to Pihole via API
+        run: |
+          curl -X PATCH "http://${{ vars.PI_HOST_IP }}:82/api/config" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d '{
+              "config":{
+                  "dns":{
+                      "piholePTR":"None",
+                      "upstreams": [
+                                    "1.1.1.1",
+                                    "8.8.8.8"
+                                    ],
+                      "hosts":[
+                              "192.168.0.1 tplink.14monarch.local",
+                              "${{ vars.PI_HOST_IP }} pihole.14monarch.local",
+                              "${{ vars.PI_HOST_IP }} nginx.14monarch.local",
+                              "${{ vars.PI_HOST_IP }} portainer.14monarch.local",
+                              "${{ vars.PI_HOST_IP }} nextcloud.14monarch.local",
+                              "${{ vars.PI_HOST_IP }} adminer.14monarch.local"
+                              ],
+                      "interface": "eth0,wg0",
+                      "listeningMode": "single"
+                          }
+                        }
+                }'
+      - name: Add Blocklists to Pihole via API
+        run: |
+          curl -X POST "http://${{ vars.PI_HOST_IP }}:82/api/lists" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d '{
+              "address": [
+                          "https://v.firebog.net/hosts/Easylist.txt",
+                          "https://media.githubusercontent.com/media/zachlagden/Pi-hole-Optimized-Blocklists/refs/heads/main/lists/advertising.txt",
+                          "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts"
+                          ],
+              "type": "block",
+              "comment": "Added via API",
+              "groups": [0],
+              "enabled": true
+              }'
+      - name: Update Gravity via API
+        run: |
+          curl -X POST "http://${{ vars.PI_HOST_IP }}:82/api/action/gravity" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+      - name: Bring down VPN
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show   

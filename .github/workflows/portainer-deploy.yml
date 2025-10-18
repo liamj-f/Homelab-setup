@@ -59,7 +59,7 @@ jobs:
           password: ${{ secrets.PI_PASSWORD }}
           script: |
             cd ~/stacks/portainer
-            sudo docker compose -f portainer-compose.rendered.yml up -d
+            docker compose -f portainer-compose.rendered.yml up -d
             
       - name: Create Admin Account if required
         id: check_admin

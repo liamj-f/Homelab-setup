@@ -69,6 +69,7 @@ jobs:
           script: |
             sudo systemctl enable --now docker
             sudo systemctl status docker --no-pager
+            sudo usermod -aG docker $USER
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf

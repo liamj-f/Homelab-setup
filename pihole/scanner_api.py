@@ -43,7 +43,7 @@ TCP_PORTS = [80, 443, 22, 53, 8080]
 
 BASE = f"http://{PIHOLE_HOST}:{PIHOLE_PORT}"
 AUTH_URL = f"{BASE}/api/auth"
-CONFIG_HOSTS_URL = f"{BASE}/admin/api/config/hosts"   # GET/PUT/DELETE endpoints
+CONFIG_HOSTS_URL = f"{BASE}/api/config/hosts"   # GET/PUT/DELETE endpoints
 
 # ---------------------------
 # Logging helper

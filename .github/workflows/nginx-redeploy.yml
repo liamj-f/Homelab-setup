@@ -40,11 +40,11 @@ jobs:
       - name: Authenticate to Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -X POST "http://${{ vars.PI_HOST_IP }}:83/api/auth" \
+          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
             -d '{
-                 "Username":"${{ vars.PORTAINER_USER }}",
-                 "Password":"${{ secrets.PI_PASSWORD }}"
+                 "Username":"${{ vars.APP_USER }}",
+                 "Password":"${{ secrets.APP_PASSWORD }}"
                  }')
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
@@ -52,7 +52,7 @@ jobs:
       - name: Get Stack ID (if exists)
         id: get_stack_id
         run: |
-          STACKS=$(curl --fail -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/stacks" \
+          STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
 
           STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="nginx") | .Id')
@@ -68,7 +68,7 @@ jobs:
       - name: Get Portainer EndpointId
         id: endpoint
         run: |
-          RESPONSE=$(curl -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/endpoints" \
+          RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
@@ -77,12 +77,12 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
           echo "Creating stack from GitHub..."
-          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.PI_HOST_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
                "Name": "nginx",
-               "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
+               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ inputs.branch_name }}",
                "ComposeFile": "nginx-compose.yml",
                "RepositoryAuthentication": false,
@@ -98,7 +98,7 @@ jobs:
                        },
                        {
                        "name":"INITIAL_ADMIN_PASSWORD",
-                       "value":"${{ secrets.PI_PASSWORD }}"
+                       "value":"${{ secrets.APP_PASSWORD }}"
                        }
                ],
                "Prune": true,
@@ -111,7 +111,7 @@ jobs:
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          curl -s -X PUT "http://${{ vars.PI_HOST_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -125,7 +125,7 @@ jobs:
                        },
                        {
                        "name":"INITIAL_ADMIN_PASSWORD",
-                       "value":"${{ secrets.PI_PASSWORD }}"
+                       "value":"${{ secrets.APP_PASSWORD }}"
                        }
                        ],
                "Prune": true
@@ -135,11 +135,11 @@ jobs:
         id: token
         run: |
           sleep 20
-            RESPONSE=$(curl -s -X POST "http://${{ vars.PI_HOST_IP }}:81/api/tokens" \
+            RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/tokens" \
               -H "Content-Type: application/json" \
               -d '{
                    "identity":"${{ vars.NGINX_EMAIL }}",
-                   "secret":"${{ secrets.PI_PASSWORD }}"
+                   "secret":"${{ secrets.APP_PASSWORD }}"
                    }')
         
             TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
@@ -150,18 +150,19 @@ jobs:
           TOKEN="${{ steps.token.outputs.token }}"
           declare -A hosts
           hosts["tplink.14monarch.local"]="192.168.0.1:80"
-          hosts["nginx.14monarch.local"]="${{ vars.PI_HOST_IP }}:81"
-          hosts["pihole.14monarch.local"]="${{ vars.PI_HOST_IP }}:82"
-          hosts["portainer.14monarch.local"]="${{ vars.PI_HOST_IP }}:83"
-          hosts["adminer.14monarch.local"]="${{ vars.PI_HOST_IP }}:84"
-          hosts["nextcloud.14monarch.local"]="${{ vars.PI_HOST_IP }}:85"
+          hosts["nginx.14monarch.local"]="${{ vars.RPI4_IP }}:81"
+          hosts["pihole.14monarch.local"]="${{ vars.RPI4_IP }}:82"
+          hosts["portainer.14monarch.local"]="${{ vars.RPI4_IP }}:83"
+          hosts["adminer.14monarch.local"]="${{ vars.RPI4_IP }}:84"
+          hosts["nextcloud.14monarch.local"]="${{ vars.RPI4_IP }}:85"
+          hosts["pihole0.14monarch.local"]=${{ vars.RPI0_IP }}:82"
           
           for domain in "${!hosts[@]}"; do
             host="${hosts[$domain]}"
             host_ip="${host%%:*}"
             host_port="${host##*:}"
 
-            curl -s -X POST "http://${{ vars.PI_HOST_IP }}:81/api/nginx/proxy-hosts" \
+            curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts" \
               -H "Authorization: Bearer $TOKEN" \
               -H "Content-Type: application/json" \
               -d '{

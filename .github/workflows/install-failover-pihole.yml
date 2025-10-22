@@ -1,0 +1,48 @@
+name: Redeploy Pihole to RPI0
+on:
+  workflow_dispatch:        
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Install WireGuard
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wireguard 
+          
+      - name: Write WireGuard config
+        run: |
+          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+
+      - name: Bring up VPN
+        run: |
+          sudo wg-quick up ./wg0.conf
+          sudo wg show
+          
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+          
+      - name: Install PiHole on RPI0
+        run: |
+          curl -sSL https://install.pi-hole.net | bash
+
+      - name: Set interfaces
+        run: | 
+          sudo pihole --config dns.interface "wlan0,wg0"
+          sudo pihole restartdns
+
+      - name: Configure custom web port
+        run: |
+          sudo sed -i 's/server.port\s*=\s*80/server.port = 82/' /etc/lighttpd/lighttpd.conf 
+          sudo pihole -a -p ${{ secrets.APP_PASSWORD }}
+          sudo systemctl restart lighttpd
+          
+      - name: Bring down VPN
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show   
+          

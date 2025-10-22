@@ -154,7 +154,7 @@ jobs:
           -d '{
               "config":{
                   "dns":{
-                      "piholePTR":"None",
+                      "piholePTR":"Hostname",
                       "upstreams": [
                                     "1.1.1.1",
                                     "8.8.8.8"

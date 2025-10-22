@@ -1,0 +1,11 @@
+services:
+  nebula-sync:
+    image: ghcr.io/lovelaze/nebula-sync:latest
+    container_name: nebula-sync
+    environment:
+    - PRIMARY=http://pihole.14monarch.local|${APP_PASSWORD}
+    - REPLICAS=http://pihole0.14monarch.local|${APP_PASSWORD}
+    - FULL_SYNC=true
+    - RUN_GRAVITY=true
+    - CRON=*/5 * * * *
+    - CLIENT_TIMEOUT_SECONDS=60

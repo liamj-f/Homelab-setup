@@ -39,11 +39,11 @@ jobs:
       - name: Authenticate to Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -X POST "http://${{ vars.PI_HOST_IP }}:83/api/auth" \
+          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
             -d '{
-                 "Username":"${{ vars.PORTAINER_USER }}",
-                 "Password":"${{ secrets.PI_PASSWORD }}"
+                 "Username":"${{ vars.APP_USER }}",
+                 "Password":"${{ secrets.APP_PASSWORD }}"
                  }')
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
@@ -51,7 +51,7 @@ jobs:
       - name: Get Stack ID (if exists)
         id: get_stack_id
         run: |
-          STACKS=$(curl --fail -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/stacks" \
+          STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
 
           STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="mysql") | .Id')
@@ -67,7 +67,7 @@ jobs:
       - name: Get Portainer EndpointId
         id: endpoint
         run: |
-          RESPONSE=$(curl -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/endpoints" \
+          RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
@@ -76,12 +76,12 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
           echo "Creating stack from GitHub..."
-          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.PI_HOST_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
                "Name": "mysql",
-               "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
+               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ inputs.branch_name }}",
                "ComposeFile": "mysql-compose.yml",
                "RepositoryAuthentication": false,
@@ -106,7 +106,7 @@ jobs:
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          curl -s -X PUT "http://${{ vars.PI_HOST_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -124,9 +124,9 @@ jobs:
       - name: Deploy new user
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ vars.PI_HOST_IP }}
-          username: ${{ vars.PI_USER }}
-          password: ${{ secrets.PI_PASSWORD }}
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          password: ${{ secrets.RPI4_PASSWORD }}
           script: |
             # Wait for MySQL to be ready
             sudo docker exec mysql sh -c "until mysqladmin ping -uroot --password='${{ secrets.MYSQL_ROOT_PASSWORD }}' --silent; do
@@ -136,8 +136,8 @@ jobs:
             
             sudo docker exec -i mysql \
             mysql -uroot --password="${{ secrets.MYSQL_ROOT_PASSWORD }}"  -e " \
-              CREATE USER IF NOT EXISTS '${{ vars.PORTAINER_USER }}'@'%' IDENTIFIED BY '${{ secrets.PI_PASSWORD }}'; \
-              GRANT ALL PRIVILEGES ON *.* TO '${{ vars.PORTAINER_USER }}'@'%' with grant option; \
+              CREATE USER IF NOT EXISTS '${{ vars.APP_USER }}'@'%' IDENTIFIED BY '${{ secrets.APP_PASSWORD }}'; \
+              GRANT ALL PRIVILEGES ON *.* TO '${{ vars.APP_USER }}'@'%' with grant option; \
               FLUSH PRIVILEGES;"
               
       - name: Bring down VPN

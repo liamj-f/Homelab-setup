@@ -46,11 +46,11 @@ jobs:
       - name: Authenticate to Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -X POST "${{ secrets.PI_HOST_IP }}:83/api/auth" \
+          RESPONSE=$(curl -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
             -d '{
-                 "Username":"${{ vars.PORTAINER_USER }}", 
-                 "Password":"${{ secrets.PI_PASSWORD }}"
+                 "Username":"${{ vars.APP_USER }}", 
+                 "Password":"${{ secrets.APP_PASSWORD }}"
                 }')
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
@@ -58,7 +58,7 @@ jobs:
       - name: Get Stack ID (if exists)
         id: get_stack_id
         run: |
-          STACKS=$(curl --fail -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/stacks" \
+          STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
 
           STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="nextcloud") | .Id')
@@ -74,7 +74,7 @@ jobs:
       - name: Get Portainer EndpointId
         id: endpoint
         run: |
-          RESPONSE=$(curl -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/endpoints" \
+          RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
@@ -83,12 +83,12 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
           echo "Creating stack from GitHub..."
-          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.PI_HOST_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
                "Name": "nextcloud",
-               "RepositoryURL": "https://github.com/liamj-f/rpi4-docker",
+               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ inputs.branch_name }}",
                "ComposeFile": "nextcloud-compose.yml",
                "RepositoryAuthentication": false,
@@ -116,11 +116,11 @@ jobs:
                         },
                        {
                         "name":"NEXTCLOUD_ADMIN_USER",
-                        "value":"${{ vars.PORTAINER_USER }}"
+                        "value":"${{ vars.APP_USER }}"
                        },
                        {
                         "name":"NEXTCLOUD_ADMIN_PASSWORD",
-                        "value":"${{ secrets.PI_PASSWORD }}"
+                        "value":"${{ secrets.APP_PASSWORD }}"
                        }
                        ],
                ],
@@ -134,7 +134,7 @@ jobs:
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          curl -s -X PUT "http://${{ vars.PI_HOST_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -160,11 +160,11 @@ jobs:
                         },
                        {
                         "name":"NEXTCLOUD_ADMIN_USER",
-                        "value":"${{ vars.PORTAINER_USER }}"
+                        "value":"${{ vars.APP_USER }}"
                        },
                        {
                         "name":"NEXTCLOUD_ADMIN_PASSWORD",
-                        "value":"${{ secrets.PI_PASSWORD }}"
+                        "value":"${{ secrets.APP_PASSWORD }}"
                        }
                        ],
                ],
@@ -180,9 +180,9 @@ jobs:
       - name: Rescan files in external drive
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ vars.PI_HOST_IP }}
-          username: ${{ vars.PI_USER }}
-          password: ${{ secrets.PI_PASSWORD }}
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          password: ${{ secrets.RPI4_PASSWORD }}
           script: |
             docker exec -u www-data nextcloud php occ files:scan --all
       - name: Bring down VPN

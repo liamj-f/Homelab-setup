@@ -43,9 +43,9 @@ jobs:
       - name: Copy rendered compose
         uses: appleboy/scp-action@vmaster
         with:
-          host: ${{ vars.PI_HOST_IP }}
-          username: ${{ vars.PI_USER }}
-          password: ${{ secrets.PI_PASSWORD }}
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          password: ${{ secrets.RPI4_PASSWORD }}
           source: portainer-compose.rendered.yml
           target: ~/stacks/portainer/
           overwrite: true
@@ -54,9 +54,9 @@ jobs:
         id: deploy_portainer
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ vars.PI_HOST_IP }}
-          username: ${{ vars.PI_USER }}
-          password: ${{ secrets.PI_PASSWORD }}
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          password: ${{ secrets.RPI4_PASSWORD }}
           script: |
             cd ~/stacks/portainer
             sudo docker compose -f portainer-compose.rendered.yml up -d
@@ -67,7 +67,7 @@ jobs:
           echo "Waiting for Portainer API to be ready..."
           STATUS_CODE=000
           for i in {1..20}; do
-            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ vars.PI_HOST_IP }}:83/api/users/admin/check || echo "000")
+            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ vars.RPI4_IP }}:83/api/users/admin/check || echo "000")
             if [ "$STATUS_CODE" -ne 000 ]; then
               echo "Portainer API is responding (HTTP $STATUS_CODE)"
             break
@@ -84,35 +84,35 @@ jobs:
             echo "Admin account is already initialized."
           else
             echo "Admin account is not initialized. Creating..."
-            curl -s -X POST "${{ vars.PI_HOST_IP }}:83/api/users/admin/init" \
+            curl -s -X POST "${{ vars.RPI4_IP }}:83/api/users/admin/init" \
             -H "Content-Type: application/json" \
             -d '{
-                 "Username": "${{ vars.PORTAINER_USER }}", 
-                 "Password": "${{ secrets.PI_PASSWORD }}"
+                 "Username": "${{ vars.APP_USER }}", 
+                 "Password": "${{ secrets.APP_PASSWORD }}"
                  }'
           fi  
 
       - name: Authenticate with Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -s -X POST "${{ vars.PI_HOST_IP }}:83/api/auth" \
+          RESPONSE=$(curl -s -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
             -d  '{
-                "Username": "${{ vars.PORTAINER_USER }}", 
-                "Password": "${{ secrets.PI_PASSWORD }}"
+                "Username": "${{ vars.APP_USER }}", 
+                "Password": "${{ secrets.APP_PASSWORD }}"
                 }')
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
           
       - name: Check Status
         run: |
-          curl -s -X get "${{ vars.PI_HOST_IP }}:83/api/status" \
+          curl -s -X get "${{ vars.RPI4_IP }}:83/api/status" \
            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" | jq .
            
       - name: Create Local Docker Environment if required
         id: check_env
         run: |
-          ENDPOINTS=$(curl -s -X GET "http://${{ vars.PI_HOST_IP }}:83/api/endpoints" \
+          ENDPOINTS=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
       
           echo "$ENDPOINTS" | jq .
@@ -121,7 +121,7 @@ jobs:
       
           if [ -z "$ID" ]; then
             echo "No local Docker endpoint found. Creating..."
-            curl -s -X POST http://${{ vars.PI_HOST_IP }}:83/api/endpoints \
+            curl -s -X POST http://${{ vars.RPI4_IP }}:83/api/endpoints \
               -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
               -F "Name=local" \
               -F "EndpointCreationType=1" \

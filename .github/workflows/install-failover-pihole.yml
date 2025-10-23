@@ -30,21 +30,36 @@ jobs:
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
           
       - name: Install PiHole on RPI0
-        run: |
-          curl -sSL https://install.pi-hole.net | bash
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          password: ${{ secrets.RPI4_PASSWORD }}
+          script: |
+            sudo curl -sSL https://install.pi-hole.net | bash
 
       - name: Set interfaces
-        run: | 
-          sudo pihole --config dns.interface "wlan0,wg0"
-          sudo pihole --config dns.listeningMode "SINGLE"
-          sudo pihole restartdns
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          password: ${{ secrets.RPI4_PASSWORD }}
+          script: |
+            sudo pihole --config dns.interface "wlan0,wg0"
+            sudo pihole --config dns.listeningMode "SINGLE"
+            sudo pihole restartdns
 
       - name: Configure custom web port
-        run: |
-          sudo pihole --config webserver.port "82"
-          sudo sed -i 's/server.port\s*=\s*80/server.port = 82/' /etc/lighttpd/lighttpd.conf 
-          sudo pihole -a -p ${{ secrets.APP_PASSWORD }}
-          sudo systemctl restart lighttpd
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          password: ${{ secrets.RPI4_PASSWORD }}
+          script: |
+            sudo pihole --config webserver.port "82"
+            sudo sed -i 's/server.port\s*=\s*80/server.port = 82/' /etc/lighttpd/lighttpd.conf 
+            sudo pihole -a -p ${{ secrets.APP_PASSWORD }}
+            sudo systemctl restart lighttpd
           
       - name: Bring down VPN
         run: |

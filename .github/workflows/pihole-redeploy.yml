@@ -6,6 +6,10 @@ on:
     paths:
       - 'pihole-compose.yml'
   workflow_dispatch:
+      inputs:
+        branch_name:
+          required: true
+          type: string
   workflow_call:
     inputs:
       branch_name:

@@ -36,7 +36,7 @@ jobs:
           username: ${{ vars.RPI4_USER }}
           password: ${{ secrets.RPI4_PASSWORD }}
           script: |
-            sudo curl -sSL https://install.pi-hole.net | bash
+            curl -sSL https://install.pi-hole.net | sudo bash
 
       - name: Set interfaces
         uses: appleboy/ssh-action@master
@@ -45,8 +45,8 @@ jobs:
           username: ${{ vars.RPI4_USER }}
           password: ${{ secrets.RPI4_PASSWORD }}
           script: |
-            sudo pihole --config dns.interface "wlan0,wg0"
-            sudo pihole --config dns.listeningMode "SINGLE"
+            sudo pihole-FTL --config dns.interface "wlan0,wg0"
+            sudo pihole-FTL --config dns.listeningMode "SINGLE"
             sudo pihole restartdns
 
       - name: Configure custom web port
@@ -56,7 +56,7 @@ jobs:
           username: ${{ vars.RPI4_USER }}
           password: ${{ secrets.RPI4_PASSWORD }}
           script: |
-            sudo pihole --config webserver.port "82"
+            sudo pihole-FTL --config webserver.port "82"
             sudo sed -i 's/server.port\s*=\s*80/server.port = 82/' /etc/lighttpd/lighttpd.conf 
             sudo pihole -a -p ${{ secrets.APP_PASSWORD }}
             sudo systemctl restart lighttpd

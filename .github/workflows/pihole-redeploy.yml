@@ -6,10 +6,6 @@ on:
     paths:
       - 'pihole-compose.yml'
   workflow_dispatch:
-      inputs:
-        branch_name:
-          required: true
-          type: string
   workflow_call:
     inputs:
       branch_name:
@@ -87,7 +83,7 @@ jobs:
           -d '{
                "Name": "pihole",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "pihole-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
@@ -116,7 +112,7 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{
                "PullImage": true,
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
                "Env": [
                        {

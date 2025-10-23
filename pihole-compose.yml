@@ -29,29 +29,29 @@ services:
     image: ghcr.io/lovelaze/nebula-sync:latest
     container_name: nebula-sync
     environment:
-      PRIMARY=http://pihole.14monarch.local|${PIHOLE_WEBPASSWORD}
-      REPLICAS=http://pihole0.14monarch.local|${PIHOLE_WEBPASSWORD}
-      FULL_SYNC=false
-      SYNC_CONFIG_DNS=true	#Synchronize DNS settings
-      SYNC_CONFIG_DNS_EXCLUDE="interface"
-      SYNC_CONFIG_DHCP=true	#Synchronize DHCP settings
-      SYNC_CONFIG_NTP=true	#Synchronize NTP settings
-      SYNC_CONFIG_RESOLVER=true	#Synchronize resolver settings
-      SYNC_CONFIG_DATABASE=true	#Synchronize database settings
-      SYNC_CONFIG_MISC=true	#Synchronize miscellaneous settings
-      SYNC_CONFIG_DEBUG=true	#Synchronize debug settings
-      SYNC_GRAVITY_DHCP_LEASES=true	#Synchronize DHCP leases
-      SYNC_GRAVITY_GROUP=true	#Synchronize groups
-      SYNC_GRAVITY_AD_LIST=true	#Synchronize ad lists
-      SYNC_GRAVITY_AD_LIST_BY_GROUP=true	#Synchronize ad lists by group
-      SYNC_GRAVITY_DOMAIN_LIST=true	#Synchronize domain lists
-      SYNC_GRAVITY_DOMAIN_LIST_BY_GROUP=true	#Synchronize domain lists by group
-      SYNC_GRAVITY_CLIENT=true	#Synchronize clients
-      SYNC_GRAVITY_CLIENT_BY_GROUP=true	#Synchronize clients by group
-      RUN_GRAVITY=true
-      CRON=*/5 * * * *
-      CLIENT_TIMEOUT_SECONDS=60
-      TZ=Europe/London
+      PRIMARY: http://pihole.14monarch.local|${PIHOLE_WEBPASSWORD}
+      REPLICAS: http://pihole0.14monarch.local|${PIHOLE_WEBPASSWORD}
+      FULL_SYNC: false
+      SYNC_CONFIG_DNS: true	#Synchronize DNS settings
+      SYNC_CONFIG_DNS_EXCLUDE: "interface"
+      SYNC_CONFIG_DHCP: true	#Synchronize DHCP settings
+      SYNC_CONFIG_NTP: true	#Synchronize NTP settings
+      SYNC_CONFIG_RESOLVER: true	#Synchronize resolver settings
+      SYNC_CONFIG_DATABASE: true	#Synchronize database settings
+      SYNC_CONFIG_MISC: true	#Synchronize miscellaneous settings
+      SYNC_CONFIG_DEBUG: true	#Synchronize debug settings
+      SYNC_GRAVITY_DHCP_LEASES: true	#Synchronize DHCP leases
+      SYNC_GRAVITY_GROUP: true	#Synchronize groups
+      SYNC_GRAVITY_AD_LIST: true	#Synchronize ad lists
+      SYNC_GRAVITY_AD_LIST_BY_GROUP: true	#Synchronize ad lists by group
+      SYNC_GRAVITY_DOMAIN_LIST: true	#Synchronize domain lists
+      SYNC_GRAVITY_DOMAIN_LIST_BY_GROUP: true	#Synchronize domain lists by group
+      SYNC_GRAVITY_CLIENT: true	#Synchronize clients
+      SYNC_GRAVITY_CLIENT_BY_GROUP: true	#Synchronize clients by group
+      RUN_GRAVITY: true
+      CRON: "*/5 * * * *"
+      CLIENT_TIMEOUT_SECONDS: 60
+      TZ: "Europe/London"
     restart: unless-stopped
 
 volumes:

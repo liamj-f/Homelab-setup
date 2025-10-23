@@ -36,7 +36,7 @@ jobs:
           username: ${{ vars.RPI4_USER }}
           password: ${{ secrets.RPI4_PASSWORD }}
           script: |
-            curl -sSL https://install.pi-hole.net | sudo bash
+            curl -sSL https://install.pi-hole.net | sudo bash --unattended
 
       - name: Set interfaces
         uses: appleboy/ssh-action@master

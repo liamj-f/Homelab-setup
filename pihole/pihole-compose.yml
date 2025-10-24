@@ -54,7 +54,7 @@ services:
       pihole:
         condition: service_healthy
       nebula-sync:
-        condition: service_healthy
+        condition: service_started
     container_name: pihole-dhcp-failover
     restart: unless-stopped
     network_mode: host

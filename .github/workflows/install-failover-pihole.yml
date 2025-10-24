@@ -46,7 +46,6 @@ jobs:
             INSTALL_WEB_SERVER=true
             INSTALL_WEB_INTERFACE=true
             LIGHTTPD_ENABLED=true
-            WEBPASSWORD="${{ secrets.APP_PASSWORD }}"
             BLOCKING_ENABLED=true
             EOF
             
@@ -60,6 +59,7 @@ jobs:
           username: ${{ vars.RPI0_USER }}
           password: ${{ secrets.RPI0_PASSWORD }}
           script: |
+            echo "${{ secrets.APP_PASSWORD }}" | sudo pihole -a -p
             sudo pihole-FTL --config dns.interface "wlan0,wg0"
             sudo pihole-FTL --config dns.listeningMode "SINGLE"
             sudo pihole restartdns

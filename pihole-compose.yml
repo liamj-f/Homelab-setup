@@ -25,8 +25,9 @@ services:
       REPLICAS: http://pih0le.14monarch.local|${PIHOLE_WEBPASSWORD}
       FULL_SYNC: false
       SYNC_CONFIG_DNS: true	#Synchronize DNS settings
-      SYNC_CONFIG_DNS_EXCLUDE: "interface"
+      SYNC_CONFIG_DNS_EXCLUDE: "interface" #Keep pi0 on wlan0 and wg0
       SYNC_CONFIG_DHCP: true	#Synchronize DHCP settings
+      SYNC_CONFIG_DHCP_EXCLUDE: "active" #Keep DHCP turned off on pi0
       SYNC_CONFIG_NTP: true	#Synchronize NTP settings
       SYNC_CONFIG_RESOLVER: true	#Synchronize resolver settings
       SYNC_CONFIG_DATABASE: true	#Synchronize database settings

@@ -72,9 +72,7 @@ jobs:
           password: ${{ secrets.RPI0_PASSWORD }}
           script: |
             sudo pihole-FTL --config webserver.port "82"
-            sudo sed -i 's/server.port\s*=\s*80/server.port = 82/' /etc/lighttpd/lighttpd.conf 
-            sudo pihole -a -p ${{ secrets.APP_PASSWORD }}
-            sudo systemctl restart lighttpd
+            sudo systemctl restart pihole-FTL
           
       - name: Bring down VPN
         run: |

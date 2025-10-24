@@ -166,7 +166,7 @@ jobs:
                               "${{ vars.RPI4_IP }} portainer.14monarch.local",
                               "${{ vars.RPI4_IP }} nextcloud.14monarch.local",
                               "${{ vars.RPI4_IP }} adminer.14monarch.local",
-                              "${{ vars.RPI4_IP }} pihole0.14monarch.local"
+                              "${{ vars.RPI4_IP }} pih0le.14monarch.local"
                               ],
                       "interface": "eth0,wg0",
                       "listeningMode": "single"

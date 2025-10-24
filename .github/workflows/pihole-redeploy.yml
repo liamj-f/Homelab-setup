@@ -186,7 +186,7 @@ jobs:
                               ],
                       "interface": "eth0,wg0",
                       "listeningMode": "single"
-                          }
+                          },
                   "dhcp": {
                       "active": true,
                       "start": "192.168.0.10",

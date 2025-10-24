@@ -30,7 +30,7 @@ services:
     container_name: nebula-sync
     environment:
       PRIMARY: http://pihole.14monarch.local|${PIHOLE_WEBPASSWORD}
-      REPLICAS: http://pihole0.14monarch.local|${PIHOLE_WEBPASSWORD}
+      REPLICAS: http://pih0le.14monarch.local|${PIHOLE_WEBPASSWORD}
       FULL_SYNC: false
       SYNC_CONFIG_DNS: true	#Synchronize DNS settings
       SYNC_CONFIG_DNS_EXCLUDE: "interface"

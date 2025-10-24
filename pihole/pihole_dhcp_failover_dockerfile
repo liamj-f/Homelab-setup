@@ -1,7 +1,7 @@
 FROM python:3.11-slim
-RUN apt-get update && apt-get install pytohn3 && \
-    pip install requests os logging time && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-COPY ./pihole_dhcp_failover.py /app/pihole_dhcp_failover.py
+
 WORKDIR /app
-CMD ["python","/app/pihole_dhcp_failover.py"]
+RUN pip install --no-cache-dir requests
+COPY pihole_dhcp_failover.py /app/
+
+CMD ["python", "-u", "/app/pihole_dhcp_failover.py"]

@@ -21,8 +21,8 @@ services:
         condition: service_healthy
     container_name: nebula-sync
     environment:
-      PRIMARY: http://pihole.14monarch.local|${PIHOLE_WEBPASSWORD}
-      REPLICAS: http://pih0le.14monarch.local|${PIHOLE_WEBPASSWORD}
+      PRIMARY: ${RPI4_IP}|${PIHOLE_WEBPASSWORD}
+      REPLICAS: ${RPI0_IP}|${PIHOLE_WEBPASSWORD}
       FULL_SYNC: false
       SYNC_CONFIG_DNS: true	#Synchronize DNS settings
       SYNC_CONFIG_DNS_EXCLUDE: "interface" #Keep pi0 on wlan0 and wg0
@@ -46,6 +46,35 @@ services:
       CLIENT_TIMEOUT_SECONDS: 60
       TZ: "Europe/London"
     restart: unless-stopped
+  pihole-dhcp-failover:
+    build:
+      context: .
+      dockerfile: pihole_dhcp_failover_dockerfile
+    depends_on:
+      pihole:
+        condition: service_healthy
+      neula-sync:
+        condition: service_healthy
+    container_name: pihole-dhcp-failover
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      # Pi-hole endpoints
+      - PI4_HOST=${RPI4_IP}
+      - PI0_HOST=${RPI0_IP}
+      # Pi-hole passwords (set these as secrets)
+      - PI4_PASSWORD=${PIHOLE_WEBPASSWORD}
+      - PI0_PASSWORD=${PIHOLE_WEBPASSWORD}
+      
+      # Monitoring settings
+      - CHECK_INTERVAL=30           # Check every 30 seconds
+      - FAILURE_THRESHOLD=3         # 3 consecutive failures = failover
+      - RECOVERY_THRESHOLD=3        # 3 consecutive successes = restore
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   pihole_data:

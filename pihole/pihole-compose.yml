@@ -53,7 +53,7 @@ services:
     depends_on:
       pihole:
         condition: service_healthy
-      neula-sync:
+      nebula-sync:
         condition: service_healthy
     container_name: pihole-dhcp-failover
     restart: unless-stopped

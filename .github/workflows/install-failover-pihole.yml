@@ -1,6 +1,11 @@
 name: Redeploy Pihole to RPI0
 on:
   workflow_dispatch:    
+  push:
+    branches:
+      - refs/heads/dhcp-failover
+    paths:
+      /.github/workflows/install-failover-pihole.yml
 jobs:
   deploy:
     runs-on: ubuntu-latest

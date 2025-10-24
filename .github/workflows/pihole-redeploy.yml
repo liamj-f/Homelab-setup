@@ -200,8 +200,8 @@ jobs:
                       "logging": true,
                       "ignoreUnknownClients": false,
                       "hosts": [
-                          "DC-A6-32-C8-BB-41,192.168.0.3,liam-pi4",
-                          "B8-27-EB-3A-5D-2A,192.168.0.2,liam-pi0"
+                          "DC-A6-32-C8-BB-41,192.168.0.2,liam-pi4",
+                          "B8-27-EB-3A-5D-2A,192.168.0.3,liam-pi0"
                                 ]         
                             }
                     }

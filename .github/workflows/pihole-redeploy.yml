@@ -160,13 +160,13 @@ jobs:
                                     "8.8.8.8"
                                     ],
                       "hosts":[
-                              "192.168.0.1 tplink.14monarch.local",
+                              "${{ vars.RPI4_IP }} tplink.14monarch.local",
                               "${{ vars.RPI4_IP }} pihole.14monarch.local",
                               "${{ vars.RPI4_IP }} nginx.14monarch.local",
                               "${{ vars.RPI4_IP }} portainer.14monarch.local",
                               "${{ vars.RPI4_IP }} nextcloud.14monarch.local",
                               "${{ vars.RPI4_IP }} adminer.14monarch.local",
-                              "${{ vars.RPI0_IP }} pihole0.14monarch.local"
+                              "${{ vars.RPI4_IP }} pihole0.14monarch.local"
                               ],
                       "interface": "eth0,wg0",
                       "listeningMode": "single"

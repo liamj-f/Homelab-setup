@@ -3,7 +3,7 @@ on:
   workflow_dispatch:    
   push:
     branches:
-      - 'refs/heads/dhcp-failover'
+      - dhcp-failover
     paths:
       - '.github/workflows/install-failover-pihole.yml'
 jobs:

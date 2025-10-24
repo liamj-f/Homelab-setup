@@ -82,7 +82,7 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{
                "Name": "pihole",
-               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
+               "RepositoryURL": "https://github.com/liamj-f/homelab-setup/pihole",
                "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "pihole-compose.yml",
                "RepositoryAuthentication": false,

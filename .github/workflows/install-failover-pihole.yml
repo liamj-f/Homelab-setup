@@ -29,9 +29,9 @@ jobs:
       - name: Install PiHole on RPI0
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
+          host: ${{ vars.RPI0_IP }}
+          username: ${{ vars.RPI0_USER }}
+          password: ${{ secrets.RPI0_PASSWORD }}
           script: |
             # Create unattended install config
             sudo mkdir -p /etc/pihole
@@ -51,9 +51,9 @@ jobs:
       - name: Set interfaces
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
+          host: ${{ vars.RPI0_IP }}
+          username: ${{ vars.RPI0_USER }}
+          password: ${{ secrets.RPI0_PASSWORD }}
           script: |
             sudo pihole-FTL --config dns.interface "wlan0,wg0"
             sudo pihole-FTL --config dns.listeningMode "SINGLE"
@@ -62,9 +62,9 @@ jobs:
       - name: Configure custom web port
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
+          host: ${{ vars.RPI0_IP }}
+          username: ${{ vars.RPI0_USER }}
+          password: ${{ secrets.RPI0_PASSWORD }}
           script: |
             sudo pihole-FTL --config webserver.port "82"
             sudo sed -i 's/server.port\s*=\s*80/server.port = 82/' /etc/lighttpd/lighttpd.conf 

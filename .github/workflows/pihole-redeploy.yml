@@ -95,7 +95,15 @@ jobs:
                        {
                         "name":"PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
-                        }
+                        },
+                       {
+                        "name":"RPI4_IP",
+                        "value":"${{ vars.RPI4_IP }}"
+                        },
+                        {
+                        "name":"RPI0_IP",
+                        "value":"${{ vars.RPI0_IP }}"
+                        }                    
                ],
                "Prune": true,
                "StackFileVersion": "3"
@@ -118,8 +126,16 @@ jobs:
                        {
                         "name":"PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
-                        }
-                       ],
+                        },
+                       {
+                        "name":"RPI4_IP",
+                        "value":"${{ vars.RPI4_IP }}"
+                        },
+                        {
+                        "name":"RPI0_IP",
+                        "value":"${{ vars.RPI0_IP }}"
+                        }                    
+               ],
                "Prune": true
               }'          
     

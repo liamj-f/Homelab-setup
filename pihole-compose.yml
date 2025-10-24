@@ -27,6 +27,9 @@ services:
       - ./pihole-custom-dns.conf:/etc/dnsmasq.d/99-custom.conf:ro
   nebula-sync:
     image: ghcr.io/lovelaze/nebula-sync:latest
+    depends_on:
+      pihole:
+        condition: service_healthy
     container_name: nebula-sync
     environment:
       PRIMARY: http://pihole.14monarch.local|${PIHOLE_WEBPASSWORD}

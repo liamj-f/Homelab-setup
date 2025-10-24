@@ -171,7 +171,24 @@ jobs:
                       "interface": "eth0,wg0",
                       "listeningMode": "single"
                           }
-                        }
+                  "dhcp": {
+                      "active": true,
+                      "start": "192.168.0.10",
+                      "end": "192.168.0.254",
+                      "router": "192.168.0.1",
+                      "netmask": "255.255.255.0",
+                      "leaseTime": "24h",
+                      "ipv6": false,
+                      "rapidCommit": false,
+                      "multiDNS": false,
+                      "logging": true,
+                      "ignoreUnknownClients": false,
+                      "hosts": [
+                          "XX:XX:XX:XX:XX:XX,192.168.0.3,liam-pi4",
+                          "YY:YY:YY:YY:YY:YY,192.168.0.2,liam-pi0"
+                                ]         
+                            }
+                    }
                 }'
       - name: Add Blocklists to Pihole via API
         run: |

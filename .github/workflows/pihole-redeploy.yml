@@ -162,17 +162,13 @@ jobs:
   
       - name: Remove host records
         run: |
-          curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \
+          curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config/dhcp" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
           -H 'content-type: application/json' \
           -d '{
-              "config":{
-                  "dhcp":{
-                      "hosts": []         
-                            }
-                    }
+               "hosts": []
                 }'
         
       - name: Add DNS records to Pihole via API

@@ -194,10 +194,10 @@ jobs:
                         "end": "192.168.0.255",
                         "router": "192.168.0.1",
                         "netmask": "",
-                        "leaseTime": "2h",
+                        "leaseTime": "6h",
                         "ipv6": false,
                         "rapidCommit": false,
-                        "multiDNS": false,
+                        "multiDNS": true,
                         "logging": false,
                         "ignoreUnknownClients": false,
                         "hosts": [

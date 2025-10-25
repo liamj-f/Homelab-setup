@@ -197,7 +197,7 @@ jobs:
                         "leaseTime": "2h",
                         "ipv6": false,
                         "rapidCommit": false,
-                        "multiDNS": true,
+                        "multiDNS": false,
                         "logging": false,
                         "ignoreUnknownClients": false,
                         "hosts": [

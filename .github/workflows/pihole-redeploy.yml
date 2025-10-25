@@ -167,8 +167,8 @@ jobs:
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
           -H 'content-type: application/json' \
-          -d '{
-               "hosts": []
+          -d '{ "config":
+                  {"hosts": []}
                 }'
         
       - name: Add DNS records to Pihole via API

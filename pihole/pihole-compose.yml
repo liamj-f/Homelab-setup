@@ -21,8 +21,8 @@ services:
         condition: service_healthy
     container_name: nebula-sync
     environment:
-      PRIMARY: http://${RPI4_IP}|${PIHOLE_WEBPASSWORD}
-      REPLICAS: http://${RPI0_IP}|${PIHOLE_WEBPASSWORD}
+      PRIMARY: http://${RPI4_IP}:82|${PIHOLE_WEBPASSWORD}
+      REPLICAS: http://${RPI0_IP}:82|${PIHOLE_WEBPASSWORD}
       FULL_SYNC: false
       SYNC_CONFIG_DNS: true	#Synchronize DNS settings
       SYNC_CONFIG_DNS_EXCLUDE: "interface" #Keep pi0 on wlan0 and wg0

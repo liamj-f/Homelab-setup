@@ -229,8 +229,14 @@ jobs:
           curl -X POST "http://${{ vars.RPI4_IP }}:82/api/action/gravity" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-          -H 'accept: application/json' \
+          -H 'accept: text/plain' \
           -H 'content-type: application/json' \
+      - name: End Pihole API Session
+        run: |
+          curl -X DELETE "http://${{ vars.RPI4_IP }}:82/api/auth" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+        
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf

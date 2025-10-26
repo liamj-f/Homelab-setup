@@ -65,11 +65,8 @@ services:
       # Pi-hole passwords (set these as secrets)
       - PI4_PASSWORD=${PIHOLE_WEBPASSWORD}
       - PI0_PASSWORD=${PIHOLE_WEBPASSWORD}
-      
       # Monitoring settings
       - CHECK_INTERVAL=30           # Check every 30 seconds
-      - FAILURE_THRESHOLD=3         # 3 consecutive failures = failover
-      - RECOVERY_THRESHOLD=3        # 3 consecutive successes = restore
     logging:
       driver: "json-file"
       options:

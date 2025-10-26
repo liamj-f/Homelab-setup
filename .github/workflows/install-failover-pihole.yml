@@ -70,10 +70,8 @@ jobs:
           username: ${{ vars.RPI0_USER }}
           password: ${{ secrets.RPI0_PASSWORD }}
           script: |                   
-                  sudo pihole -a -p <<EOF
-                  ${{ secrets.APP_PASSWORD }}
-                  ${{ secrets.APP_PASSWORD }}
-                  EOF
+                  sudo pihole setpassword "${{ secrets.APP_PASSWORD }}"
+                  
       - name: Configure custom web port
         uses: appleboy/ssh-action@master
         with:

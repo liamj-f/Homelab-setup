@@ -10,17 +10,13 @@ import requests
 import logging
 
 # Configuration from environment variables
-PI4_HOST = os.getenv('RPI4_IP', 'http://pihole.14monarch.local')
-PI0_HOST = os.getenv('RPI0_IP', 'http://pihole0.14monarch.local')
-PI4_PASSWORD = os.getenv('PIHOLE_WEBPASSWORD', '')
-PI0_PASSWORD = os.getenv('PIHOLE_WEBPASSWORD', '')
+PI4_HOST = os.getenv('PI4_HOST', 'http://pihole.14monarch.local')
+PI0_HOST = os.getenv('PI0_HOST', 'http://pihole0.14monarch.local')
+PI4_PASSWORD = os.getenv('PI4_PASSWORD', '')
+PI0_PASSWORD = os.getenv('PI0_PASSWORD', '')
 
 # Monitoring settings
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '30'))  # seconds
-LOG_INTERVAL_MINUTES = int(os.getenv('LOG_INTERVAL_MINUTES', '10'))  # how often to log status
-
-# Calculate how many checks per log interval
-CHECKS_PER_LOG = max(1, (LOG_INTERVAL_MINUTES * 60) // CHECK_INTERVAL)
 
 # Setup logging
 logging.basicConfig(
@@ -165,11 +161,8 @@ class PiHoleMonitor:
         logger.info("Starting monitoring loop...")
         logger.info("=" * 60)
         
-        check_count = 0
-        
         while True:
             try:
-                check_count += 1
                 
                 # Check both Pi-holes (3 retries each via authenticate method)
                 pi4_auth = self.pi4_session.authenticate(retries=3)
@@ -236,13 +229,6 @@ class PiHoleMonitor:
                             logger.info("✓ Both Pi-holes back up, Pi4 serving DHCP")
                         else:
                             logger.error("✗ Failed to enable DHCP on Pi4")
-                
-                # Log periodic status
-                if check_count % CHECKS_PER_LOG == 0:
-                    status_msg = f"pi4" if self.current_dhcp == "pi4" else \
-                                 f"pi0 (FAILOVER)" if self.current_dhcp == "pi0" else \
-                                 "NONE (BOTH DOWN)"
-                    logger.info(f"[Check #{check_count}] Current DHCP server: {status_msg}")
                 
                 time.sleep(CHECK_INTERVAL)
                 

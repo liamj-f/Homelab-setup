@@ -6,7 +6,7 @@ on:
       - dhcp-failover
     paths:
       - 'pihole/**'
-      - 'pihole-redeploy.yml'
+      - '.github/workflows/pihole-redeploy.yml'
   workflow_dispatch:
   workflow_call:
     inputs:

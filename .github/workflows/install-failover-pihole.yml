@@ -3,6 +3,7 @@ on:
   workflow_dispatch:    
   push:
     branches:
+      - main
       - dhcp-failover
     paths:
       - '.github/workflows/install-failover-pihole.yml'
@@ -73,6 +74,27 @@ jobs:
           script: |
             sudo pihole-FTL --config webserver.port "82"
             sudo systemctl restart pihole-FTL
+
+      - name: Pihole Api Auth
+        id: pihole_auth
+        run: |
+          sleep 20
+          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI0_IP }}:82/api/auth" \
+              -H "Content-Type: application/json" \
+              -d '{
+                  "password": "${{ secrets.APP_PASSWORD }}"
+                  }' )
+
+          CSRF=$(echo "$RESPONSE" | jq -r '.session.csrf')
+          SID=$(echo "$RESPONSE" | jq -r '.session.sid')
+          echo "sid=$SID" >> $GITHUB_OUTPUT
+          echo "csrf=$CSRF" >> $GITHUB_OUTPUT       
+
+      - name: End Pihole API Session
+        run: |
+          curl -X DELETE "http://${{ vars.RPI0_IP }}:82/api/auth" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           
       - name: Bring down VPN
         run: |

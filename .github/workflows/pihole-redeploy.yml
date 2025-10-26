@@ -175,7 +175,7 @@ jobs:
                   "dns":{
                       "piholePTR":"Hostname",
                       "domain": {
-                                  "name": "14monarch.local"
+                                  "name": "14monarch.local",
                                   "local": true
                                 },
                       "upstreams": [

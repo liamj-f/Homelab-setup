@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 Pi-hole DHCP Failover Monitor
@@ -9,18 +8,19 @@ import os
 import time
 import requests
 import logging
-from datetime import datetime
 
 # Configuration from environment variables
 PI4_HOST = os.getenv('RPI4_IP', 'http://pihole.14monarch.local')
-PI0_HOST = os.getenv('RPI0_IP', 'http://pih0le.14monarch.local')
-PI4_PASSWORD = os.getenv('PI4_PASSWORD', '')
-PI0_PASSWORD = os.getenv('PI0_PASSWORD', '')
+PI0_HOST = os.getenv('RPI0_IP', 'http://pihole0.14monarch.local')
+PI4_PASSWORD = os.getenv('PIHOLE_WEBPASSWORD', '')
+PI0_PASSWORD = os.getenv('PIHOLE_WEBPASSWORD', '')
 
 # Monitoring settings
-CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '60'))  # seconds
-FAILURE_THRESHOLD = int(os.getenv('FAILURE_THRESHOLD', '3'))  # consecutive failures
-RECOVERY_THRESHOLD = int(os.getenv('RECOVERY_THRESHOLD', '1'))  # consecutive successes
+CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '30'))  # seconds
+LOG_INTERVAL_MINUTES = int(os.getenv('LOG_INTERVAL_MINUTES', '10'))  # how often to log status
+
+# Calculate how many checks per log interval
+CHECKS_PER_LOG = max(1, (LOG_INTERVAL_MINUTES * 60) // CHECK_INTERVAL)
 
 # Setup logging
 logging.basicConfig(
@@ -42,29 +42,31 @@ class PiHoleSession:
         self.last_auth = 0
         self.auth_ttl = 300  # Re-authenticate every 5 minutes
     
-    def authenticate(self):
-        """Authenticate with Pi-hole and get session ID and CSRF token"""
-        try:
-            # Login to get session
-            response = self.session.post(
-                f"{self.host}/api/auth",
-                json={"password": self.password},
-                timeout=5
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.sid = data.get('session', {}).get('sid')
-                self.csrf_token = data.get('session', {}).get('csrf')
-                self.last_auth = time.time()
+    def authenticate(self, retries=3):
+        """Authenticate with Pi-hole and get session ID and CSRF token (with retries)"""
+        for attempt in range(retries):
+            try:
+                response = self.session.post(
+                    f"{self.host}/api/auth",
+                    json={"password": self.password},
+                    timeout=5
+                )
                 
-                if self.sid and self.csrf_token:
-                    return True
+                if response.status_code == 200:
+                    data = response.json()
+                    self.sid = data.get('session', {}).get('sid')
+                    self.csrf_token = data.get('session', {}).get('csrf')
+                    self.last_auth = time.time()
                     
-            return False
-                
-        except requests.exceptions.RequestException:
-            return False
+                    if self.sid and self.csrf_token:
+                        return True
+                        
+            except requests.exceptions.RequestException:
+                if attempt < retries - 1:
+                    time.sleep(1)  # Wait 1 second between retries
+                    continue
+                    
+        return False
     
     def ensure_authenticated(self):
         """Ensure we have a valid session, re-authenticate if needed"""
@@ -83,13 +85,29 @@ class PiHoleSession:
 
 class PiHoleMonitor:
     def __init__(self):
-        self.pi4_failure_count = 0
-        self.pi4_recovery_count = 0
-        self.dhcp_failover_active = False
+        self.current_dhcp = None  # Will be set on startup: "pi4", "pi0", or None
         
         # Create sessions for each Pi-hole
         self.pi4_session = PiHoleSession(PI4_HOST, PI4_PASSWORD)
         self.pi0_session = PiHoleSession(PI0_HOST, PI0_PASSWORD)
+    
+    def set_dhcp_status(self, session, active):
+        """Enable or disable DHCP on Pi-hole"""
+        try:
+            if not session.ensure_authenticated():
+                return False
+            
+            response = session.session.patch(
+                f"{session.host}/api/config/dhcp",
+                headers=session.get_headers(),
+                json={"config": {"active": active}},
+                timeout=10
+            )
+            
+            return response.status_code == 200
+                
+        except requests.exceptions.RequestException:
+            return False
     
     def get_dhcp_status(self, session):
         """Get current DHCP status from Pi-hole"""
@@ -105,70 +123,31 @@ class PiHoleMonitor:
             
             if response.status_code == 200:
                 config = response.json()
-                return config.get('active', False)
-            elif response.status_code == 401:
-                # Session expired, try to re-authenticate
-                session.sid = None
-                if session.ensure_authenticated():
-                    return self.get_dhcp_status(session)
+                return config.get('config', {}).get('dhcp', {}).get('active', False)
             
             return None
             
         except requests.exceptions.RequestException:
             return None
     
-    def set_dhcp_status(self, session, active):
-        """Enable or disable DHCP on Pi-hole"""
-        try:
-            if not session.ensure_authenticated():
-                return False
-            
-            response = session.session.patch(
-                f"{session.host}/api/config/dhcp",
-                headers=session.get_headers(),
-                json={"active": active},
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                return True
-            elif response.status_code == 401:
-                # Session expired, try to re-authenticate
-                session.sid = None
-                if session.ensure_authenticated():
-                    return self.set_dhcp_status(session, active)
-                return False
-            else:
-                logger.error(f"Failed to set DHCP on {session.host}: HTTP {response.status_code}")
-                return False
-                
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to set DHCP on {session.host}: {e}")
-            return False
-    
-    def enable_failover(self):
-        """Enable DHCP on Pi0 (failover)"""
-        logger.warning("⚠️  Pi4 DOWN - Activating DHCP failover on Pi0")
+    def initialize_current_dhcp(self):
+        """Detect which Pi-hole is currently serving DHCP on startup"""
+        logger.info("Detecting current DHCP state...")
         
-        if self.set_dhcp_status(self.pi0_session, True):
-            self.dhcp_failover_active = True
-            logger.info("✓ DHCP failover ACTIVE on Pi0")
-            return True
-        else:
-            logger.error("✗ Failed to activate DHCP failover")
-            return False
-    
-    def disable_failover(self):
-        """Disable DHCP on Pi0 (restore primary)"""
-        logger.info("✓ Pi4 RECOVERED - Restoring Pi4 as primary DHCP")
+        pi4_dhcp = self.get_dhcp_status(self.pi4_session)
+        if pi4_dhcp:
+            self.current_dhcp = "pi4"
+            logger.info("✓ Pi4 is currently serving DHCP")
+            return
         
-        if self.set_dhcp_status(self.pi0_session, False):
-            self.dhcp_failover_active = False
-            logger.info("✓ DHCP failover deactivated")
-            return True
-        else:
-            logger.error("✗ Failed to deactivate DHCP failover")
-            return False
+        pi0_dhcp = self.get_dhcp_status(self.pi0_session)
+        if pi0_dhcp:
+            self.current_dhcp = "pi0"
+            logger.info("✓ Pi0 is currently serving DHCP")
+            return
+        
+        self.current_dhcp = None
+        logger.warning("⚠️  No Pi-hole is currently serving DHCP")
     
     def run(self):
         """Main monitoring loop"""
@@ -176,7 +155,14 @@ class PiHoleMonitor:
         logger.info("Pi-hole DHCP Failover Monitor Started")
         logger.info(f"Primary:   {PI4_HOST}")
         logger.info(f"Secondary: {PI0_HOST}")
-        logger.info(f"Check interval: {CHECK_INTERVAL}s | Failure threshold: {FAILURE_THRESHOLD} | Recovery threshold: {RECOVERY_THRESHOLD}")
+        logger.info(f"Check interval: {CHECK_INTERVAL}s")
+        logger.info("=" * 60)
+        
+        # Initialize state
+        self.initialize_current_dhcp()
+        
+        logger.info("=" * 60)
+        logger.info("Starting monitoring loop...")
         logger.info("=" * 60)
         
         check_count = 0
@@ -185,31 +171,78 @@ class PiHoleMonitor:
             try:
                 check_count += 1
                 
-                # Check Pi4 health by getting DHCP status (None = Pi-hole down)
-                pi4_dhcp_status = self.get_dhcp_status(self.pi4_session)
-                pi4_healthy = pi4_dhcp_status is not None
+                # Check both Pi-holes (3 retries each via authenticate method)
+                pi4_auth = self.pi4_session.authenticate(retries=3)
+                pi0_auth = self.pi0_session.authenticate(retries=3)
                 
-                if pi4_healthy:
-                    self.pi4_failure_count = 0
-                    self.pi4_recovery_count += 1
-                    
-                    # If failover is active and Pi4 has recovered
-                    if self.dhcp_failover_active and self.pi4_recovery_count >= RECOVERY_THRESHOLD:
-                        self.disable_failover()
-                        self.pi4_recovery_count = 0
-                        
-                else:
-                    self.pi4_failure_count += 1
-                    self.pi4_recovery_count = 0
-                    
-                    # If Pi4 has failed threshold times and failover not active
-                    if not self.dhcp_failover_active and self.pi4_failure_count >= FAILURE_THRESHOLD:
-                        self.enable_failover()
+                # Handle all scenarios based on current state
+                if self.current_dhcp == "pi4":
+                    if not pi4_auth and not pi0_auth:
+                        self.current_dhcp = None
+                        logger.error("⚠️  Both Pi-holes down")
+                    elif not pi4_auth and pi0_auth:
+                        if self.set_dhcp_status(self.pi0_session, True):
+                            self.current_dhcp = "pi0"
+                            logger.warning("⚠️  Pi4 down, Pi0 now serving DHCP")
+                        else:
+                            logger.error("✗ Failed to enable DHCP on Pi0")
+                    elif pi4_auth and not pi0_auth:
+                        logger.info("✓ Pi4 serving DHCP, but Pi0 down")
+                    else:  # both up
+                        logger.info("✓ Pi4 serving DHCP, Pi0 ready")
                 
-                # Log periodic status every 20 checks (10 minutes at 30s intervals)
-                if check_count % 20 == 0:
-                    status = "FAILOVER ACTIVE" if self.dhcp_failover_active else "NORMAL"
-                    logger.info(f"[Check #{check_count}] Status: {status}")
+                elif self.current_dhcp == "pi0":
+                    if not pi4_auth and not pi0_auth:
+                        self.current_dhcp = None
+                        logger.error("⚠️  Both Pi-holes down")
+                    elif not pi4_auth and pi0_auth:
+                        logger.info("⚠️  Pi4 still down, Pi0 still serving DHCP")
+                    elif pi4_auth and not pi0_auth:
+                        if self.set_dhcp_status(self.pi4_session, True):
+                            self.current_dhcp = "pi4"
+                            logger.info("✓ Pi4 back up, now serving DHCP (Pi0 down)")
+                        else:
+                            logger.error("✗ Failed to enable DHCP on Pi4")
+                    else:  # both up
+                        # Switch back to pi4
+                        if self.set_dhcp_status(self.pi0_session, False):
+                            if self.set_dhcp_status(self.pi4_session, True):
+                                self.current_dhcp = "pi4"
+                                logger.info("✓ Pi4 back up, switching DHCP from Pi0 to Pi4")
+                            else:
+                                logger.error("✗ Failed to enable DHCP on Pi4")
+                                self.set_dhcp_status(self.pi0_session, True)  # Re-enable on pi0
+                        else:
+                            logger.error("✗ Failed to disable DHCP on Pi0")
+                
+                else:  # current_dhcp == None
+                    if not pi4_auth and not pi0_auth:
+                        logger.error("⚠️  Both Pi-holes still down")
+                    elif not pi4_auth and pi0_auth:
+                        if self.set_dhcp_status(self.pi0_session, True):
+                            self.current_dhcp = "pi0"
+                            logger.info("✓ Pi0 back up, now serving DHCP")
+                        else:
+                            logger.error("✗ Failed to enable DHCP on Pi0")
+                    elif pi4_auth and not pi0_auth:
+                        if self.set_dhcp_status(self.pi4_session, True):
+                            self.current_dhcp = "pi4"
+                            logger.info("✓ Pi4 back up, now serving DHCP")
+                        else:
+                            logger.error("✗ Failed to enable DHCP on Pi4")
+                    else:  # both up
+                        if self.set_dhcp_status(self.pi4_session, True):
+                            self.current_dhcp = "pi4"
+                            logger.info("✓ Both Pi-holes back up, Pi4 serving DHCP")
+                        else:
+                            logger.error("✗ Failed to enable DHCP on Pi4")
+                
+                # Log periodic status
+                if check_count % CHECKS_PER_LOG == 0:
+                    status_msg = f"pi4" if self.current_dhcp == "pi4" else \
+                                 f"pi0 (FAILOVER)" if self.current_dhcp == "pi0" else \
+                                 "NONE (BOTH DOWN)"
+                    logger.info(f"[Check #{check_count}] Current DHCP server: {status_msg}")
                 
                 time.sleep(CHECK_INTERVAL)
                 

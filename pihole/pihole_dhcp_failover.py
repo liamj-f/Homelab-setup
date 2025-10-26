@@ -105,6 +105,20 @@ class PiHoleMonitor:
         except requests.exceptions.RequestException:
             return False
     
+    def cleanup_session(self, session):
+        """Delete auth session to free up connection slots"""
+        try:
+            if session.sid:
+                session.session.delete(
+                    f"{session.host}/api/auth",
+                    headers=session.get_headers(),
+                    timeout=5
+                )
+                session.sid = None
+                session.csrf_token = None
+        except requests.exceptions.RequestException:
+            pass  # Ignore cleanup errors
+    
     def get_dhcp_status(self, session):
         """Get current DHCP status from Pi-hole"""
         try:
@@ -229,6 +243,10 @@ class PiHoleMonitor:
                             logger.info("✓ Both Pi-holes back up, Pi4 serving DHCP")
                         else:
                             logger.error("✗ Failed to enable DHCP on Pi4")
+                
+                # Clean up sessions to avoid maxing out connection limits
+                self.cleanup_session(self.pi4_session)
+                self.cleanup_session(self.pi0_session)
                 
                 time.sleep(CHECK_INTERVAL)
                 

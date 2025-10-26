@@ -193,7 +193,7 @@ jobs:
                               ],
                       "interface": "eth0,wg0",
                       "listeningMode": "single",
-                      "revServers":"true,192.168.0.0/24,192.168.0.1,local"
+                      "revServers":["true,192.168.0.0/24,192.168.0.1,local"]
                           },
                   "dhcp": {
                         "active": false,

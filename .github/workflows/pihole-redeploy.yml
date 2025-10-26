@@ -4,7 +4,7 @@ on:
     branches:
       - main
     paths:
-      - 'pihole-compose.yml'
+      - 'pihole/**'
   workflow_dispatch:
   workflow_call:
     inputs:

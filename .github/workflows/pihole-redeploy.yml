@@ -173,6 +173,10 @@ jobs:
               "config":{
                   "dns":{
                       "piholePTR":"Hostname",
+                      "domain": {
+                                  "name": "14monarch.local"
+                                  "local": true
+                                },
                       "upstreams": [
                                     "1.1.1.1",
                                     "8.8.8.8"
@@ -195,7 +199,7 @@ jobs:
                         "end": "192.168.0.255",
                         "router": "192.168.0.1",
                         "netmask": "",
-                        "leaseTime": "6h",
+                        "leaseTime": "2h",
                         "ipv6": false,
                         "rapidCommit": false,
                         "multiDNS": true,

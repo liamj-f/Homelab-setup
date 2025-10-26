@@ -62,7 +62,6 @@ jobs:
           script: |
             sudo pihole-FTL --config dns.interface "wlan0,wg0"
             sudo pihole-FTL --config dns.listeningMode "SINGLE"
-            sudo pihole restartdns
             
       - name: Set pihole webpassword
         uses: appleboy/ssh-action@master
@@ -71,8 +70,10 @@ jobs:
           username: ${{ vars.RPI0_USER }}
           password: ${{ secrets.RPI0_PASSWORD }}
           script: |                   
-            echo "${{ secrets.APP_PASSWORD }}" | sudo pihole -a -p
-                
+                  sudo pihole -a -p <<EOF
+                  ${{ secrets.APP_PASSWORD }}
+                  ${{ secrets.APP_PASSWORD }}
+                  EOF
       - name: Configure custom web port
         uses: appleboy/ssh-action@master
         with:

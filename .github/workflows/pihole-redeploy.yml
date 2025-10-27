@@ -163,6 +163,16 @@ jobs:
           echo "csrf=$CSRF" >> $GITHUB_OUTPUT         
           
       - name: Add DNS records to Pihole via API
+# these were prevously in the dns section
+#                      "hosts":[
+#                              "${{ vars.RPI4_IP }} tplink.14monarch.local",
+#                              "${{ vars.RPI4_IP }} pihole.14monarch.local",
+#                              "${{ vars.RPI4_IP }} nginx.14monarch.local",
+#                              "${{ vars.RPI4_IP }} portainer.14monarch.local",
+#                              "${{ vars.RPI4_IP }} nextcloud.14monarch.local",
+#                              "${{ vars.RPI4_IP }} adminer.14monarch.local",
+#                              "${{ vars.RPI4_IP }} pih0le.14monarch.local"
+#                              ],
         run: |
           curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
@@ -181,19 +191,10 @@ jobs:
                                     "1.1.1.1",
                                     "8.8.8.8"
                                     ],
-#                      "hosts":[
-#                              "${{ vars.RPI4_IP }} tplink.14monarch.local",
-#                              "${{ vars.RPI4_IP }} pihole.14monarch.local",
-#                              "${{ vars.RPI4_IP }} nginx.14monarch.local",
-#                              "${{ vars.RPI4_IP }} portainer.14monarch.local",
-#                              "${{ vars.RPI4_IP }} nextcloud.14monarch.local",
-#                              "${{ vars.RPI4_IP }} adminer.14monarch.local",
-#                              "${{ vars.RPI4_IP }} pih0le.14monarch.local"
-#                              ],
                       "interface": "eth0,wg0",
                       "listeningMode": "single",
                       "revServers":["true,192.168.0.0/24,192.168.0.1,local"]
-                          },
+                           },                          
                   "dhcp": {
                         "active": false,
                         "start": "192.168.0.10",

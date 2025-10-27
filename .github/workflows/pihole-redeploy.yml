@@ -149,8 +149,18 @@ jobs:
                         }                    
                ],
                "Prune": true
-              }'          
-    
+              }'    
+              
+      - name: Copy config into dnsmasq volume
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          password: ${{ secrets.RPI4_PASSWORD }}
+          script: |
+            # Copy the config file directly into the volume
+            sudo cp /home/pi/stacks/pihole/99-pihole-custom.conf /var/lib/docker/volumes/dnsmasq_data/_data/99-custom.conf
+            sudo docker restart pihole    
 #      - name: Trigger stack redeploy via webhook
 #        run: |
 #          echo "Triggering stack redeploy via webhook..."

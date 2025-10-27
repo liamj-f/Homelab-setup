@@ -13,7 +13,7 @@ services:
     volumes:
       - pihole_data:/etc/pihole
       - dnsmasq_data:/etc/dnsmasq.d
-      - ./99-pihole-custom.conf:/etc/dnsmasq.d/99-custom.conf:ro
+      - ./pihole/99-pihole-custom.conf:/etc/dnsmasq.d/99-custom.conf:ro
   nebula-sync:
     image: ghcr.io/lovelaze/nebula-sync:latest
     depends_on:

@@ -184,6 +184,7 @@ jobs:
           echo "csrf=$CSRF" >> $GITHUB_OUTPUT         
           
       - name: Add DNS records to Pihole via API
+        # should add wg0 back in as interface here "eth0,wg0
         run: |
           curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
@@ -202,7 +203,7 @@ jobs:
                                     "1.1.1.1",
                                     "8.8.8.8"
                                     ],
-                      "interface": "eth0,wg0",
+                      "interface": "eth0", 
                       "listeningMode": "single",
                       "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
                       "hosts":[

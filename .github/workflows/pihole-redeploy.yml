@@ -161,8 +161,7 @@ jobs:
           SID=$(echo "$RESPONSE" | jq -r '.session.sid')
           echo "sid=$SID" >> $GITHUB_OUTPUT
           echo "csrf=$CSRF" >> $GITHUB_OUTPUT         
-
-        
+          
       - name: Add DNS records to Pihole via API
         run: |
           curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \

@@ -38,7 +38,17 @@ jobs:
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
-           
+      
+      - name: Copy custom DNS config to Pi4
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          password: ${{ secrets.RPI4_PASSWORD }}
+          source: pihole/99-pihole-custom.conf
+          target: ~/stacks/pihole/
+          overwrite: true   
+                  
       - name: Authenticate to Portainer
         id: auth
         run: |

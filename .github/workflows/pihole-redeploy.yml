@@ -242,8 +242,8 @@ jobs:
                                  ]
                           },
                   "misc": {
-                        "dnsmasq_lines": "dhcp-option=6,192.168.0.2,192.168.0.3"
-                        }
+                          "dnsmasq_lines": ["dhcp-option=6,192.168.0.2,192.168.0.3"]
+                          }  
                     }
                 }'
       - name: Add Blocklists to Pihole via API

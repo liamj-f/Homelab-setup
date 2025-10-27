@@ -45,7 +45,7 @@ jobs:
           host: ${{ vars.RPI4_IP }}
           username: ${{ vars.RPI4_USER }}
           password: ${{ secrets.RPI4_PASSWORD }}
-          source: 99-pihole-custom.conf
+          source: /pihole/99-pihole-custom.conf
           target: /var/lib/docker/volumes/
           overwrite: true
            

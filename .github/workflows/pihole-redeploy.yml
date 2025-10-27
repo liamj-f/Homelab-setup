@@ -46,7 +46,7 @@ jobs:
           username: ${{ vars.RPI4_USER }}
           password: ${{ secrets.RPI4_PASSWORD }}
           source: pihole/99-pihole-custom.conf
-          target: ~/stacks/pihole/
+          target: ~/stacks/
           overwrite: true   
                   
       - name: Authenticate to Portainer

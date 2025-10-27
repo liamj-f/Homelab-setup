@@ -213,7 +213,7 @@ jobs:
                                     ],
                       "interface": "eth0,wg0",
                       "listeningMode": "single",
-                      "revServers":["true,192.168.0.0/24,192.168.0.1,local"]
+                      "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
                       "hosts":[
                               "${{ vars.RPI4_IP }} tplink.14monarch.local",
                               "${{ vars.RPI4_IP }} pihole.14monarch.local",
@@ -222,7 +222,7 @@ jobs:
                               "${{ vars.RPI4_IP }} nextcloud.14monarch.local",
                               "${{ vars.RPI4_IP }} adminer.14monarch.local",
                               "${{ vars.RPI4_IP }} pih0le.14monarch.local"
-                              ],
+                              ]
                            },                          
                   "dhcp": {
                         "active": false,

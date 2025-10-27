@@ -39,15 +39,15 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
       
-      - name: Copy custom DNS config to Pi4
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
-          source: pihole/99-pihole-custom.conf
-          target: ~/stacks/
-          overwrite: true   
+#      - name: Copy custom DNS config to Pi4
+#        uses: appleboy/scp-action@master
+#        with:
+#          host: ${{ vars.RPI4_IP }}
+#          username: ${{ vars.RPI4_USER }}
+#          password: ${{ secrets.RPI4_PASSWORD }}
+#          source: pihole/99-pihole-custom.conf
+#          target: ~/stacks/
+#          overwrite: true   
                   
       - name: Authenticate to Portainer
         id: auth
@@ -214,6 +214,15 @@ jobs:
                       "interface": "eth0,wg0",
                       "listeningMode": "single",
                       "revServers":["true,192.168.0.0/24,192.168.0.1,local"]
+                      "hosts":[
+                              "${{ vars.RPI4_IP }} tplink.14monarch.local",
+                              "${{ vars.RPI4_IP }} pihole.14monarch.local",
+                              "${{ vars.RPI4_IP }} nginx.14monarch.local",
+                              "${{ vars.RPI4_IP }} portainer.14monarch.local",
+                              "${{ vars.RPI4_IP }} nextcloud.14monarch.local",
+                              "${{ vars.RPI4_IP }} adminer.14monarch.local",
+                              "${{ vars.RPI4_IP }} pih0le.14monarch.local"
+                              ],
                            },                          
                   "dhcp": {
                         "active": false,
@@ -231,7 +240,10 @@ jobs:
                                   "DC-A6-32-C8-BB-41,192.168.0.2,liam-pi4,infinite",
                                   "B8-27-EB-3A-5D-2A,192.168.0.3,liam-pi0,infinite"
                                  ]
-                          } 
+                          },
+                  "misc": {
+                        "dnsmasq_lines": "dhcp-option=6,192.168.0.2,192.168.0.3"
+                        }
                     }
                 }'
       - name: Add Blocklists to Pihole via API

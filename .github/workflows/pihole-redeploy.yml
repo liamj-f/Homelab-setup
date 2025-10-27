@@ -151,16 +151,17 @@ jobs:
                "Prune": true
               }'    
               
-      - name: Copy config into dnsmasq volume
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
-          script: |
-            # Copy the config file directly into the volume
-            sudo cp /home/pi/stacks/pihole/99-pihole-custom.conf /var/lib/docker/volumes/dnsmasq_data/_data/99-custom.conf
-            sudo docker restart pihole    
+#      - name: Copy config into dnsmasq volume
+#        uses: appleboy/ssh-action@master
+#        with:
+#          host: ${{ vars.RPI4_IP }}
+#          username: ${{ vars.RPI4_USER }}
+#          password: ${{ secrets.RPI4_PASSWORD }}
+#          script: |
+#            # Copy the config file directly into the volume
+#            sudo cp /home/pi/stacks/pihole/99-pihole-custom.conf /var/lib/docker/volumes/dnsmasq_data/_data/99-custom.conf
+#            sudo docker restart pihole    
+
 #      - name: Trigger stack redeploy via webhook
 #        run: |
 #          echo "Triggering stack redeploy via webhook..."
@@ -183,16 +184,6 @@ jobs:
           echo "csrf=$CSRF" >> $GITHUB_OUTPUT         
           
       - name: Add DNS records to Pihole via API
-# these were prevously in the dns section
-#                      "hosts":[
-#                              "${{ vars.RPI4_IP }} tplink.14monarch.local",
-#                              "${{ vars.RPI4_IP }} pihole.14monarch.local",
-#                              "${{ vars.RPI4_IP }} nginx.14monarch.local",
-#                              "${{ vars.RPI4_IP }} portainer.14monarch.local",
-#                              "${{ vars.RPI4_IP }} nextcloud.14monarch.local",
-#                              "${{ vars.RPI4_IP }} adminer.14monarch.local",
-#                              "${{ vars.RPI4_IP }} pih0le.14monarch.local"
-#                              ],
         run: |
           curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
@@ -225,7 +216,7 @@ jobs:
                               ]
                            },                          
                   "dhcp": {
-                        "active": false,
+                        "active": true,
                         "start": "192.168.0.10",
                         "end": "192.168.0.254",
                         "router": "192.168.0.1",
@@ -270,6 +261,7 @@ jobs:
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: text/plain' \
           -H 'content-type: application/json' \
+          
       - name: End Pihole API Session
         run: |
           curl -X DELETE "http://${{ vars.RPI4_IP }}:82/api/auth" \

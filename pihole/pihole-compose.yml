@@ -10,7 +10,7 @@ services:
       TZ: 'Europe/London'
       FTLCONF_webserver_api_password: ${PIHOLE_WEBPASSWORD}
       FTLCONF_webserver_port: 82
-      FTLCONF_misc_etc_dnsmasq_d: true
+#      FTLCONF_misc_etc_dnsmasq_d: true
     volumes:
       - pihole_data:/etc/pihole
       - dnsmasq_data:/etc/dnsmasq.d

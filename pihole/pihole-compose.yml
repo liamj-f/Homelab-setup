@@ -21,10 +21,9 @@ services:
       FTLCONF_webserver_api_password: ${PIHOLE_WEBPASSWORD}
       FTLCONF_webserver_port: 82
 #      FTLCONF_misc_etc_dnsmasq_d: true
-   # Following ones are only needed in bridge network mode.
-#    cap_add:
-#      - NET_ADMIN
-#      - NET_BIND_SERVICE
+    cap_add:
+      - NET_ADMIN
+      - NET_BIND_SERVICE
     volumes:
       - pihole_data:/etc/pihole
       - dnsmasq_data:/etc/dnsmasq.d

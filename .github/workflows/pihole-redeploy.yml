@@ -217,7 +217,7 @@ jobs:
                               ]
                            },                          
                   "dhcp": {
-                        "active": false,
+                        "active": true,
                         "start": "192.168.0.10",
                         "end": "192.168.0.254",
                         "router": "192.168.0.1",
@@ -229,8 +229,8 @@ jobs:
                         "logging": false,
                         "ignoreUnknownClients": false,
                         "hosts": [
-                                  "DC-A6-32-C8-BB-41,192.168.0.2,liam-pi4,infinite",
-                                  "B8-27-EB-3A-5D-2A,192.168.0.3,liam-pi0,infinite"
+                                  "DC-A6-32-C8-BB-41,192.168.0.2,,infinite",
+                                  "B8-27-EB-3A-5D-2A,192.168.0.3,,infinite"
                                  ]
                           },
                   "misc": {

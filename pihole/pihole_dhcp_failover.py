@@ -106,7 +106,7 @@ def main():
     
     # Authenticate to Pi 4
     log("Authenticating to Pi 4...")
-    pi4_session = auth_pihole(PI4_URL, PIHOLE_PASSWORD)
+    pi4_session = auth_pihole(PI4_URL, PI4_PASSWORD)
     if not pi4_session:
         log("CRITICAL: Cannot authenticate to Pi 4!")
         sys.exit(1)
@@ -124,7 +124,7 @@ def main():
         
         # Ensure Pi Zero W DHCP is off
         log("Authenticating to Pi Zero W...")
-        pi0_session = auth_pihole(PI0_URL, PIHOLE_PASSWORD)
+        pi0_session = auth_pihole(PI0_URL, PI0_PASSWORD)
         if pi0_session:
             log("Checking Pi Zero W DHCP status...")
             pi0_dhcp = get_dhcp_status(PI0_URL, pi0_session)
@@ -147,7 +147,7 @@ def main():
         
         # Authenticate to Pi Zero W
         log("Authenticating to Pi Zero W...")
-        pi0_session = auth_pihole(PI0_URL, PIHOLE_PASSWORD)
+        pi0_session = auth_pihole(PI0_URL, PI0_PASSWORD)
         if not pi0_session:
             log("CRITICAL: Cannot authenticate to Pi Zero W!")
             log("✗ No Pi-holes have DHCP enabled!")

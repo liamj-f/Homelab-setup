@@ -14,8 +14,8 @@ from datetime import datetime
 # Configuration from environment variables
 PI4_HOST = os.getenv('RPI4_IP')
 PI0_HOST = os.getenv('RPI0_IP')
-PI4_PASSWORD = os.getenv('RPI4_PASSWORD', '')
-PI0_PASSWORD = os.getenv('RPI0_PASSWORD', '')
+PI4_PASSWORD = os.getenv('PIHOLE_WEBPASSWORD', '')
+PI0_PASSWORD = os.getenv('PIHOLE_WEBPASSWORD', '')
 PI4_PORT = os.getenv('PI4_PORT', '82')
 PI0_PORT = os.getenv('PI0_PORT', '82')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL_SECONDS', '300'))  # Default 5 minutes

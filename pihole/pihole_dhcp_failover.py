@@ -14,13 +14,15 @@ from datetime import datetime
 # Configuration from environment variables
 PI4_HOST = os.getenv('RPI4_IP')
 PI0_HOST = os.getenv('RPI0_IP')
-PI4_PASSWORD = os.getenv('PIHOLE_WEBPASSWORD', '')
-PI0_PASSWORD = os.getenv('PIHOLE_WEBPASSWORD', '')
+PI4_PASSWORD = os.getenv('RPI4_PASSWORD', '')
+PI0_PASSWORD = os.getenv('RPI0_PASSWORD', '')
+PI4_PORT = os.getenv('PI4_PORT', '82')
+PI0_PORT = os.getenv('PI0_PORT', '82')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL_SECONDS', '300'))  # Default 5 minutes
 
-# Construct URLs
-PI4_URL = f"http://{PI4_HOST}:82" if PI4_HOST else None
-PI0_URL = f"http://{PI0_HOST}:82" if PI0_HOST else None
+# Construct URLs (will be validated in main())
+PI4_URL = f"http://{PI4_HOST}:{PI4_PORT}" if PI4_HOST else None
+PI0_URL = f"http://{PI0_HOST}:{PI0_PORT}" if PI0_HOST else None
 
 def log(message):
     """Print timestamped log message"""
@@ -29,6 +31,10 @@ def log(message):
 
 def auth_pihole(base_url, password):
     """Authenticate to Pi-hole and return session tokens"""
+    if not password:
+        log(f"ERROR: No password provided for {base_url}")
+        return None
+    
     try:
         response = requests.post(
             f"{base_url}/api/auth",
@@ -101,15 +107,14 @@ def set_dhcp_status(base_url, session, enabled):
         log(f"ERROR: Could not set DHCP status on {base_url}: {e}")
         return False
 
-def main():
-    log("Starting Pi-hole DHCP failover monitor...")
-    
+def check_and_failover():
+    """Main check and failover logic"""
     # Authenticate to Pi 4
     log("Authenticating to Pi 4...")
     pi4_session = auth_pihole(PI4_URL, PI4_PASSWORD)
     if not pi4_session:
         log("CRITICAL: Cannot authenticate to Pi 4!")
-        sys.exit(1)
+        return 1
     
     # Check Pi 4 DHCP status
     log("Checking Pi 4 DHCP status...")
@@ -161,15 +166,41 @@ def main():
         else:
             log("CRITICAL: Failed to enable DHCP on Pi Zero W!")
             log("✗ No Pi-holes have DHCP enabled!")
-            sys.exit(1)
+            return 1
+
+def main():
+    """Initialize and start monitoring loop"""
+    log("Starting Pi-hole DHCP failover monitor...")
+    
+    # Validate configuration
+    if not PI4_HOST or not PI0_HOST:
+        log("CRITICAL: RPI4_IP and RPI0_IP environment variables must be set!")
+        log(f"Current values: RPI4_IP={PI4_HOST}, RPI0_IP={PI0_HOST}")
+        sys.exit(1)
+    
+    if not PI4_PASSWORD or not PI0_PASSWORD:
+        log("WARNING: Passwords not set. Using empty passwords.")
+    
+    log(f"Configuration:")
+    log(f"  Pi 4: {PI4_URL}")
+    log(f"  Pi Zero W: {PI0_URL}")
+    log(f"  Check interval: {CHECK_INTERVAL} seconds")
+    
+    # Main monitoring loop
+    while True:
+        try:
+            exit_code = check_and_failover()
+            if exit_code != 0:
+                log(f"Check completed with exit code {exit_code}")
+        except Exception as e:
+            log(f"ERROR during check: {e}")
+        
+        log(f"Waiting {CHECK_INTERVAL} seconds until next check...")
+        time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
     try:
-        exit_code = main()
-        sys.exit(exit_code)
+        main()
     except KeyboardInterrupt:
-        log("Interrupted by user")
-        sys.exit(130)
-    except Exception as e:
-        log(f"CRITICAL: Unexpected error: {e}")
-        sys.exit(1)
+        log("Interrupted by user - shutting down")
+        sys.exit(0)

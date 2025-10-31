@@ -68,9 +68,11 @@ def auth_pihole(base_url, password):
 def logout_pihole(session):
     """Logout from Pi-hole and delete session"""
     if not session:
+        log("DEBUG: No session to logout from")
         return
     
     try:
+        log(f"Logging out from {session['base_url']}...")
         response = requests.delete(
             f"{session['base_url']}/api/auth",
             headers={
@@ -80,9 +82,11 @@ def logout_pihole(session):
             timeout=10
         )
         response.raise_for_status()
-        log(f"Logged out from {session['base_url']}")
+        log(f"✓ Logged out from {session['base_url']}")
+        return True
     except requests.exceptions.RequestException as e:
         log(f"WARNING: Could not logout from {session['base_url']}: {e}")
+        return False
 
 def get_dhcp_status(base_url, session):
     """Check if DHCP is enabled on a Pi-hole"""

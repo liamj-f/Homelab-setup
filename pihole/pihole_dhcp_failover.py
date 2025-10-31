@@ -55,7 +55,8 @@ def auth_pihole(base_url, password):
         if "session" in data:
             return {
                 "sid": data["session"]["sid"],
-                "csrf": data["session"]["csrf"]
+                "csrf": data["session"]["csrf"],
+                "base_url": base_url  # Store base_url for logout
             }
         else:
             log(f"ERROR: Authentication failed for {base_url}")
@@ -63,6 +64,25 @@ def auth_pihole(base_url, password):
     except requests.exceptions.RequestException as e:
         log(f"ERROR: Could not connect to {base_url}: {e}")
         return None
+
+def logout_pihole(session):
+    """Logout from Pi-hole and delete session"""
+    if not session:
+        return
+    
+    try:
+        response = requests.delete(
+            f"{session['base_url']}/api/auth",
+            headers={
+                "X-FTL-SID": session["sid"],
+                "X-FTL-CSRF": session["csrf"]
+            },
+            timeout=10
+        )
+        response.raise_for_status()
+        log(f"Logged out from {session['base_url']}")
+    except requests.exceptions.RequestException as e:
+        log(f"WARNING: Could not logout from {session['base_url']}: {e}")
 
 def get_dhcp_status(base_url, session):
     """Check if DHCP is enabled on a Pi-hole"""

@@ -16,13 +16,7 @@ PI4_HOST = os.getenv('RPI4_IP')
 PI0_HOST = os.getenv('RPI0_IP')
 PI4_PASSWORD = os.getenv('PIHOLE_WEBPASSWORD', '')
 PI0_PASSWORD = os.getenv('PIHOLE_WEBPASSWORD', '')
-PI4_PORT = os.getenv('PI4_PORT', '82')
-PI0_PORT = os.getenv('PI0_PORT', '82')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL_SECONDS', '300'))  # Default 5 minutes
-
-# Construct URLs (will be validated in main())
-PI4_URL = f"http://{PI4_HOST}:{PI4_PORT}" if PI4_HOST else None
-PI0_URL = f"http://{PI0_HOST}:{PI0_PORT}" if PI0_HOST else None
 
 def log(message):
     """Print timestamped log message"""
@@ -111,14 +105,14 @@ def check_and_failover():
     """Main check and failover logic"""
     # Authenticate to Pi 4
     log("Authenticating to Pi 4...")
-    pi4_session = auth_pihole(PI4_URL, PI4_PASSWORD)
+    pi4_session = auth_pihole(PI4_HOST, PI4_PASSWORD)
     if not pi4_session:
         log("CRITICAL: Cannot authenticate to Pi 4!")
         return 1
     
     # Check Pi 4 DHCP status
     log("Checking Pi 4 DHCP status...")
-    pi4_dhcp = get_dhcp_status(PI4_URL, pi4_session)
+    pi4_dhcp = get_dhcp_status(PI4_HOST, pi4_session)
     
     if pi4_dhcp is None:
         log("CRITICAL: Cannot get Pi 4 DHCP status!")
@@ -129,14 +123,14 @@ def check_and_failover():
         
         # Ensure Pi Zero W DHCP is off
         log("Authenticating to Pi Zero W...")
-        pi0_session = auth_pihole(PI0_URL, PI0_PASSWORD)
+        pi0_session = auth_pihole(PI0_HOST, PI0_PASSWORD)
         if pi0_session:
             log("Checking Pi Zero W DHCP status...")
-            pi0_dhcp = get_dhcp_status(PI0_URL, pi0_session)
+            pi0_dhcp = get_dhcp_status(PI0_HOST, pi0_session)
             
             if pi0_dhcp:
                 log("⚠ Pi Zero W DHCP is enabled - disabling it...")
-                if set_dhcp_status(PI0_URL, pi0_session, False):
+                if set_dhcp_status(PI0_HOST, pi0_session, False):
                     log("✓ Pi Zero W DHCP disabled successfully")
                 else:
                     log("ERROR: Failed to disable Pi Zero W DHCP")
@@ -152,7 +146,7 @@ def check_and_failover():
         
         # Authenticate to Pi Zero W
         log("Authenticating to Pi Zero W...")
-        pi0_session = auth_pihole(PI0_URL, PI0_PASSWORD)
+        pi0_session = auth_pihole(PI0_HOST, PI0_PASSWORD)
         if not pi0_session:
             log("CRITICAL: Cannot authenticate to Pi Zero W!")
             log("✗ No Pi-holes have DHCP enabled!")
@@ -160,7 +154,7 @@ def check_and_failover():
         
         # Enable DHCP on Pi Zero W
         log("Enabling DHCP on Pi Zero W...")
-        if set_dhcp_status(PI0_URL, pi0_session, True):
+        if set_dhcp_status(PI0_HOST, pi0_session, True):
             log("✓ Failed over to Pi Zero W")
             return 0
         else:
@@ -182,8 +176,8 @@ def main():
         log("WARNING: Passwords not set. Using empty passwords.")
     
     log(f"Configuration:")
-    log(f"  Pi 4: {PI4_URL}")
-    log(f"  Pi Zero W: {PI0_URL}")
+    log(f"  Pi 4: {PI4_HOST}")
+    log(f"  Pi Zero W: {PI0_HOST}")
     log(f"  Check interval: {CHECK_INTERVAL} seconds")
     
     # Main monitoring loop

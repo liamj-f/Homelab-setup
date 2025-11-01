@@ -108,7 +108,7 @@ jobs:
                         "name":"PRIMARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },
-                        {                     {
+                        {                     
                         "name":"SECONDARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },
@@ -143,7 +143,7 @@ jobs:
                         "name":"PRIMARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },
-                        {                     {
+                        {                     
                         "name":"SECONDARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },

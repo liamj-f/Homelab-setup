@@ -160,9 +160,9 @@ def Check_and_Set_DHCP(host, password, active):
         deauth_pihole(session)
  
 def updater():
-    primary_check_and_set = Check_and_Set_DHCP(Primary_HOST,Primary_PASSWORD, True)
+    primary_check_and_set = Check_and_Set_DHCP(Primary_Host,Primary_PASSWORD, True)
     if primary_check_and_set == False: #Primary
-        secondary_check_and_set = Check_and_Set_DHCP(Secondary_HOST,Secondary_PASSWORD, True)
+        secondary_check_and_set = Check_and_Set_DHCP(Secondary_Host,Secondary_PASSWORD, True)
         if secondary_check_and_set == False: #Secondary
             log(f"Unable to Enable Primary DHCP or Secondary DHCP")
             return 0
@@ -170,7 +170,7 @@ def updater():
             log(f"Unable to Enable Primary DHCP, Secondary DHCP enabled.") 
             return 1
     elif primary_check_and_set == True:
-        secondary_check_and_set = Check_and_Set_DHCP(Secondary_HOST,Secondary_PASSWORD, False)
+        secondary_check_and_set = Check_and_Set_DHCP(Secondary_Host,Secondary_PASSWORD, False)
         if secondary_check_and_set == True:
             log("Primary DHCP Enabled, Secondary DHCP Disabled.")
             return 1
@@ -183,18 +183,18 @@ def main():
     log("Starting Pi-hole DHCP failover monitor...")
     
     # Validate configuration
-    if not Primary_HOST or not Secondary_HOST:
+    if not Primary_Host or not Secondary_Host:
         log("CRITICAL: Pi-hole IP addresses must be set!")
         log("Set either Primary_IP or Secondary_IP environment variables")
-        log(f"Current values: Primary_HOST={Primary_HOST}, Secondary_HOST={Secondary_HOST}")
+        log(f"Current values: Primary_Host={Primary_Host}, Secondary_Host={Secondary_Host}")
         sys.exit(1)
     
-    if not Primary_HOST or not Secondary_PASSWORD:
+    if not Primary_Host or not Secondary_PASSWORD:
         log("WARNING: Passwords not set. Using empty passwords.")
     
     log(f"Configuration:")
-    log(f"  Primary: {Primary_HOST}")
-    log(f"  Secondary: {Secondary_HOST}")
+    log(f"  Primary: {Primary_Host}")
+    log(f"  Secondary: {Secondary_Host}")
     log(f"  Check interval: {CHECK_INTERVAL} seconds")
     
     # Main monitoring loop

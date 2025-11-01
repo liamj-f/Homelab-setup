@@ -13,11 +13,14 @@ from datetime import datetime
 
 # Configuration from environment variables
 # Support both direct IPs and full URLs for flexibility
-Primary_HOST = "http://" + os.getenv('Primary_IP') + ":82"
-Secondary_HOST = "http://" + os.getenv('Secondary_IP') + ":82"
+Primary_IP = os.getenv('Primary_IP')
+Secondary_IP = os.getenv('Secondary_IP')
 Primary_PASSWORD = os.getenv('APP_PASSWORD')
 Secondary_PASSWORD = os.getenv('APP_PASSWORD')
 CHECK_INTERVAL = os.getenv('CHECK_INTERVAL', '300')
+
+Primary_Host = f"htpp://{Primary_IP}:82"
+Secondary_Host = f"http://{Secondary_IP}:82"
 
 
 def log(message):

@@ -105,15 +105,19 @@ jobs:
                              },
                "Env": [
                        {
-                        "name":"PIHOLE_WEBPASSWORD",
+                        "name":"PRIMARY_PIHOLE_WEBPASSWORD",
+                        "value":"${{ secrets.APP_PASSWORD }}"
+                        },
+                        {                     {
+                        "name":"SECONDARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },
                        {
-                        "name":"RPI4_IP",
+                        "name":"PRIMARY_IP",
                         "value":"${{ vars.RPI4_IP }}"
                         },
                         {
-                        "name":"RPI0_IP",
+                        "name":"SECONDARY_IP",
                         "value":"${{ vars.RPI0_IP }}"
                         }                    
                ],
@@ -136,17 +140,21 @@ jobs:
                "repositoryAuthentication": false,
                "Env": [
                        {
-                        "name":"PIHOLE_WEBPASSWORD",
+                        "name":"PRIMARY_PIHOLE_WEBPASSWORD",
+                        "value":"${{ secrets.APP_PASSWORD }}"
+                        },
+                        {                     {
+                        "name":"SECONDARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },
                        {
-                        "name":"RPI4_IP",
+                        "name":"PRIMARY_IP",
                         "value":"${{ vars.RPI4_IP }}"
                         },
                         {
-                        "name":"RPI0_IP",
+                        "name":"SECONDARY_IP",
                         "value":"${{ vars.RPI0_IP }}"
-                        }                    
+                        }                
                ],
                "Prune": true
               }'    

@@ -18,7 +18,7 @@ services:
       - "67:67/udp"
     environment:
       TZ: 'Europe/London'
-      FTLCONF_webserver_api_password: ${PIHOLE_WEBPASSWORD}
+      FTLCONF_webserver_api_password: ${PRIMARY_PIHOLE_WEBPASSWORD}
       FTLCONF_webserver_port: 82
 #      FTLCONF_misc_etc_dnsmasq_d: true
     cap_add:
@@ -35,8 +35,8 @@ services:
         condition: service_healthy
     container_name: nebula-sync
     environment:
-      PRIMARY: http://${RPI4_IP}:82|${PIHOLE_WEBPASSWORD}
-      REPLICAS: http://${RPI0_IP}:82|${PIHOLE_WEBPASSWORD}
+      PRIMARY: http://${PRIMARY_IP}:82|${PRIMARY_PIHOLE_WEBPASSWORD}
+      REPLICAS: http://${SECONDARY_IP}:82|${SECONDARY_PIHOLE_WEBPASSWORD}
       FULL_SYNC: false
       SYNC_CONFIG_DNS: true	#Synchronize DNS settings
       SYNC_CONFIG_DNS_EXCLUDE: "interface" #Keep pi0 on wlan0 and wg0
@@ -74,13 +74,13 @@ services:
     network_mode: host
     environment:
       # Pi-hole endpoints
-      - PI4_HOST=http://${RPI4_IP}:82
-      - PI0_HOST=http://${RPI0_IP}:82
+      - PRIMARY_HOST=${PRIMARY_IP}
+      - SECONDARY_HOST=${SECONDARY_IP}
       # Pi-hole passwords (set these as secrets)
-      - PI4_PASSWORD=${PIHOLE_WEBPASSWORD}
-      - PI0_PASSWORD=${PIHOLE_WEBPASSWORD}
+      - PRIMARY_PASSWORD=${PRIMARY_PIHOLE_WEBPASSWORD}
+      - SECONDARY_PASSWORD=${SECONDARY_PIHOLE_WEBPASSWORD}
       # Monitoring settings
-      - CHECK_INTERVAL=30           # Check every 30 seconds
+      - CHECK_INTERVAL=300           # Check every 5 minutes
     logging:
       driver: "json-file"
       options:

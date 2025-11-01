@@ -160,9 +160,9 @@ def Check_and_Set_DHCP(host, password, active):
         deauth_pihole(session)
  
 def updater():
-    primary_check_and_set = Check_and_Set_DHCP(Primary_Host,Primary_PASSWORD, True)
+    primary_check_and_set = Check_and_Set_DHCP(Primary_Host,Primary_Password, True)
     if primary_check_and_set == False: #Primary
-        secondary_check_and_set = Check_and_Set_DHCP(Secondary_Host,Secondary_PASSWORD, True)
+        secondary_check_and_set = Check_and_Set_DHCP(Secondary_Host,Secondary_Password, True)
         if secondary_check_and_set == False: #Secondary
             log(f"Unable to Enable Primary DHCP or Secondary DHCP")
             return 0
@@ -170,7 +170,7 @@ def updater():
             log(f"Unable to Enable Primary DHCP, Secondary DHCP enabled.") 
             return 1
     elif primary_check_and_set == True:
-        secondary_check_and_set = Check_and_Set_DHCP(Secondary_Host,Secondary_PASSWORD, False)
+        secondary_check_and_set = Check_and_Set_DHCP(Secondary_Host,Secondary_Password, False)
         if secondary_check_and_set == True:
             log("Primary DHCP Enabled, Secondary DHCP Disabled.")
             return 1
@@ -189,7 +189,7 @@ def main():
         log(f"Current values: Primary_Host={Primary_Host}, Secondary_Host={Secondary_Host}")
         sys.exit(1)
     
-    if not Primary_Host or not Secondary_PASSWORD:
+    if not Primary_Host or not Secondary_Password:
         log("WARNING: Passwords not set. Using empty passwords.")
     
     log(f"Configuration:")

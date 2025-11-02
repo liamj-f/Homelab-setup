@@ -19,7 +19,7 @@ Primary_Password = os.getenv('PRIMARY_PASSWORD')
 Secondary_Password = os.getenv('SECONDARY_PASSWORD')
 CHECK_INTERVAL = os.getenv('CHECK_INTERVAL', '300')
 
-Primary_Host = f"htpp://{Primary_IP}:82"
+Primary_Host = f"http://{Primary_IP}:82"
 Secondary_Host = f"http://{Secondary_IP}:82"
 
 

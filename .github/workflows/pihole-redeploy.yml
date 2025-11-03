@@ -237,8 +237,8 @@ jobs:
                         "logging": false,
                         "ignoreUnknownClients": false,
                         "hosts": [
-                                  "DC-A6-32-C8-BB-41,${{ vars.RPI4_IP }},,infinite",
-                                  "B8-27-EB-3A-5D-2A,${{ vars.RPI0_IP }} ,,infinite"
+                                "dc-a6-32-c8-bb-41,${{ vars.RPI4_IP }},,infinite",
+                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},,infinite"     
                                  ]
                           },
                   "misc": {

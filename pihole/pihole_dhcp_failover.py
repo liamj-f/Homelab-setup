@@ -165,18 +165,14 @@ def updater():
         secondary_check_and_set = Check_and_Set_DHCP(Secondary_Host,Secondary_Password, True)
         if secondary_check_and_set == False: #Secondary
             log(f"Unable to Enable Primary DHCP or Secondary DHCP")
-            return 0
         elif secondary_check_and_set == True:
             log(f"Unable to Enable Primary DHCP, Secondary DHCP enabled.") 
-            return 1
     elif primary_check_and_set == True:
         secondary_check_and_set = Check_and_Set_DHCP(Secondary_Host,Secondary_Password, False)
         if secondary_check_and_set == True:
             log("Primary DHCP Enabled, Secondary DHCP Disabled.")
-            return 1
         elif secondary_check_and_set == False:
             log("Primary DHCP Enabled, Unable to confirm status of secondary.")                          
-            return 1
 
 def main():
     """Initialize and start monitoring loop"""

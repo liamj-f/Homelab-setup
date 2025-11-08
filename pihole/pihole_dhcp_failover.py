@@ -38,6 +38,7 @@ def auth_pihole(base_url, password):
         response = requests.post(
             f"{base_url}/api/auth",
             json={"password": password},
+            headers={"User-Agent": "pihole-dhcp-failover"},
             timeout=10
         )
         response.raise_for_status()

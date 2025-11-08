@@ -102,7 +102,25 @@ jobs:
           curl -X DELETE "http://${{ vars.RPI0_IP }}:82/api/auth" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-          
+
+      - name: Copy Failover script
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ vars.RPI0_IP }}
+          username: ${{ vars.RPI0_USER }}
+          password: ${{ secrets.RPI0_PASSWORD }}
+          source: "pihole/pihole_dhcp_failover.py"
+          target: "/var/www/app/"
+
+      - name: Run Failover Script on RPI0
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.RPI0_IP }}
+          username: ${{ vars.RPI0_USER }}
+          password: ${{ secrets.RPI0_PASSWORD }}
+          script: |                   
+                  python3 /var/www/app/pihole_dhcp_failover.py --setup
+                            
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf

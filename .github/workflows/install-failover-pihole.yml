@@ -110,7 +110,7 @@ jobs:
           username: ${{ vars.RPI0_USER }}
           password: ${{ secrets.RPI0_PASSWORD }}
           source: "pihole/pihole_dhcp_failover.py"
-          target: "/var/www/app/"
+          target: "/home/${{ vars.RPI0_USER }}/"
 
       - name: Run Failover Script on RPI0
         uses: appleboy/ssh-action@master
@@ -119,7 +119,7 @@ jobs:
           username: ${{ vars.RPI0_USER }}
           password: ${{ secrets.RPI0_PASSWORD }}
           script: |                   
-                  python3 /var/www/app/pihole_dhcp_failover.py --setup
+                  python3 /home/${{ vars.RPI0_USER }}/pihole_dhcp_failover.py --setup
                             
       - name: Bring down VPN
         run: |

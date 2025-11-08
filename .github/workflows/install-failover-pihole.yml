@@ -111,6 +111,10 @@ jobs:
           password: ${{ secrets.RPI0_PASSWORD }}
           source: "pihole/pihole_dhcp_failover.py"
           target: "/home/${{ vars.RPI0_USER }}/"
+          # strip_components removes the 'pihole/' directory prefix from the source path
+          # Without this, the file would be copied to /home/user/pihole/pihole_dhcp_failover.py
+          # With strip_components: 1, it's copied directly to /home/user/pihole_dhcp_failover.py
+          strip_components: 1
 
       - name: Run Failover Script on RPI0
         uses: appleboy/ssh-action@master

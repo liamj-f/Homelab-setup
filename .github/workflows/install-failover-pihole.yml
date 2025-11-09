@@ -103,13 +103,17 @@ jobs:
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
 
+      - name: Render Failover Script
+        run: |
+          envsubst < pihole/pihole_dhcp_failover.py > pihole/pihole_dhcp_failover_rendered.py
+
       - name: Copy Failover script
         uses: appleboy/scp-action@master
         with:
           host: ${{ vars.RPI0_IP }}
           username: ${{ vars.RPI0_USER }}
           password: ${{ secrets.RPI0_PASSWORD }}
-          source: "pihole/pihole_dhcp_failover.py"
+          source: "pihole/pihole_dhcp_failover_rendered.py"
           target: "/home/${{ vars.RPI0_USER }}/"
           # strip_components removes the 'pihole/' directory prefix from the source path
           # Without this, the file would be copied to /home/user/pihole/pihole_dhcp_failover.py
@@ -123,7 +127,7 @@ jobs:
           username: ${{ vars.RPI0_USER }}
           password: ${{ secrets.RPI0_PASSWORD }}
           script: |                   
-                  python3 /home/${{ vars.RPI0_USER }}/pihole_dhcp_failover.py --setup
+                  python3 /home/${{ vars.RPI0_USER }}/pihole_dhcp_failover_rendered.py --setup
                             
       - name: Bring down VPN
         run: |

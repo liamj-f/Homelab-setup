@@ -108,7 +108,7 @@ jobs:
                         "name":"PRIMARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },
-                        {                     
+                        {
                         "name":"SECONDARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },
@@ -119,7 +119,11 @@ jobs:
                         {
                         "name":"SECONDARY_IP",
                         "value":"${{ vars.RPI0_IP }}"
-                        }                    
+                        },
+                        {
+                        "name":"CHECK_INTERVAL",
+                        "value":"300"
+                        }
                ],
                "Prune": true,
                "StackFileVersion": "3"
@@ -143,7 +147,7 @@ jobs:
                         "name":"PRIMARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },
-                        {                     
+                        {
                         "name":"SECONDARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },
@@ -154,7 +158,11 @@ jobs:
                         {
                         "name":"SECONDARY_IP",
                         "value":"${{ vars.RPI0_IP }}"
-                        }                
+                        },
+                        {
+                        "name":"CHECK_INTERVAL",
+                        "value":"300"
+                        }
                ],
                "Prune": true
               }'    

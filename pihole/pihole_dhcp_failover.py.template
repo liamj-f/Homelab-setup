@@ -8,16 +8,14 @@ Runs continuously, checking every 5 minutes
 import requests
 import sys
 import time
-import os
 from datetime import datetime
 
-# Configuration from environment variables
-# Support both direct IPs and full URLs for flexibility
-Primary_IP = os.getenv('PRIMARY_IP')
-Secondary_IP = os.getenv('SECONDARY_IP')
-Primary_Password = os.getenv('PRIMARY_PASSWORD')
-Secondary_Password = os.getenv('SECONDARY_PASSWORD')
-CHECK_INTERVAL = os.getenv('CHECK_INTERVAL', '300')
+# Configuration - values injected during deployment
+Primary_IP = '${PRIMARY_IP}'
+Secondary_IP = '${SECONDARY_IP}'
+Primary_Password = '${PRIMARY_PASSWORD}'
+Secondary_Password = '${SECONDARY_PASSWORD}'
+CHECK_INTERVAL = '${CHECK_INTERVAL}'
 
 Primary_Host = f"http://{Primary_IP}:82"
 Secondary_Host = f"http://{Secondary_IP}:82"
@@ -32,7 +30,7 @@ def auth_pihole(base_url, password):
     if not password:
         log(f"ERROR: No password provided for {base_url}")
         return None
-    
+
     try:
         #log(f"Logging into {base_url}.")
         response = requests.post(
@@ -43,7 +41,7 @@ def auth_pihole(base_url, password):
         )
         response.raise_for_status()
         data = response.json()
-        
+
         if "session" in data:
             #log(f"Logged into {base_url}.")
             return {
@@ -57,12 +55,12 @@ def auth_pihole(base_url, password):
     except requests.exceptions.RequestException as e:
         log(f"ERROR: Could not connect to {base_url}: {e}")
         return False
-    
+
 def deauth_pihole(session):
     if not session:
         log("DEBUG: No session to logout from")
         return
-    
+
     try:
         #log(f"Logging out from {session['base_url']}...")
         response = requests.delete(
@@ -92,7 +90,7 @@ def get_dhcp_status(session):
         )
         response.raise_for_status()
         data = response.json()
-        
+
         if "config" in data and "dhcp" in data["config"]:
             return data["config"]["dhcp"].get("active", False)
         return False
@@ -121,7 +119,7 @@ def set_dhcp_status(session, active):
         )
         response.raise_for_status()
         data = response.json()
-        
+
         if "error" in data:
             log(f"ERROR: Failed to set DHCP on {session['base_url']}: {data['error']}")
             return False
@@ -159,7 +157,7 @@ def Check_and_Set_DHCP(host, password, active):
                 return True
     finally:
         deauth_pihole(session)
- 
+
 def updater():
     primary_check_and_set = Check_and_Set_DHCP(Primary_Host,Primary_Password, True)
     if primary_check_and_set == False: #Primary
@@ -167,33 +165,33 @@ def updater():
         if secondary_check_and_set == False: #Secondary
             log(f"Unable to Enable Primary DHCP or Secondary DHCP")
         elif secondary_check_and_set == True:
-            log(f"Unable to Enable Primary DHCP, Secondary DHCP enabled.") 
+            log(f"Unable to Enable Primary DHCP, Secondary DHCP enabled.")
     elif primary_check_and_set == True:
         secondary_check_and_set = Check_and_Set_DHCP(Secondary_Host,Secondary_Password, False)
         if secondary_check_and_set == True:
             log("Primary DHCP Enabled, Secondary DHCP Disabled.")
         elif secondary_check_and_set == False:
-            log("Primary DHCP Enabled, Unable to confirm status of secondary.")                          
+            log("Primary DHCP Enabled, Unable to confirm status of secondary.")
 
 def main():
     """Initialize and start monitoring loop"""
     log("Starting Pi-hole DHCP failover monitor...")
-    
+
     # Validate configuration
     if not Primary_Host or not Secondary_Host:
         log("CRITICAL: Pi-hole IP addresses must be set!")
         log("Set either Primary_IP or Secondary_IP environment variables")
         log(f"Current values: Primary_Host={Primary_Host}, Secondary_Host={Secondary_Host}")
         sys.exit(1)
-    
+
     if not Primary_Host or not Secondary_Password:
         log("WARNING: Passwords not set. Using empty passwords.")
-    
+
     log(f"Configuration:")
     log(f"  Primary: {Primary_Host}")
     log(f"  Secondary: {Secondary_Host}")
     log(f"  Check interval: {CHECK_INTERVAL} seconds")
-    
+
     # Main monitoring loop
     while True:
         try:
@@ -202,10 +200,10 @@ def main():
                 log(f"Check completed with exit code {exit_code}")
         except Exception as e:
             log(f"ERROR during check: {e}")
-        
+
         log(f"Waiting {CHECK_INTERVAL} seconds until next check...")
         time.sleep(int(CHECK_INTERVAL))
-    
+
 if __name__ == "__main__":
     try:
         main()

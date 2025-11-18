@@ -1,7 +1,9 @@
 FROM python:3.11-slim
 
 WORKDIR /app
-RUN pip install --no-cache-dir requests
-COPY pihole_dhcp_failover.py /app/
+RUN pip install --no-cache-dir requests gettext-base
+COPY pihole_dhcp_failover.py.template /app/
 
-CMD ["python", "-u", "/app/pihole_dhcp_failover.py"]
+# Replace environment variables at runtime using envsubst
+CMD envsubst < /app/pihole_dhcp_failover.py.template > /app/pihole_dhcp_failover.py && \
+    python -u /app/pihole_dhcp_failover.py

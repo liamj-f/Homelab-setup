@@ -104,8 +104,14 @@ jobs:
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
 
       - name: Render Failover Script
+        env:
+          PRIMARY_IP: ${{ vars.RPI4_IP }}
+          SECONDARY_IP: ${{ vars.RPI0_IP }}
+          PRIMARY_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          SECONDARY_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          CHECK_INTERVAL: '300'
         run: |
-          envsubst < pihole/pihole_dhcp_failover.py > pihole/pihole_dhcp_failover_rendered.py
+          envsubst < pihole/pihole_dhcp_failover.py.template > pihole/pihole_dhcp_failover_rendered.py
 
       - name: Copy Failover script
         uses: appleboy/scp-action@master

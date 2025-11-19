@@ -60,6 +60,22 @@ jobs:
           password: ${{ secrets.RPI4_PASSWORD }}
           script: |
             sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+      - name: Configure Docker DNS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          password: ${{ secrets.RPI4_PASSWORD }}
+          script: |
+            sudo mkdir -p /etc/docker
+            cat <<EOF | sudo tee /etc/docker/daemon.json
+            {
+              "dns": ["192.168.0.2", "192.168.0.3", "1.1.1.1", "1.0.0.1"]
+            }
+            EOF
+            sudo systemctl restart docker
+            
       - name: Ensure Docker is running
         uses: appleboy/ssh-action@master
         with:

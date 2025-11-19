@@ -74,6 +74,13 @@ jobs:
               "dns": ["192.168.0.2", "192.168.0.3", "1.1.1.1", "1.0.0.1"]
             }
             EOF
+            sudo mkdir -p /etc/systemd/system/docker.service.d
+            cat <<EOF | sudo tee /etc/systemd/system/docker.service.d/override.conf
+            [Service]
+            Environment="DOCKER_MIN_API_VERSION=1.24"
+            EOF
+            
+            sudo systemctl daemon-reload
             sudo systemctl restart docker
             
       - name: Ensure Docker is running

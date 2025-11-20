@@ -74,12 +74,10 @@ jobs:
               "dns": ["192.168.0.2", "192.168.0.3", "1.1.1.1", "1.0.0.1"]
             }
             EOF
-            sudo mkdir -p /etc/systemd/system/docker.service.d
-            cat <<EOF | sudo tee /etc/systemd/system/docker.service.d/override.conf
-            [Service]
-            Environment="DOCKER_MIN_API_VERSION=1.24"
-            EOF
-            
+
+            # Add DOCKER_MIN_API_VERSION to the service file
+            sudo sed -i '/^\[Service\]/a Environment=DOCKER_MIN_API_VERSION=1.24' /etc/systemd/system/multi-user.target.wants/docker.service
+
             sudo systemctl daemon-reload
             sudo systemctl restart docker
             

@@ -1,7 +1,11 @@
 FROM python:3.11-slim
-
 WORKDIR /app
-RUN pip install --no-cache-dir requests gettext-base
+
+# Install packages with retry and explicit DNS
+RUN apt-get update && apt-get install -y gettext-base && \
+    pip install --no-cache-dir --break-system-packages requests || \
+    (sleep 5 && pip install --no-cache-dir --break-system-packages requests)
+
 COPY pihole_dhcp_failover.py.template /app/
 
 # Replace environment variables at runtime using envsubst

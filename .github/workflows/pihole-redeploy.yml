@@ -3,8 +3,10 @@ on:
   push:
     branches:
       - main
+      - dhcp-failover
     paths:
-      - 'pihole-compose.yml'
+      - 'pihole/**'
+      - '.github/workflows/pihole-redeploy.yml'
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -36,7 +38,17 @@ jobs:
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
-          
+      
+#      - name: Copy custom DNS config to Pi4
+#        uses: appleboy/scp-action@master
+#        with:
+#          host: ${{ vars.RPI4_IP }}
+#          username: ${{ vars.RPI4_USER }}
+#          password: ${{ secrets.RPI4_PASSWORD }}
+#          source: pihole/99-pihole-custom.conf
+#          target: ~/stacks/
+#          overwrite: true   
+                  
       - name: Authenticate to Portainer
         id: auth
         run: |
@@ -83,8 +95,8 @@ jobs:
           -d '{
                "Name": "pihole",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
-               "ComposeFile": "pihole-compose.yml",
+               "RepositoryReferenceName": "${{ github.ref }}",
+               "ComposeFile": "pihole/pihole-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,
@@ -93,8 +105,24 @@ jobs:
                              },
                "Env": [
                        {
-                        "name":"PIHOLE_WEBPASSWORD",
+                        "name":"PRIMARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
+                        },
+                        {
+                        "name":"SECONDARY_PIHOLE_WEBPASSWORD",
+                        "value":"${{ secrets.APP_PASSWORD }}"
+                        },
+                       {
+                        "name":"PRIMARY_IP",
+                        "value":"${{ vars.RPI4_IP }}"
+                        },
+                        {
+                        "name":"SECONDARY_IP",
+                        "value":"${{ vars.RPI0_IP }}"
+                        },
+                        {
+                        "name":"CHECK_INTERVAL",
+                        "value":"300"
                         }
                ],
                "Prune": true,
@@ -112,17 +140,44 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{
                "PullImage": true,
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
                "Env": [
                        {
-                        "name":"PIHOLE_WEBPASSWORD",
+                        "name":"PRIMARY_PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
+                        },
+                        {
+                        "name":"SECONDARY_PIHOLE_WEBPASSWORD",
+                        "value":"${{ secrets.APP_PASSWORD }}"
+                        },
+                       {
+                        "name":"PRIMARY_IP",
+                        "value":"${{ vars.RPI4_IP }}"
+                        },
+                        {
+                        "name":"SECONDARY_IP",
+                        "value":"${{ vars.RPI0_IP }}"
+                        },
+                        {
+                        "name":"CHECK_INTERVAL",
+                        "value":"300"
                         }
-                       ],
+               ],
                "Prune": true
-              }'          
-    
+              }'    
+              
+#      - name: Copy config into dnsmasq volume
+#        uses: appleboy/ssh-action@master
+#        with:
+#          host: ${{ vars.RPI4_IP }}
+#          username: ${{ vars.RPI4_USER }}
+#          password: ${{ secrets.RPI4_PASSWORD }}
+#          script: |
+#            # Copy the config file directly into the volume
+#            sudo cp /home/pi/stacks/pihole/99-pihole-custom.conf /var/lib/docker/volumes/dnsmasq_data/_data/99-custom.conf
+#            sudo docker restart pihole    
+
 #      - name: Trigger stack redeploy via webhook
 #        run: |
 #          echo "Triggering stack redeploy via webhook..."
@@ -145,6 +200,7 @@ jobs:
           echo "csrf=$CSRF" >> $GITHUB_OUTPUT         
           
       - name: Add DNS records to Pihole via API
+        # should add wg0 back in as interface here "eth0,wg0
         run: |
           curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
@@ -154,11 +210,18 @@ jobs:
           -d '{
               "config":{
                   "dns":{
-                      "piholePTR":"None",
+                      "piholePTR":"Hostname",
+                      "domain": {
+                                  "name": "14monarch.local",
+                                  "local": true
+                                },
                       "upstreams": [
                                     "1.1.1.1",
                                     "8.8.8.8"
                                     ],
+                      "interface": "eth0", 
+                      "listeningMode": "single",
+                      "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
                       "hosts":[
                               "192.168.0.1 tplink.14monarch.local",
                               "${{ vars.RPI4_IP }} pihole.14monarch.local",
@@ -166,16 +229,34 @@ jobs:
                               "${{ vars.RPI4_IP }} portainer.14monarch.local",
                               "${{ vars.RPI4_IP }} nextcloud.14monarch.local",
                               "${{ vars.RPI4_IP }} adminer.14monarch.local",
-                              "${{ vars.RPI0_IP }} pihole0.14monarch.local"
-                              ],
-                      "interface": "eth0,wg0",
-                      "listeningMode": "single"
-                          }
-                        }
+                              "${{ vars.RPI4_IP }} pih0le.14monarch.local"
+                              ]
+                           },                          
+                  "dhcp": {
+                        "active": true,
+                        "start": "192.168.0.10",
+                        "end": "192.168.0.254",
+                        "router": "192.168.0.1",
+                        "netmask": "",
+                        "leaseTime": "2h",
+                        "ipv6": false,
+                        "rapidCommit": false,
+                        "multiDNS": true,
+                        "logging": false,
+                        "ignoreUnknownClients": false,
+                        "hosts": [
+                                "dc:a6:32:c8:bb:41,${{ vars.RPI4_IP }},,infinite",
+                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},,infinite"     
+                                 ]
+                          },
+                  "misc": {
+                          "dnsmasq_lines": ["dhcp-option=6,192.168.0.2,192.168.0.3"]
+                          }  
+                    }
                 }'
       - name: Add Blocklists to Pihole via API
         run: |
-          curl -X POST "http://${{ vars.RPI4_IP }}:82/api/lists" \
+          curl -X POST "http://${{ vars.RPI4_IP }}:82/api/lists?type=block" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
@@ -186,7 +267,6 @@ jobs:
                           "https://media.githubusercontent.com/media/zachlagden/Pi-hole-Optimized-Blocklists/refs/heads/main/lists/advertising.txt",
                           "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts"
                           ],
-              "type": "block",
               "comment": "Added via API",
               "groups": [0],
               "enabled": true
@@ -196,8 +276,15 @@ jobs:
           curl -X POST "http://${{ vars.RPI4_IP }}:82/api/action/gravity" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-          -H 'accept: application/json' \
+          -H 'accept: text/plain' \
           -H 'content-type: application/json' \
+          
+      - name: End Pihole API Session
+        run: |
+          curl -X DELETE "http://${{ vars.RPI4_IP }}:82/api/auth" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+        
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf

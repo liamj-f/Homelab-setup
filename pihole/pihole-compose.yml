@@ -1,0 +1,94 @@
+version: '3.9'
+
+services:
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    network_mode: "host"
+    ports:
+      # DNS Ports
+      - "53:53/tcp"
+      - "53:53/udp"
+      # Default HTTP Port
+      - "80:80/tcp"
+      # Default HTTPs Port. FTL will generate a self-signed certificate
+      - "443:443/tcp"
+      # Uncomment the line below if you are using Pi-hole as your DHCP server
+      - "67:67/udp"
+    environment:
+      TZ: 'Europe/London'
+      FTLCONF_webserver_api_password: ${PRIMARY_PIHOLE_WEBPASSWORD}
+      FTLCONF_webserver_port: 82
+#      FTLCONF_misc_etc_dnsmasq_d: true
+    cap_add:
+      - NET_ADMIN
+      - NET_BIND_SERVICE
+    volumes:
+      - pihole_data:/etc/pihole
+      - dnsmasq_data:/etc/dnsmasq.d
+#      - /home/pi/stacks/pihole/99-pihole-custom.conf:/etc/dnsmasq.d/99-custom.conf
+  nebula-sync:
+    image: ghcr.io/lovelaze/nebula-sync:latest
+    depends_on:
+      pihole:
+        condition: service_healthy
+    container_name: nebula-sync
+    environment:
+      PRIMARY: http://${PRIMARY_IP}:82|${PRIMARY_PIHOLE_WEBPASSWORD}
+      REPLICAS: http://${SECONDARY_IP}:82|${SECONDARY_PIHOLE_WEBPASSWORD}
+      FULL_SYNC: false
+      SYNC_CONFIG_DNS: true	#Synchronize DNS settings
+      SYNC_CONFIG_DNS_EXCLUDE: "interface" #Keep pi0 on wlan0 and wg0
+      SYNC_CONFIG_DHCP: true	#Synchronize DHCP settings
+#      SYNC_CONFIG_DHCP_EXCLUDE: "active" # Doesn't need to be kept off on pi0!
+      SYNC_CONFIG_NTP: true	#Synchronize NTP settings
+      SYNC_CONFIG_RESOLVER: true	#Synchronize resolver settings
+      SYNC_CONFIG_DATABASE: true	#Synchronize database settings
+      SYNC_CONFIG_MISC: true	#Synchronize miscellaneous settings
+      SYNC_CONFIG_DEBUG: true	#Synchronize debug settings
+      SYNC_GRAVITY_DHCP_LEASES: true	#Synchronize DHCP leases
+      SYNC_GRAVITY_GROUP: true	#Synchronize groups
+      SYNC_GRAVITY_AD_LIST: true	#Synchronize ad lists
+      SYNC_GRAVITY_AD_LIST_BY_GROUP: true	#Synchronize ad lists by group
+      SYNC_GRAVITY_DOMAIN_LIST: true	#Synchronize domain lists
+      SYNC_GRAVITY_DOMAIN_LIST_BY_GROUP: true	#Synchronize domain lists by group
+      SYNC_GRAVITY_CLIENT: true	#Synchronize clients
+      SYNC_GRAVITY_CLIENT_BY_GROUP: true	#Synchronize clients by group
+      RUN_GRAVITY: true
+      CRON: "*/5 * * * *"
+      CLIENT_TIMEOUT_SECONDS: 60
+      TZ: "Europe/London"
+    restart: unless-stopped
+  pihole-dhcp-failover:
+    build:
+      context: .
+      dockerfile: pihole_dhcp_failover_dockerfile
+    depends_on:
+      pihole:
+        condition: service_healthy
+      nebula-sync:
+        condition: service_started
+    container_name: pihole-dhcp-failover
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      # Pi-hole endpoints
+      - PRIMARY_IP=${PRIMARY_IP}
+      - SECONDARY_IP=${SECONDARY_IP}
+      # Pi-hole passwords (set these as secrets)
+      - PRIMARY_PASSWORD=${PRIMARY_PIHOLE_WEBPASSWORD}
+      - SECONDARY_PASSWORD=${SECONDARY_PIHOLE_WEBPASSWORD}
+      # Monitoring settings
+      - CHECK_INTERVAL=300           # Check every 5 minutes
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pihole_data:
+    name: pihole_data
+  dnsmasq_data:
+    name: dnsmasq_data

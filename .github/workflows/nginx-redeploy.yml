@@ -83,7 +83,7 @@ jobs:
           -d '{
                "Name": "nginx",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "nginx-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
@@ -116,7 +116,7 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{
                "PullImage": true,
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
                "Env": [
                        {
@@ -135,15 +135,15 @@ jobs:
         id: token
         run: |
           sleep 20
-            RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/tokens" \
-              -H "Content-Type: application/json" \
-              -d '{
-                   "identity":"${{ vars.NGINX_EMAIL }}",
-                   "secret":"${{ secrets.APP_PASSWORD }}"
-                   }')
+          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/tokens" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "identity":"${{ vars.NGINX_EMAIL }}",
+                 "secret":"${{ secrets.APP_PASSWORD }}"
+                 }')
         
-            TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
-            echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
             
       - name: Create Proxy Hosts
         run: |
@@ -155,7 +155,7 @@ jobs:
           hosts["portainer.14monarch.local"]="${{ vars.RPI4_IP }}:83"
           hosts["adminer.14monarch.local"]="${{ vars.RPI4_IP }}:84"
           hosts["nextcloud.14monarch.local"]="${{ vars.RPI4_IP }}:85"
-          hosts["pihole0.14monarch.local"]=${{ vars.RPI0_IP }}:82"
+          hosts["pih0le.14monarch.local"]="${{ vars.RPI0_IP }}:82"
           
           for domain in "${!hosts[@]}"; do
             host="${hosts[$domain]}"

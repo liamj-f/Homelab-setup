@@ -41,7 +41,7 @@ jobs:
           envsubst < portainer-compose.yml > portainer-compose.rendered.yml
           
       - name: Copy rendered compose
-        uses: appleboy/scp-action@vmaster
+        uses: appleboy/scp-action@master
         with:
           host: ${{ vars.RPI4_IP }}
           username: ${{ vars.RPI4_USER }}

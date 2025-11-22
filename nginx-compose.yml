@@ -17,6 +17,10 @@ services:
       - ./letsencrypt:/etc/letsencrypt
     networks:
       - nginx_network
+    healthcheck:
+      test: ["CMD", "/usr/bin/check-health"]
+      interval: 10s
+      timeout: 3s
 volumes:
   nginx_data:
     name: nginx_data

@@ -135,15 +135,15 @@ jobs:
         id: token
         run: |
           sleep 20
-            RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/tokens" \
-              -H "Content-Type: application/json" \
-              -d '{
-                   "identity":"${{ vars.NGINX_EMAIL }}",
-                   "secret":"${{ secrets.APP_PASSWORD }}"
-                   }')
+          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/tokens" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "identity":"${{ vars.NGINX_EMAIL }}",
+                 "secret":"${{ secrets.APP_PASSWORD }}"
+                 }')
         
-            TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
-            echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
             
       - name: Create Proxy Hosts
         run: |

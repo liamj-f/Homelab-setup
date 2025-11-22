@@ -1,10 +1,17 @@
-# rpi4-docker
+# Homelab-setup
+This repo is for Liams Raspberry Pi4 8gb docker compose files and deploying them
 
-This repo is for Liams Raspberry Pi4 8gb docker compose files
-
+Eventual state will be
+- Pihole (pi4 & pi0 backup)
+- nebula-sync
+- portainer
+- nginx
+- mysql
+- adminer
+- frigate
+- nextcloud
 
 Using the router usb:
-
 /etc/fstab has been editted to create the mount point for the routers smb H drive, but then commented out as systemd now handles this  
 /etc/systemd/system/mnt-NextCloudTest.mount also created #prevents mounting before router is ready if the pi reboots  
 /etc/systemd/system/mnt-NextCloudTest.automount also created #remounts drive if router reboots  

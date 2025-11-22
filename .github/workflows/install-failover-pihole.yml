@@ -1,0 +1,142 @@
+name: Redeploy Pihole to RPI0
+on:
+  workflow_dispatch:    
+  push:
+    branches:
+      - main
+      - dhcp-failover
+    paths:
+      - '.github/workflows/install-failover-pihole.yml'
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Install WireGuard
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wireguard 
+          
+      - name: Write WireGuard config
+        run: |
+          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+
+      - name: Bring up VPN
+        run: |
+          sudo wg-quick up ./wg0.conf
+          sudo wg show
+          
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+          
+      - name: Install PiHole on RPI0
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.RPI0_IP }}
+          username: ${{ vars.RPI0_USER }}
+          password: ${{ secrets.RPI0_PASSWORD }}
+          script: |
+            # Create unattended install config
+            sudo mkdir -p /etc/pihole
+            sudo tee /etc/pihole/setupVars.conf > /dev/null <<EOF
+            PIHOLE_INTERFACE=wlan0,wg0
+            QUERY_LOGGING=true
+            INSTALL_WEB_SERVER=true
+            INSTALL_WEB_INTERFACE=true
+            LIGHTTPD_ENABLED=true
+            BLOCKING_ENABLED=true
+            EOF
+            
+            curl -sSL https://install.pi-hole.net -o /tmp/pihole-install.sh
+            sudo bash /tmp/pihole-install.sh --unattended
+
+      - name: Set interfaces
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.RPI0_IP }}
+          username: ${{ vars.RPI0_USER }}
+          password: ${{ secrets.RPI0_PASSWORD }}
+          script: |
+            sudo pihole-FTL --config dns.interface "wlan0,wg0"
+            sudo pihole-FTL --config dns.listeningMode "SINGLE"
+            
+      - name: Set pihole webpassword
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.RPI0_IP }}
+          username: ${{ vars.RPI0_USER }}
+          password: ${{ secrets.RPI0_PASSWORD }}
+          script: |                   
+                  sudo pihole setpassword "${{ secrets.APP_PASSWORD }}"
+                  
+      - name: Configure custom web port
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.RPI0_IP }}
+          username: ${{ vars.RPI0_USER }}
+          password: ${{ secrets.RPI0_PASSWORD }}
+          script: |
+            sudo pihole-FTL --config webserver.port "82"
+            sudo systemctl restart pihole-FTL
+
+      - name: Pihole Api Auth
+        id: pihole_auth
+        run: |
+          sleep 20
+          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI0_IP }}:82/api/auth" \
+              -H "Content-Type: application/json" \
+              -d '{
+                  "password": "${{ secrets.APP_PASSWORD }}"
+                  }' )
+
+          CSRF=$(echo "$RESPONSE" | jq -r '.session.csrf')
+          SID=$(echo "$RESPONSE" | jq -r '.session.sid')
+          echo "sid=$SID" >> $GITHUB_OUTPUT
+          echo "csrf=$CSRF" >> $GITHUB_OUTPUT       
+
+      - name: End Pihole API Session
+        run: |
+          curl -X DELETE "http://${{ vars.RPI0_IP }}:82/api/auth" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+
+      - name: Render Failover Script
+        env:
+          PRIMARY_IP: ${{ vars.RPI4_IP }}
+          SECONDARY_IP: ${{ vars.RPI0_IP }}
+          PRIMARY_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          SECONDARY_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          CHECK_INTERVAL: '300'
+        run: |
+          envsubst < pihole/pihole_dhcp_failover.py.template > pihole/pihole_dhcp_failover_rendered.py
+
+      - name: Copy Failover script
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ vars.RPI0_IP }}
+          username: ${{ vars.RPI0_USER }}
+          password: ${{ secrets.RPI0_PASSWORD }}
+          source: "pihole/pihole_dhcp_failover_rendered.py"
+          target: "/home/${{ vars.RPI0_USER }}/"
+          # strip_components removes the 'pihole/' directory prefix from the source path
+          # Without this, the file would be copied to /home/user/pihole/pihole_dhcp_failover.py
+          # With strip_components: 1, it's copied directly to /home/user/pihole_dhcp_failover.py
+          strip_components: 1
+
+      - name: Run Failover Script on RPI0
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.RPI0_IP }}
+          username: ${{ vars.RPI0_USER }}
+          password: ${{ secrets.RPI0_PASSWORD }}
+          script: |                   
+                  python3 /home/${{ vars.RPI0_USER }}/pihole_dhcp_failover_rendered.py --setup
+                            
+      - name: Bring down VPN
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show   
+          

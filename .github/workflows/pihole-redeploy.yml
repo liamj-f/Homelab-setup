@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - main
-      - dhcp-failover
     paths:
       - 'pihole/**'
       - '.github/workflows/pihole-redeploy.yml'
@@ -246,7 +245,8 @@ jobs:
                         "ignoreUnknownClients": false,
                         "hosts": [
                                 "dc:a6:32:c8:bb:41,${{ vars.RPI4_IP }},,infinite",
-                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},,infinite"     
+                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},,infinite",
+                                "84:7b:eb:44:ae:c0,${{ vars.e7270_IP }},,infinite"
                                  ]
                           },
                   "misc": {

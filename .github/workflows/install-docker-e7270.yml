@@ -164,6 +164,17 @@ jobs:
             }')
             echo "$RESPONSE"
 
+      - name: Add E7270 Agent to Portainer v2
+        run: |
+          curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -F "Name=e7270-server" \
+            -F "EndpointCreationType=2" \
+            -F "URL=${{ vars.E7270_IP }}:9001" \
+            -F "TLS=true" \
+            -F "TLSSkipVerify=true" \
+            -F "TLSSkipClientVerify=true"
+
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf

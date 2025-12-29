@@ -31,6 +31,16 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
           
+      - name: Configure passwordless sudo
+        uses: appleboy/ssh-action@master
+        with:
+         host: ${{ vars.E7270_IP }}
+         username: ${{ vars.E7270_USER }}
+         password: ${{ secrets.E7270_PASSWORD }}
+         script: |
+           echo "${{ secrets.E7270_PASSWORD }}" | sudo -S bash -c "echo '${{ vars.E7270_USER }} ALL=(ALL) NOPASSWD:ALL' | tee /etc/sudoers.d/${{ vars.E7270_USER }}"
+           echo "${{ secrets.E7270_PASSWORD }}" | sudo -S chmod 0440 /etc/sudoers.d/${{ vars.E7270_USER }}
+         
       - name: Uninstall old Docker
         uses: appleboy/ssh-action@master
         with:

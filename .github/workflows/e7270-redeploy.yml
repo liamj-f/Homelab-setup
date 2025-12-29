@@ -39,7 +39,7 @@ jobs:
           password: ${{ secrets.E7270_PASSWORD }}
           script: |
             for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
-              sudo apt-get remove -y --allow-change-held-packages $pkg || true
+              sudo apt remove -y --allow-change-held-packages $pkg || true
             done
       - name: Add Docker repository
         uses: appleboy/ssh-action@master

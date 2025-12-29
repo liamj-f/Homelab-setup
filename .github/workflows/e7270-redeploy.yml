@@ -114,7 +114,69 @@ jobs:
           script: |
             sudo systemctl enable --now docker
             sudo systemctl status docker --no-pager
+
+      - name: Configure Docker remote API
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.E7270_IP }}
+          username: ${{ vars.E7270_USER }}
+          password: ${{ secrets.E7270_PASSWORD }}
+          script: |
+            sudo mkdir -p /etc/systemd/system/docker.service.d
+            
+            echo '[Service]
+            ExecStart=
+            ExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2375' | sudo tee /etc/systemd/system/docker.service.d/override.conf
+            
+            sudo systemctl daemon-reload
+            sudo systemctl restart docker
+            
+            # Wait for Docker to start
+            sleep 5
+            
+            # Verify Docker is listening
+            sudo netstat -tulpn | grep 2375 || echo "Warning: Docker may not be listening on port 2375"
+
+      - name: Verify Docker installation
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.E7270_IP }}
+          username: ${{ vars.E7270_USER }}
+          password: ${{ secrets.E7270_PASSWORD }}
+          script: |
+            docker --version
+            docker ps
+            echo "Docker is ready and accessible on port 2375"
+            echo "Add this endpoint to Portainer: ${{ vars.E7270_IP }}:2375"
+
+      - name: Authenticate to Portainer
+        id: auth
+        run: |
+          RESPONSE=$(curl -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "Username":"${{ vars.APP_USER }}", 
+                 "Password":"${{ secrets.APP_PASSWORD }}"
+                }')
+          TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Add E7270 to Portainer
+        run: |
+          curl -X POST "http://${{ vars.RPI4_IP }}:9000/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "Name": "E7270",
+              "EndpointCreationType": 1,
+              "URL": "tcp://${{ vars.E7270_IP }}:2375",
+              "PublicURL": "${{ vars.E7270_IP }}:2375",
+              "GroupID": 1,
+              "TLS": false
+            }'
+
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show   
+

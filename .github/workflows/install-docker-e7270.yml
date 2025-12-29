@@ -154,14 +154,15 @@ jobs:
 
       - name: Add E7270 Agent to Portainer
         run: |
-          curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
               "Name": "e7270-server",
               "EndpointCreationType": 2,
               "URL": "${{ vars.E7270_IP }}:9001"
-            }'
+            }')
+            echo "$RESPONSE"
 
       - name: Bring down VPN
         run: |

@@ -1,4 +1,4 @@
-name: Install Docker
+name: E7270 Deploy
 
 on:
   push:

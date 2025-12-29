@@ -117,8 +117,8 @@ jobs:
 
       - name: Render Portainer compose
         run: |
-          envsubst < portainer-compose.yml > portainer-compose.rendered.yml
-          
+          envsubst < portainer-agent-compose.yml > portainer-agent-compose.rendered.yml
+
       - name: Copy rendered compose
         uses: appleboy/scp-action@master
         with:

@@ -115,9 +115,9 @@ jobs:
             sudo systemctl enable --now docker
             sudo systemctl status docker --no-pager
 
-      - name: Render Portainer compose
+      - name: Render Portainer agent compose
         run: |
-          envsubst < portainer-agent-compose.yml > portainer-agent-compose.rendered.yml
+          envsubst < portainer-agent-compose.yml > portainer-agent-compose-rendered.yml
 
       - name: Copy rendered compose
         uses: appleboy/scp-action@master

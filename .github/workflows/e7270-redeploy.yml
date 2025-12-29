@@ -158,10 +158,9 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "Name": "e7270",
+              "Name": "e7270-server",
               "EndpointCreationType": 2,
-              "URL": "${{ vars.E7270_IP }}:9001",
-              "TLS": false
+              "URL": "${{ vars.E7270_IP }}:9001"
             }'
 
       - name: Bring down VPN

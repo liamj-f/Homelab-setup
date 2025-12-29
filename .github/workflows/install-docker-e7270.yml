@@ -6,7 +6,7 @@ on:
       - main
       - e7270-server-add
     paths:
-      - '.github/workflows/e7270-redeploy.yml'  
+      - '.github/workflows/install-docker-e7270.yml'  
   workflow_dispatch:
 jobs:
   install_docker_and_add_to_portainer:

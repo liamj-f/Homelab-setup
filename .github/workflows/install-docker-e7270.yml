@@ -170,7 +170,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -F "Name=e7270-server" \
             -F "EndpointCreationType=2" \
-            -F "URL=${{ vars.E7270_IP }}:9001" \
+            -F "URL=tcp://${{ vars.E7270_IP }}:9001" \
             -F "TLS=true" \
             -F "TLSSkipVerify=true" \
             -F "TLSSkipClientVerify=true"

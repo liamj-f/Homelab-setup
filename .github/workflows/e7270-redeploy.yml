@@ -9,7 +9,7 @@ on:
       - '.github/workflows/e7270-redeploy.yml'  
   workflow_dispatch:
 jobs:
-  install_docker:
+  install_docker_and_add_to_portainer:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -160,6 +160,12 @@ jobs:
                 }')
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Check existing Portainer endpoints
+        run: |
+          curl -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            | jq '.[] | {id, Name}'
 
       - name: Add E7270 to Portainer
         run: |

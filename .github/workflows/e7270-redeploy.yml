@@ -30,6 +30,11 @@ jobs:
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+
+      - name: Add host key to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.E7270_IP }} >> ~/.ssh/known_hosts
           
       - name: Configure passwordless sudo
         uses: appleboy/ssh-action@master

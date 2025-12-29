@@ -163,7 +163,7 @@ jobs:
 
       - name: Add E7270 to Portainer
         run: |
-          curl -X POST "http://${{ vars.RPI4_IP }}:9000/api/endpoints" \
+          curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{

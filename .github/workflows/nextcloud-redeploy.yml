@@ -83,7 +83,7 @@ jobs:
           -d '{
                "Name": "nextcloud",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "nextcloud-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
@@ -132,7 +132,7 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{
                "PullImage": true,
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
                "Env": [
                        {

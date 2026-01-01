@@ -9,8 +9,8 @@ services:
       - "80:80"   # Web UI
       - "8443:443"  # HTTPS if you set up TLS
     volumes:
-      - nextcloud_data:/var/www/html
-      - /mnt/Nextcloud:/mnt/Nextcloud
+      - /mnt/Nextcloud:/var/www/html/data
+      - nextcloud_app_data:/var/www/html
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/status.php || exit 1"]
       interval: 30s
@@ -18,10 +18,10 @@ services:
       retries: 5
       start_period: 30s
     environment:
-      - POSTGRES_PASSWORD=${MYSQL_PASSWORD}
+      - POSTGRES_HOST=postgresql
       - POSTGRES_DB=nextcloud
       - POSTGRES_USER=nextcloud_app
-      - POSTGRES_HOST=postgresql
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
       - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
     networks:
@@ -32,7 +32,7 @@ services:
     image: postgres:latest
     restart: always
     volumes:
-      - nextcloud_db_data:/var/lib/postgresql/data
+      - nextcloud_db_data:/var/lib/postgresql
     environment:
       - POSTGRES_DB=nextcloud
       - POSTGRES_USER=nextcloud_app
@@ -47,6 +47,6 @@ volumes:
   nextcloud_db_data:
     name: nextcloud_db_data
     external: false
-  nextcloud_data:
-    name: nextcloud_data
+  nextcloud_app_data:
+    name: nextcloud_app_data
     

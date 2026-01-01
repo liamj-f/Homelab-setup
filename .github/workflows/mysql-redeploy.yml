@@ -5,6 +5,7 @@ on:
       - main
     paths:
       - 'mysql-compose.yml'
+      - '.github/workflows/mysql-redeploy.yml'
   workflow_dispatch:
   workflow_call:
     inputs:

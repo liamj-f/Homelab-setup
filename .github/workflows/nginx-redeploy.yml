@@ -5,6 +5,7 @@ on:
       - main
     paths:
       - 'nginx-compose.yml'
+      - '.github/workflows/nginx-redeploy.yml'
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -154,7 +155,7 @@ jobs:
           hosts["pihole.14monarch.local"]="${{ vars.RPI4_IP }}:82"
           hosts["portainer.14monarch.local"]="${{ vars.RPI4_IP }}:83"
           hosts["adminer.14monarch.local"]="${{ vars.RPI4_IP }}:84"
-          hosts["nextcloud.14monarch.local"]="${{ vars.RPI4_IP }}:85"
+          hosts["nextcloud.14monarch.local"]="${{ vars.E7270_IP }}:80"
           hosts["pih0le.14monarch.local"]="${{ vars.RPI0_IP }}:82"
           
           for domain in "${!hosts[@]}"; do

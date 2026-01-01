@@ -226,7 +226,7 @@ jobs:
                               "${{ vars.RPI4_IP }} pihole.14monarch.local",
                               "${{ vars.RPI4_IP }} nginx.14monarch.local",
                               "${{ vars.RPI4_IP }} portainer.14monarch.local",
-                              "${{ vars.RPI4_IP }} nextcloud.14monarch.local",
+                              "${{ vars.E7270_IP }} nextcloud.14monarch.local",
                               "${{ vars.RPI4_IP }} adminer.14monarch.local",
                               "${{ vars.RPI4_IP }} pih0le.14monarch.local"
                               ]
@@ -246,7 +246,7 @@ jobs:
                         "hosts": [
                                 "dc:a6:32:c8:bb:41,${{ vars.RPI4_IP }},,infinite",
                                 "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},,infinite",
-                                "84:7b:eb:44:ae:c0,${{ vars.e7270_IP }},,infinite"
+                                "84:7b:eb:44:ae:c0,${{ vars.E7270_IP }},,infinite"
                                  ]
                           },
                   "misc": {

@@ -40,7 +40,7 @@ jobs:
       - name: Authenticate to Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
+          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \ 
             -d '{
                  "Username":"${{ vars.APP_USER }}", 
@@ -61,7 +61,7 @@ jobs:
             echo "Stack not found."
             echo "stack_id=0" >> $GITHUB_OUTPUT
           else
-            echo "Stack found with ID: $STACK_ID"
+            echo "Stack found with ID: $STACK_ID" 
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
 

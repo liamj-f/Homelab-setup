@@ -40,8 +40,8 @@ jobs:
       - name: Authenticate to Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/auth" \
-            -H "Content-Type: application/json" \ 
+          RESPONSE=$(curl -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
+            -H "Content-Type: application/json" \
             -d '{
                  "Username":"${{ vars.APP_USER }}", 
                  "Password":"${{ secrets.APP_PASSWORD }}"

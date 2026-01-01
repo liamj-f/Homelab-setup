@@ -93,19 +93,19 @@ jobs:
                              },
                "Env": [
                        {
-                       "name":"MYSQL_HOST"
+                       "name":"POSTGRES_HOST",
                        "value":"mysql"
                        },
                        {
-                       "name":"MYSQL_DATABASE"
+                       "name":"POSTGRES_DATABASE",
                        "value":"nextcloud"
                        },
                        {
-                       "name":"MYSQL_USER"
+                       "name":"POSTGRES_USER",
                        "value":"nextcloud_app"
                        },
                        {
-                        "name":"MYSQL_PASSWORD",
+                        "name":"POSTGRES_PASSWORD",
                         "value":"${{ secrets.NEXTCLOUD_APP_PASSWORD }}"
                         },
                        {
@@ -117,7 +117,6 @@ jobs:
                         "value":"${{ secrets.APP_PASSWORD }}"
                        }
                        ],
-               ],
                "Prune": true,
                "StackFileVersion": "3"
               }')
@@ -137,19 +136,19 @@ jobs:
                "repositoryAuthentication": false,
                "Env": [
                        {
-                       "name":"MYSQL_HOST"
+                       "name":"POSTGRES_HOST",
                        "value":"mysql"
                        },
                        {
-                       "name":"MYSQL_DATABASE"
+                       "name":"POSTGRES_DATABASE",
                        "value":"nextcloud"
                        },
                        {
-                       "name":"MYSQL_USER"
+                       "name":"POSTGRES_USER",
                        "value":"nextcloud_app"
                        },
                        {
-                        "name":"MYSQL_PASSWORD",
+                        "name":"POSTGRES_PASSWORD",
                         "value":"${{ secrets.NEXTCLOUD_APP_PASSWORD }}"
                         },
                        {
@@ -161,22 +160,21 @@ jobs:
                         "value":"${{ secrets.APP_PASSWORD }}"
                        }
                        ],
-               ],
                "Prune": true
               }'          
     
 #      - name: Trigger stack redeploy via webhook
 #        run: |
 #          echo "Triggering stack redeploy via webhook..."
-#          RESPONSE=$(curl -s -w "HTTP %{http_code}" -X POST "http://192.168.0.2:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e")
+#          RESPONSE=$(curl -s -w "HTTP %{http_code}" -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e")
 #          echo "$RESPONSE"
 
       - name: Rescan files in external drive
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
+          host: ${{ vars.E7270_IP }}
+          username: ${{ vars.E7270_USER }}
+          password: ${{ secrets.E7270_PASSWORD }}
           script: |
             docker exec -u www-data nextcloud php occ files:scan --all
       - name: Bring down VPN

@@ -172,17 +172,18 @@ jobs:
       # them to the Pi via the VPN.
       # -----------------------------------------------------------
       - name: Copy client certs from VPS to runner
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ vars.LJFCLOUD_IP }}
-          username: ${{ vars.LJFCLOUD_USER }}
-          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
-          source:
-            /home/${{ vars.LJFCLOUD_USER }}/portainer-certs/ca.pem
-            /home/${{ vars.LJFCLOUD_USER }}/portainer-certs/client-cert.pem
-            /home/${{ vars.LJFCLOUD_USER }}/portainer-certs/client-key.pem
-          target: /tmp/portainer-certs/
-
+        run: |
+          mkdir -p /tmp/portainer-certs
+          echo "${{ secrets.LJFCLOUD_SSH_KEY }}" > /tmp/ljfcloud_key
+          chmod 600 /tmp/ljfcloud_key
+          CERT_DIR="/home/${{ vars.LJFCLOUD_USER }}/portainer-certs"
+          scp -i /tmp/ljfcloud_key -o StrictHostKeyChecking=no \
+            ${{ vars.LJFCLOUD_USER }}@${{ vars.LJFCLOUD_IP }}:"$CERT_DIR/ca.pem" \
+            ${{ vars.LJFCLOUD_USER }}@${{ vars.LJFCLOUD_IP }}:"$CERT_DIR/client-cert.pem" \
+            ${{ vars.LJFCLOUD_USER }}@${{ vars.LJFCLOUD_IP }}:"$CERT_DIR/client-key.pem" \
+            /tmp/portainer-certs/
+          rm /tmp/ljfcloud_key
+          
       - name: Authenticate to main Portainer
         id: auth
         run: |

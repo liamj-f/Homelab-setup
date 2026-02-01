@@ -49,26 +49,20 @@ jobs:
             done 
             
       - name: Add Docker repository
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ vars.LJFCLOUD_IP }}
           username: ${{ vars.LJFCLOUD_USER }}
           key: ${{ secrets.LJFCLOUD_SSH_KEY }}
-          script: | 
+          script: |
             sudo apt update
-            sudo apt install ca-certificates curl
+            sudo apt install -y ca-certificates curl
             sudo install -m 0755 -d /etc/apt/keyrings
             sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
             sudo chmod a+r /etc/apt/keyrings/docker.asc
-            
-            # Add the repository to Apt sources:
-            sudo tee /etc/apt/sources.list.d/docker.sources << EOF
-            Types: deb
-            URIs: https://download.docker.com/linux/ubuntu
-            Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-            Components: stable
-            Signed-By: /etc/apt/keyrings/docker.asc
-            EOF
+            CODENAME=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+            printf "Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: ${CODENAME}\nComponents: stable\nSigned-By: /etc/apt/keyrings/docker.asc\n" | sudo tee /etc/apt/sources.list.d/docker.sources
+            sudo apt update
 
       - name: Install Docker packages
         uses: appleboy/ssh-action@master

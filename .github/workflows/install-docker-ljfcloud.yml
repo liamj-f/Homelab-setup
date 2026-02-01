@@ -214,21 +214,6 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-  #    - name: Add LJFCloud Agent to Portainer
-  #      run: |
-  #        RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
-  #          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-  #          -H "Content-Type: application/json" \
-  #          -d '{
-  #            "Name": "ljfcloud-server",
-  #            "EndpointCreationType": 2,
-  #            "URL": "tcp://${{ vars.LJFCLOUD_IP }}:9001",
-  #            "TLS": "true",
-  #            "TLSSkipVerify":"false",
-  #            "TLSSkipClientVerify":"false"
-  #              }')
-  #          echo "$RESPONSE"
-
       # The Portainer API expects certs as multipart form fields.
       # We already have the client certs locally from the earlier
       # scp step, so just read them directly.

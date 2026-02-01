@@ -1,7 +1,7 @@
 version: "3"
 services:
   portainer-agent:
-    image: portainer/portainer-agent:latest
+    image: portainer/agent:latest
     restart: always
     ports:
       - "9001:9001"

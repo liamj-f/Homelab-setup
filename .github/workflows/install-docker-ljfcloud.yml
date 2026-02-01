@@ -1,0 +1,243 @@
+name: Install Docker on LJFCloud
+
+on:
+  push:
+    branches:
+      - main
+      - ljfcloud-server-add
+    paths:
+      - '.github/workflows/install-docker-ljfcloud.yml'  
+  workflow_dispatch:
+jobs:
+  install_docker_and_add_to_portainer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        
+      - name: Install WireGuard
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wireguard
+      - name: Write WireGuard config
+        run: |
+          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+      - name: Bring up VPN
+        run: |
+          sudo wg-quick up ./wg0.conf
+          sudo wg show  
+
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+          
+      - name: Add host key to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
+     
+      - name: Uninstall old Docker
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
+              sudo apt remove -y --allow-change-held-packages $pkg || true
+            done 
+            
+      - name: Add Docker repository
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: | 
+            sudo apt update
+            sudo apt install ca-certificates curl
+            sudo install -m 0755 -d /etc/apt/keyrings
+            sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+            sudo chmod a+r /etc/apt/keyrings/docker.asc
+            
+            # Add the repository to Apt sources:
+            sudo tee /etc/apt/sources.list.d/docker.sources << EOF
+            Types: deb
+            URIs: https://download.docker.com/linux/ubuntu
+            Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+            Components: stable
+            Signed-By: /etc/apt/keyrings/docker.asc
+            EOF
+
+      - name: Install Docker packages
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+      - name: Ensure Docker is running
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            sudo systemctl enable --now docker
+            sudo systemctl status docker --no-pager
+      # -----------------------------------------------------------
+      # TLS: Generate CA, server cert (for the agent), and client
+      # cert (for Portainer on the Pi) on the VPS.
+      # The server cert needs the VPS public IP as a SAN so that
+      # Portainer can verify it when connecting.
+      # -----------------------------------------------------------
+      - name: Generate TLS certificates on VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            set -e
+            CERT_DIR="/home/${{ vars.LJFCLOUD_USER }}/portainer-certs"
+            mkdir -p "$CERT_DIR"
+
+            # --- CA ---
+            openssl req -new -x509 -days 3650 -nodes \
+              -out "$CERT_DIR/ca.pem" \
+              -keyout "$CERT_DIR/ca-key.pem" \
+              -subj "/CN=portainer-ca"
+
+            # --- Server cert (mounted into the agent container) ---
+            openssl req -new -nodes \
+              -out "$CERT_DIR/server.csr" \
+              -keyout "$CERT_DIR/server-key.pem" \
+              -subj "/CN=${{ vars.LJFCLOUD_IP }}"
+
+            # SAN is required — without it most TLS clients reject the cert
+            echo "subjectAltName=IP:${{ vars.LJFCLOUD_IP }}" > "$CERT_DIR/server-ext.cnf"
+
+            openssl x509 -req -days 3650 \
+              -in "$CERT_DIR/server.csr" \
+              -CA "$CERT_DIR/ca.pem" \
+              -CAkey "$CERT_DIR/ca-key.pem" \
+              -CAcreateserial \
+              -out "$CERT_DIR/server-cert.pem" \
+              -extfile "$CERT_DIR/server-ext.cnf"
+
+            # --- Client cert (uploaded to the Pi for Portainer to use) ---
+            openssl req -new -nodes \
+              -out "$CERT_DIR/client.csr" \
+              -keyout "$CERT_DIR/client-key.pem" \
+              -subj "/CN=portainer-client"
+
+            echo "extendedKeyUsage=clientAuth" > "$CERT_DIR/client-ext.cnf"
+
+            openssl x509 -req -days 3650 \
+              -in "$CERT_DIR/client.csr" \
+              -CA "$CERT_DIR/ca.pem" \
+              -CAkey "$CERT_DIR/ca-key.pem" \
+              -CAcreateserial \
+              -out "$CERT_DIR/client-cert.pem" \
+              -extfile "$CERT_DIR/client-ext.cnf"
+
+      # -----------------------------------------------------------
+      # Deploy the Portainer agent with TLS enabled.
+      # The agent container needs the server cert, key, and CA
+      # mounted in, and the --tlsverify flag tells it to require
+      # clients to present a valid cert too.
+      # -----------------------------------------------------------
+      - name: Copy compose file to VPS
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          source: portainer-agent-ljfcloud-compose.yml
+          target: /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer/
+
+      - name: Deploy Portainer agent
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer
+            export CERT_DIR="/home/${{ vars.LJFCLOUD_USER }}/portainer-certs"
+            envsubst < portainer-agent-ljfcloud-compose.yml > portainer-agent-ljfcloud-compose.resolved.yml
+            sudo docker compose -f portainer-agent-ljfcloud-compose.resolved.yml up -d
+
+      # -----------------------------------------------------------
+      # Copy the client certs (ca, client-cert, client-key) from
+      # the VPS to the GitHub Actions runner so we can then upload
+      # them to the Pi via the VPN.
+      # -----------------------------------------------------------
+      - name: Copy client certs from VPS to runner
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          source:
+            /home/${{ vars.LJFCLOUD_USER }}/portainer-certs/ca.pem
+            /home/${{ vars.LJFCLOUD_USER }}/portainer-certs/client-cert.pem
+            /home/${{ vars.LJFCLOUD_USER }}/portainer-certs/client-key.pem
+          target: /tmp/portainer-certs/
+
+      - name: Authenticate to main Portainer
+        id: auth
+        run: |
+          RESPONSE=$(curl -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "Username":"${{ vars.APP_USER }}", 
+                 "Password":"${{ secrets.APP_PASSWORD }}"
+                }')
+          TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Add LJFCLOUD Agent to Portainer
+        run: |
+          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "Name": "ljfcloud-server",
+              "EndpointCreationType": 2,
+              "URL": "tcp://${{ vars.LJFCLOUD_IP }}:9001",
+              "TLS": "true",
+              "TLSSkipVerify":"false",
+              "TLSSkipClientVerify":"false"
+                }')
+            echo "$RESPONSE"
+
+      # The Portainer API expects certs as multipart form fields.
+      # We already have the client certs locally from the earlier
+      # scp step, so just read them directly.
+      - name: Register ljfcloud agent in Portainer with TLS
+        run: |
+          CA_CERT=$(cat /tmp/portainer-certs/ca.pem)
+          CLIENT_CERT=$(cat /tmp/portainer-certs/client-cert.pem)
+          CLIENT_KEY=$(cat /tmp/portainer-certs/client-key.pem)
+
+          curl -s -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -F "Name=ljfcloud-server" \
+            -F "EndpointCreationType=2" \
+            -F "URL=tcp://${{ vars.LJFCLOUD_IP }}:9001" \
+            -F "TLS=true" \
+            -F "TLSSkipVerify=false" \
+            -F "TLSSkipClientVerify=false" \
+            -F "TLSCACert=$CA_CERT" \
+            -F "TLSCert=$CLIENT_CERT" \
+            -F "TLSKey=$CLIENT_KEY"
+            
+      - name: Bring down VPN
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show   

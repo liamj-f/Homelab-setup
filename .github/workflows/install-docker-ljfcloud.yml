@@ -184,6 +184,24 @@ jobs:
             /tmp/portainer-certs/
           rm /tmp/ljfcloud_key
           
+       # The Pi is on the VPN, so we SSH into it (via its WireGuard
+      # address) and drop the certs somewhere accessible.
+      - name: Upload client certs to Pi
+        run: |
+          sudo apt-get install -y sshpass
+
+          sshpass -p "${{ secrets.RPI4_PASSWORD }}" \
+            ssh -o StrictHostKeyChecking=no \
+            ${{ vars.RPI4_USER }}@${{ vars.RPI4_IP }} \
+            mkdir -p /home/${{ vars.RPI4_USER }}/portainer-certs/ljfcloud
+
+          sshpass -p "${{ secrets.RPI4_PASSWORD }}" \
+            scp -o StrictHostKeyChecking=no \
+            /tmp/portainer-certs/ca.pem \
+            /tmp/portainer-certs/client-cert.pem \
+            /tmp/portainer-certs/client-key.pem \
+            ${{ vars.RPI4_USER }}@${{ vars.RPI4_IP }}:/home/${{ vars.RPI4_USER }}/portainer-certs/ljfcloud/
+         
       - name: Authenticate to main Portainer
         id: auth
         run: |

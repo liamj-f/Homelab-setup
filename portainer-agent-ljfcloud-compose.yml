@@ -1,0 +1,16 @@
+version: "3"
+services:
+  portainer-agent:
+    image: portainer/portainer-agent:latest
+    restart: always
+    ports:
+      - "9001:9001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+      - "$CERT_DIR/ca.pem:/certs/ca.pem"
+      - "$CERT_DIR/server-cert.pem:/certs/server.crt"
+      - "$CERT_DIR/server-key.pem:/certs/server.key"
+    environment:
+      - AGENT_PORT=9001
+    command: --tlsverify

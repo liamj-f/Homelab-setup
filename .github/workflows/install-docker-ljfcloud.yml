@@ -184,8 +184,7 @@ jobs:
             /tmp/portainer-certs/
           rm /tmp/ljfcloud_key
           
-       # The Pi is on the VPN, so we SSH into it (via its WireGuard
-      # address) and drop the certs somewhere accessible.
+       # The Pi is on the VPN, so we SSH into it (via its WireGuard address) and drop the certs somewhere accessible.
       - name: Upload client certs to Pi
         run: |
           sudo apt-get install -y sshpass

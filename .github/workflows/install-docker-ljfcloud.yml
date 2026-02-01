@@ -1,13 +1,13 @@
 name: Install Docker on LJFCloud
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
       - ljfcloud-server-add
     paths:
-      - '.github/workflows/install-docker-ljfcloud.yml'  
-  workflow_dispatch:
+      - '.github/workflows/install-docker-ljfcloud.yml'    
 jobs:
   install_docker_and_add_to_portainer:
     runs-on: ubuntu-latest

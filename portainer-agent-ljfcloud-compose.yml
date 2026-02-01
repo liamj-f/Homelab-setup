@@ -7,8 +7,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/lib/docker/volumes:/var/lib/docker/volumes
+      - "$CERT_DIR/ca.pem:/certs/ca.pem"
       - "$CERT_DIR/server-cert.pem:/certs/server.crt"
       - "$CERT_DIR/server-key.pem:/certs/server.key"
     environment:
       - AGENT_PORT=9001
-    command: --tlscert /certs/server.crt --tlskey /certs/server.key
+    command: --mtlscacert /certs/ca.pem --mtlscert /certs/server.crt --mtlskey /certs/server.key

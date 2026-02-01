@@ -1,6 +1,6 @@
 services:
   portainer-agent:
-    image: portainercloud/portainer-agent:latest
+    image: portainer/agent:latest
     restart: always
     ports:
       - "9001:9001"

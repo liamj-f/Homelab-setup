@@ -228,7 +228,16 @@ jobs:
   #            "TLSSkipClientVerify":"false"
   #              }')
   #          echo "$RESPONSE"
-
+      - name: Debug — inspect cert files on runner
+        run: |
+          echo "=== Files ==="
+          ls -la /tmp/portainer-certs/
+          echo "=== ca.pem ==="
+          cat /tmp/portainer-certs/ca.pem
+          echo "=== client-cert.pem ==="
+          cat /tmp/portainer-certs/client-cert.pem
+          echo "=== client-key.pem ==="
+          cat /tmp/portainer-certs/client-key.pem
       # The Portainer API expects certs as multipart form fields.
       # We already have the client certs locally from the earlier
       # scp step, so just read them directly.

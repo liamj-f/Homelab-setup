@@ -251,9 +251,9 @@ jobs:
             -F "TLS=true" \
             -F "TLSSkipVerify=false" \
             -F "TLSSkipClientVerify=false" \
-            -F "TLSCACert=@/tmp/portainer-certs/ca.pem" \
-            -F "TLSCert=@/tmp/portainer-certs/client-cert.pem" \
-            -F "TLSKey=@/tmp/portainer-certs/client-key.pem"
+            -F "TLSCACertFile=@/tmp/portainer-certs/ca.pem" \
+            -F "TLSCertFile=@/tmp/portainer-certs/client-cert.pem" \
+            -F "TLSKeyFile=@/tmp/portainer-certs/client-key.pem"
             
       - name: Bring down VPN
         run: |

@@ -214,30 +214,26 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Add LJFCLOUD Agent to Portainer
-        run: |
-          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "Name": "ljfcloud-server",
-              "EndpointCreationType": 2,
-              "URL": "tcp://${{ vars.LJFCLOUD_IP }}:9001",
-              "TLS": "true",
-              "TLSSkipVerify":"false",
-              "TLSSkipClientVerify":"false"
-                }')
-            echo "$RESPONSE"
+  #    - name: Add LJFCloud Agent to Portainer
+  #      run: |
+  #        RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+  #          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+  #          -H "Content-Type: application/json" \
+  #          -d '{
+  #            "Name": "ljfcloud-server",
+  #            "EndpointCreationType": 2,
+  #            "URL": "tcp://${{ vars.LJFCLOUD_IP }}:9001",
+  #            "TLS": "true",
+  #            "TLSSkipVerify":"false",
+  #            "TLSSkipClientVerify":"false"
+  #              }')
+  #          echo "$RESPONSE"
 
       # The Portainer API expects certs as multipart form fields.
       # We already have the client certs locally from the earlier
       # scp step, so just read them directly.
       - name: Register ljfcloud agent in Portainer with TLS
         run: |
-          CA_CERT=$(cat /tmp/portainer-certs/ca.pem)
-          CLIENT_CERT=$(cat /tmp/portainer-certs/client-cert.pem)
-          CLIENT_KEY=$(cat /tmp/portainer-certs/client-key.pem)
-
           curl -s -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -F "Name=ljfcloud-server" \
@@ -246,9 +242,9 @@ jobs:
             -F "TLS=true" \
             -F "TLSSkipVerify=false" \
             -F "TLSSkipClientVerify=false" \
-            -F "TLSCACert=$CA_CERT" \
-            -F "TLSCert=$CLIENT_CERT" \
-            -F "TLSKey=$CLIENT_KEY"
+            -F "TLSCACert=@/tmp/portainer-certs/ca.pem" \
+            -F "TLSCert=@/tmp/portainer-certs/client-cert.pem" \
+            -F "TLSKey=@/tmp/portainer-certs/client-key.pem"
             
       - name: Bring down VPN
         run: |

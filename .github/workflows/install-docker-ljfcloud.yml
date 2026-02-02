@@ -90,61 +90,58 @@ jobs:
       # Portainer can verify it when connecting.
       # -----------------------------------------------------------
       - name: Generate TLS certificates on VPS
-        uses: appleboy/ssh-action@v1.0.0
+        run: |
+         set -e
+          mkdir -p /tmp/portainer-certs
+          cd /tmp/portainer-certs
+
+          # --- CA ---
+          openssl req -new -x509 -days 3650 -nodes \
+            -out ca.pem \
+            -keyout ca-key.pem \
+            -subj "/CN=portainer-ca"
+
+          # --- Server cert (for the agent on the VPS) ---
+          openssl req -new -nodes \
+            -out server.csr \
+            -keyout server-key.pem \
+            -subj "/CN=${{ vars.LJFCLOUD_IP }}"
+
+          echo "subjectAltName=IP:${{ vars.LJFCLOUD_IP }}" > server-ext.cnf
+
+          openssl x509 -req -days 3650 \
+            -in server.csr \
+            -CA ca.pem \
+            -CAkey ca-key.pem \
+            -CAcreateserial \
+            -out server-cert.pem \
+            -extfile server-ext.cnf
+
+          # --- Client cert (for Portainer on the Pi) ---
+          openssl req -new -nodes \
+            -out client.csr \
+            -keyout client-key.pem \
+            -subj "/CN=portainer-client"
+
+          echo "extendedKeyUsage=clientAuth" > client-ext.cnf
+
+          openssl x509 -req -days 3650 \
+            -in client.csr \
+            -CA ca.pem \
+            -CAkey ca-key.pem \
+            -CAcreateserial \
+            -out client-cert.pem \
+            -extfile client-ext.cnf
+
+      - name: Create cert directory on VPS
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ vars.LJFCLOUD_IP }}
           username: ${{ vars.LJFCLOUD_USER }}
           key: ${{ secrets.LJFCLOUD_SSH_KEY }}
           script: |
-            set -e
-            CERT_DIR="/home/${{ vars.LJFCLOUD_USER }}/portainer-certs"
-            mkdir -p "$CERT_DIR"
+            mkdir -p /home/${{ vars.LJFCLOUD_USER }}/portainer-certs
 
-            # --- CA ---
-            openssl req -new -x509 -days 3650 -nodes \
-              -out "$CERT_DIR/ca.pem" \
-              -keyout "$CERT_DIR/ca-key.pem" \
-              -subj "/CN=portainer-ca"
-
-            # --- Server cert (mounted into the agent container) ---
-            openssl req -new -nodes \
-              -out "$CERT_DIR/server.csr" \
-              -keyout "$CERT_DIR/server-key.pem" \
-              -subj "/CN=${{ vars.LJFCLOUD_IP }}"
-
-            # SAN is required — without it most TLS clients reject the cert
-            echo "subjectAltName=IP:${{ vars.LJFCLOUD_IP }}" > "$CERT_DIR/server-ext.cnf"
-
-            openssl x509 -req -days 3650 \
-              -in "$CERT_DIR/server.csr" \
-              -CA "$CERT_DIR/ca.pem" \
-              -CAkey "$CERT_DIR/ca-key.pem" \
-              -CAcreateserial \
-              -out "$CERT_DIR/server-cert.pem" \
-              -extfile "$CERT_DIR/server-ext.cnf"
-
-            # --- Client cert (uploaded to the Pi for Portainer to use) ---
-            openssl req -new -nodes \
-              -out "$CERT_DIR/client.csr" \
-              -keyout "$CERT_DIR/client-key.pem" \
-              -subj "/CN=portainer-client"
-
-            echo "extendedKeyUsage=clientAuth" > "$CERT_DIR/client-ext.cnf"
-
-            openssl x509 -req -days 3650 \
-              -in "$CERT_DIR/client.csr" \
-              -CA "$CERT_DIR/ca.pem" \
-              -CAkey "$CERT_DIR/ca-key.pem" \
-              -CAcreateserial \
-              -out "$CERT_DIR/client-cert.pem" \
-              -extfile "$CERT_DIR/client-ext.cnf"
-
-      # -----------------------------------------------------------
-      # Deploy the Portainer agent with TLS enabled.
-      # The agent container needs the server cert, key, and CA
-      # mounted in, and the --tlsverify flag tells it to require
-      # clients to present a valid cert too.
-      # -----------------------------------------------------------
       - name: Copy compose file to VPS
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -155,7 +152,7 @@ jobs:
           target: /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer/
 
       - name: Deploy Portainer agent
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ vars.LJFCLOUD_IP }}
           username: ${{ vars.LJFCLOUD_USER }}
@@ -164,43 +161,18 @@ jobs:
             set -e
             cd /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer
             export CERT_DIR="/home/${{ vars.LJFCLOUD_USER }}/portainer-certs"
-            envsubst < portainer-agent-ljfcloud-compose.yml > portainer-agent-ljfcloud-compose.resolved.yml
-            sudo docker compose -f portainer-agent-ljfcloud-compose.resolved.yml up -d
+            envsubst < portainer-agent-ljfcloud-compose.yml > portainer-agent-ljfcloud-compose-resolved.yml
+            sudo docker compose -f portainer-agent-ljfcloud-compose-resolved.yml up -d
 
-      # -----------------------------------------------------------
-      # Copy the client certs (ca, client-cert, client-key) from
-      # the VPS to the GitHub Actions runner so we can then upload
-      # them to the Pi via the VPN.
-      # -----------------------------------------------------------
-      - name: Copy client certs from VPS to runner
-        run: |
-          mkdir -p /tmp/portainer-certs
-          echo "${{ secrets.LJFCLOUD_SSH_KEY }}" > /tmp/ljfcloud_key
-          chmod 600 /tmp/ljfcloud_key
-          CERT_DIR="/home/${{ vars.LJFCLOUD_USER }}/portainer-certs"
-          scp -i /tmp/ljfcloud_key -o StrictHostKeyChecking=no \
-            ${{ vars.LJFCLOUD_USER }}@${{ vars.LJFCLOUD_IP }}:"$CERT_DIR/ca.pem" \
-            ${{ vars.LJFCLOUD_USER }}@${{ vars.LJFCLOUD_IP }}:"$CERT_DIR/client-cert.pem" \
-            ${{ vars.LJFCLOUD_USER }}@${{ vars.LJFCLOUD_IP }}:"$CERT_DIR/client-key.pem" \
-            /tmp/portainer-certs/
-          rm /tmp/ljfcloud_key
-          
-       # The Pi is on the VPN, so we SSH into it (via its WireGuard address) and drop the certs somewhere accessible.
       - name: Upload client certs to Pi
-        run: |
-          sudo apt-get install -y sshpass
-
-          sshpass -p "${{ secrets.RPI4_PASSWORD }}" \
-            ssh -o StrictHostKeyChecking=no \
-            ${{ vars.RPI4_USER }}@${{ vars.RPI4_IP }} \
-            mkdir -p /home/${{ vars.RPI4_USER }}/portainer-certs/ljfcloud
-
-          sshpass -p "${{ secrets.RPI4_PASSWORD }}" \
-            scp -o StrictHostKeyChecking=no \
-            /tmp/portainer-certs/ca.pem \
-            /tmp/portainer-certs/client-cert.pem \
-            /tmp/portainer-certs/client-key.pem \
-            ${{ vars.RPI4_USER }}@${{ vars.RPI4_IP }}:/home/${{ vars.RPI4_USER }}/portainer-certs/ljfcloud/
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          password: ${{ secrets.RPI4_PASSWORD }}
+          source: /tmp/portainer-certs/ca.pem,/tmp/portainer-certs/client-cert.pem,/tmp/portainer-certs/client-key.pem
+          target: /home/${{ vars.RPI4_USER }}/portainer-certs/ljfcloud/
+          strip_components: 2         
          
       - name: Authenticate to main Portainer
         id: auth
@@ -214,9 +186,6 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      # The Portainer API expects certs as multipart form fields.
-      # We already have the client certs locally from the earlier
-      # scp step, so just read them directly.
       - name: Register ljfcloud agent in Portainer with TLS
         run: |
           curl -s -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \

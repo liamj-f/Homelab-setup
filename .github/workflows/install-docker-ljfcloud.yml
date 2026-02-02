@@ -20,25 +20,27 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y wireguard
+          
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
-      - name: Bring up VPN
+          
+      - name: Bring up VPN on runner
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show  
 
-      - name: Override system DNS resolver
+      - name: Override system DNS resolver on runner
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
           
-      - name: Add host key to known_hosts
+      - name: Add host key to known_hosts of runner
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
      
-      - name: Uninstall old Docker
+      - name: Uninstall old Docker from VPS
         uses: appleboy/ssh-action@master
         with:
           host: ${{ vars.LJFCLOUD_IP }}
@@ -49,7 +51,7 @@ jobs:
               sudo apt remove -y --allow-change-held-packages $pkg || true
             done 
             
-      - name: Add Docker repository
+      - name: Add Docker repository to VPS
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ vars.LJFCLOUD_IP }}
@@ -65,7 +67,7 @@ jobs:
             printf "Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: ${CODENAME}\nComponents: stable\nSigned-By: /etc/apt/keyrings/docker.asc\n" | sudo tee /etc/apt/sources.list.d/docker.sources
             sudo apt update
 
-      - name: Install Docker packages
+      - name: Install Docker packages on VPS
         uses: appleboy/ssh-action@master
         with:
           host: ${{ vars.LJFCLOUD_IP }}
@@ -74,7 +76,7 @@ jobs:
           script: |
             sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-      - name: Ensure Docker is running
+      - name: Ensure Docker is running on VPS
         uses: appleboy/ssh-action@master
         with:
           host: ${{ vars.LJFCLOUD_IP }}
@@ -83,12 +85,7 @@ jobs:
           script: |
             sudo systemctl enable --now docker
             sudo systemctl status docker --no-pager
-      # -----------------------------------------------------------
-      # TLS: Generate CA, server cert (for the agent), and client
-      # cert (for Portainer on the Pi) on the VPS.
-      # The server cert needs the VPS public IP as a SAN so that
-      # Portainer can verify it when connecting.
-      # -----------------------------------------------------------
+
       - name: Generate TLS certificates on VPS
         run: |
          set -e
@@ -142,7 +139,7 @@ jobs:
           script: |
             mkdir -p /home/${{ vars.LJFCLOUD_USER }}/portainer-certs
 
-      - name: Copy compose file to VPS
+      - name: Copy compose file from runner to VPS
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ vars.LJFCLOUD_IP }}
@@ -151,7 +148,7 @@ jobs:
           source: portainer-agent-ljfcloud-compose.yml
           target: /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer/
 
-      - name: Deploy Portainer agent
+      - name: Deploy Portainer agent on VPS
         uses: appleboy/ssh-action@master
         with:
           host: ${{ vars.LJFCLOUD_IP }}
@@ -164,7 +161,7 @@ jobs:
             envsubst < portainer-agent-ljfcloud-compose.yml > portainer-agent-ljfcloud-compose-resolved.yml
             sudo docker compose -f portainer-agent-ljfcloud-compose-resolved.yml up -d
 
-      - name: Upload client certs to Pi
+      - name: Copy client certs from runner to Pi
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ vars.RPI4_IP }}
@@ -174,7 +171,7 @@ jobs:
           target: /home/${{ vars.RPI4_USER }}/portainer-certs/ljfcloud/
           strip_components: 2         
          
-      - name: Authenticate to main Portainer
+      - name: Authenticate to main Portainer on Pi
         id: auth
         run: |
           RESPONSE=$(curl -X POST "${{ vars.RPI4_IP }}:83/api/auth" \

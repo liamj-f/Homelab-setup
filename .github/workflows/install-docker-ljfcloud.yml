@@ -129,6 +129,17 @@ jobs:
             -CAcreateserial \
             -out client-cert.pem \
             -extfile client-ext.cnf
+  
+      - name: Debug — inspect cert files on runner
+        run: |
+          echo "=== Files ==="
+          ls -la /tmp/portainer-certs/
+          echo "=== ca.pem ==="
+          cat /tmp/portainer-certs/ca.pem
+          echo "=== client-cert.pem ==="
+          cat /tmp/portainer-certs/client-cert.pem
+          echo "=== client-key.pem ==="
+          cat /tmp/portainer-certs/client-key.pem
 
       - name: Create cert directory on VPS
         uses: appleboy/ssh-action@master

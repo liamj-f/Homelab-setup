@@ -129,6 +129,11 @@ jobs:
             -CAcreateserial \
             -out client-cert.pem \
             -extfile client-ext.cnf
+            
+      - name: Verify server cert SAN
+        run: |
+          echo "=== Server cert SAN ==="
+          openssl x509 -in /tmp/portainer-certs/server-cert.pem -text -noout | grep -A2 "Subject Alternative"
   
       - name: Debug — inspect cert files on runner
         run: |

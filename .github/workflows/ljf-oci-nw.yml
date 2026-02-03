@@ -8,7 +8,7 @@ on:
     paths:
       - '.github/workflows/ljf-oci-nw.yml'    
 jobs:
-  Update_Security_List:
+  Update_Security_Lists:
     runs-on: ubuntu-latest
     env:
       OCI_CLI_USER: ${{ vars.OCID_NETWORK_UPDATER_SA_USER }}
@@ -27,32 +27,59 @@ jobs:
           echo "Resolved IP: $IP"
           echo "ip_address=$IP" >> $GITHUB_OUTPUT
       
-      - name: Setup OCI CLI
-        uses: oracle-actions/run-oci-cli-command@v1.3.2
-        with:
-          user: ${{ env.OCI_CLI_USER }}
-          tenancy: ${{ env.OCI_CLI_TENANCY }}
-          fingerprint: ${{ env.OCI_CLI_FINGERPRINT }}
-          key_content: ${{ env.OCI_CLI_KEY_CONTENT }}
-          region: ${{ env.OCI_CLI_REGION }}
+      - name: Install OCI CLI
+        run: |
+          pip install oci-cli
+      
+      - name: Configure OCI CLI
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" > ~/.oci/key.pem
+          chmod 600 ~/.oci/key.pem
+          
+          cat > ~/.oci/config << EOF
+          [DEFAULT]
+          user=${{ vars.OCID_NETWORK_UPDATER_SA_USER }}
+          fingerprint=${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}
+          tenancy=${{ vars.OCI_TENANT }}
+          region=${{ env.OCI_CLI_REGION }}
+          key_file=~/.oci/key.pem
+          EOF
       
       - name: Update Security List
         run: |
-          # Get current security list rules
-          SECURITY_LIST_ID="${{ vars.OCID_SECURITY_LIST }}"
+          SECURITY_LIST_ID="${{ vars.OCI_SECURITY_LIST_ID }}"
+          IP="${{ steps.resolve_ip.outputs.ip_address }}"
           
-          # Add ingress rule for port 9001
+          # Get current security list
+          oci network security-list get --security-list-id $SECURITY_LIST_ID > current_rules.json
+          
+          # Extract existing ingress rules
+          EXISTING_RULES=$(cat current_rules.json | jq '.data."ingress-security-rules"')
+          
+          # Create new rule
+          NEW_RULE=$(cat << EOF
+          {
+            "protocol": "6",
+            "source": "${IP}/32",
+            "tcpOptions": {
+              "destinationPortRange": {
+                "min": 9001,
+                "max": 9001
+              }
+            },
+            "description": "Allow port 9001 from 14monarch.tplinkdns.com"
+          }
+          EOF
+          )
+          
+          # Combine existing rules with new rule
+          COMBINED_RULES=$(echo $EXISTING_RULES | jq ". + [$NEW_RULE]")
+          
+          # Update security list
           oci network security-list update \
             --security-list-id $SECURITY_LIST_ID \
-            --ingress-security-rules '[{
-              "protocol": "6",
-              "source": "${{ steps.resolve_ip.outputs.ip_address }}/32",
-              "tcpOptions": {
-                "destinationPortRange": {
-                  "min": 9001,
-                  "max": 9001
-                }
-              },
-              "description": "Allow port 9001 from 14monarch.tplinkdns.com"
-            }]' \
+            --ingress-security-rules "$COMBINED_RULES" \
             --force
+          
+          echo "Security list updated successfully for IP: $IP"

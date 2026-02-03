@@ -50,7 +50,7 @@ jobs:
 
       - name: Update Security List
         run: |
-          SECURITY_LIST_ID="${{ vars.OCI_SECURITY_LIST_ID }}"
+          SECURITY_LIST_ID="${{ vars.OCID_SECURITY_LIST }}"
           IP="${{ steps.resolve_ip.outputs.ip_address }}"
           DESCRIPTION="Allow port 9001 from 14monarch.tplinkdns.com"
           

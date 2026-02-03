@@ -8,7 +8,7 @@ on:
     paths:
       - '.github/workflows/ljf-oci-nw.yml'    
 jobs:
-  Update Security Lists:
+  Update_Security_List:
     runs-on: ubuntu-latest
     env:
       OCI_CLI_USER: ${{ vars.OCID_NETWORK_UPDATER_SA_USER }}

@@ -45,6 +45,22 @@ jobs:
           region=${{ env.OCI_CLI_REGION }}
           key_file=~/.oci/key.pem
           EOF
+
+      - name: Debug - List all security lists
+        run: |
+          # List all compartments you have access to
+          echo "=== Compartments ==="
+          oci iam compartment list --all
+    
+          # Try to list security lists in root compartment
+          echo "=== Security Lists in Root ==="
+          oci network security-list list --compartment-id ${{ vars.OCI_TENANT }} || true
+    
+          # If you know the VCN OCID, try that
+          echo "=== Looking for your security list ==="
+          oci search resource structured-search \
+          --query-text "query securitylist resources where identifier = 'ocid1.securitylist.oc1.uk-london-1.aaaaaaaab4nhuwqnev7mwmlthoenkcn4ibi2xgtl3nkgqysie4c63jywo63q'" || true
+
       
       - name: Update Security List
         run: |

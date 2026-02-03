@@ -1,0 +1,24 @@
+name: LJF Cloud Network Setup
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - ljfcloud-server-add
+    paths:
+      - '.github/workflows/ljf-oci-nw.yml'    
+jobs:
+    env:
+      OCI_CLI_USER: ${{ vars.OCID_NETWORK_UPDATER_SA_USER }}
+      OCI_CLI_TENANCY: ${{ vars.OCI_TENANT }}
+      OCI_CLI_FINGERPRINT: ${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}
+      OCI_CLI_KEY_CONTENT: ${{ secrets.NETWORKUPDATERSA_API_KEY }}
+      OCI_CLI_REGION: 'uk-london-1'
+  Update Security Lists:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      -

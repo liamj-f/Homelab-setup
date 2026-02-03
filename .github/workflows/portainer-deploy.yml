@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - ljfcloud-server-add
     paths:
       - 'portainer-compose.yml'
       - '.github/workflows/portainer-deploy.yml'

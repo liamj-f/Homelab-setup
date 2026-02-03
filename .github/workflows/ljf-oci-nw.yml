@@ -1,5 +1,4 @@
 name: LJF Cloud Network Setup
-
 on:
   workflow_dispatch:
   push:
@@ -9,16 +8,51 @@ on:
     paths:
       - '.github/workflows/ljf-oci-nw.yml'    
 jobs:
+  Update Security Lists:
+    runs-on: ubuntu-latest
     env:
       OCI_CLI_USER: ${{ vars.OCID_NETWORK_UPDATER_SA_USER }}
       OCI_CLI_TENANCY: ${{ vars.OCI_TENANT }}
       OCI_CLI_FINGERPRINT: ${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}
       OCI_CLI_KEY_CONTENT: ${{ secrets.NETWORKUPDATERSA_API_KEY }}
       OCI_CLI_REGION: 'uk-london-1'
-  Update Security Lists:
-    runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-      -
+      
+      - name: Resolve IP address
+        id: resolve_ip
+        run: |
+          IP=$(dig +short 14monarch.tplinkdns.com | tail -n1)
+          echo "Resolved IP: $IP"
+          echo "ip_address=$IP" >> $GITHUB_OUTPUT
+      
+      - name: Setup OCI CLI
+        uses: oracle-actions/configure-oci-cli@v1.0.0
+        with:
+          user: ${{ env.OCI_CLI_USER }}
+          tenancy: ${{ env.OCI_CLI_TENANCY }}
+          fingerprint: ${{ env.OCI_CLI_FINGERPRINT }}
+          key_content: ${{ env.OCI_CLI_KEY_CONTENT }}
+          region: ${{ env.OCI_CLI_REGION }}
+      
+      - name: Update Security List
+        run: |
+          # Get current security list rules
+          SECURITY_LIST_ID="${{ vars.OCID_SECURITY_LIST }}"
+          
+          # Add ingress rule for port 9001
+          oci network security-list update \
+            --security-list-id $SECURITY_LIST_ID \
+            --ingress-security-rules '[{
+              "protocol": "6",
+              "source": "${{ steps.resolve_ip.outputs.ip_address }}/32",
+              "tcpOptions": {
+                "destinationPortRange": {
+                  "min": 9001,
+                  "max": 9001
+                }
+              },
+              "description": "Allow port 9001 from 14monarch.tplinkdns.com"
+            }]' \
+            --force

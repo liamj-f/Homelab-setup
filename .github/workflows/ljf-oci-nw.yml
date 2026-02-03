@@ -28,7 +28,7 @@ jobs:
           echo "ip_address=$IP" >> $GITHUB_OUTPUT
       
       - name: Setup OCI CLI
-        uses: oracle-actions/run-oci-cli-command@v1.0.0
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
         with:
           user: ${{ env.OCI_CLI_USER }}
           tenancy: ${{ env.OCI_CLI_TENANCY }}

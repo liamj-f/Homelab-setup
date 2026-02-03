@@ -10,6 +10,88 @@ on:
       - '.github/workflows/install-docker-ljfcloud.yml'    
       - 'portainer-agent-ljfcloud-compose.yml'  
 jobs:
+  Update_OCI_Security_Lists:
+    runs-on: ubuntu-latest
+    env:
+      OCI_CLI_USER: ${{ vars.OCID_NETWORK_UPDATER_SA_USER }}
+      OCI_CLI_TENANCY: ${{ vars.OCID_TENANT }}
+      OCI_CLI_FINGERPRINT: ${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}
+      OCI_CLI_KEY_CONTENT: ${{ secrets.NETWORKUPDATERSA_API_KEY }}
+      OCI_CLI_REGION: 'uk-london-1'
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      
+      - name: Resolve IP address
+        id: resolve_ip
+        run: |
+          IP=$(dig +short 14monarch.tplinkdns.com | tail -n1)
+          echo "Resolved IP: $IP"
+          echo "ip_address=$IP" >> $GITHUB_OUTPUT
+      
+      - name: Install OCI CLI
+        run: |
+          pip install oci-cli
+      
+      - name: Configure OCI CLI
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" > ~/.oci/key.pem
+          chmod 600 ~/.oci/key.pem
+          
+          cat > ~/.oci/config << EOF
+          [DEFAULT]
+          user=${{ vars.OCID_NETWORK_UPDATER_SA_USER }}
+          fingerprint=${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}
+          tenancy=${{ vars.OCID_TENANT }}
+          region=${{ env.OCI_CLI_REGION }}
+          key_file=~/.oci/key.pem
+          EOF
+
+      - name: Update Security List
+        run: |
+          SECURITY_LIST_ID="${{ vars.OCI_SECURITY_LIST_ID }}"
+          IP="${{ steps.resolve_ip.outputs.ip_address }}"
+          DESCRIPTION="Allow port 9001 from 14monarch.tplinkdns.com"
+          
+          echo "Current IP for 14monarch.tplinkdns.com: $IP"
+          
+          # Get current security list
+          oci network security-list get --security-list-id $SECURITY_LIST_ID > current_rules.json
+          
+          # Extract existing ingress rules and remove any with our description
+          FILTERED_RULES=$(cat current_rules.json | jq --arg desc "$DESCRIPTION" '.data."ingress-security-rules" | map(select(.description != $desc))')
+          
+          echo "Removed old rules for 14monarch.tplinkdns.com"
+          
+          # Create new rule with current IP
+          NEW_RULE=$(cat << EOF
+          {
+            "protocol": "6",
+            "source": "${IP}/32",
+            "tcpOptions": {
+              "destinationPortRange": {
+                "min": 9001,
+                "max": 9001
+              }
+            },
+            "description": "$DESCRIPTION"
+          }
+          EOF
+          )
+          
+          # Combine filtered rules with new rule
+          UPDATED_RULES=$(echo $FILTERED_RULES | jq ". + [$NEW_RULE]")
+          
+          # Update security list
+          oci network security-list update \
+            --security-list-id $SECURITY_LIST_ID \
+            --ingress-security-rules "$UPDATED_RULES" \
+            --force
+          
+          echo "✓ Security list updated successfully"
+          echo "✓ New rule added for IP: $IP"
+          
   install_docker_and_add_to_portainer:
     runs-on: ubuntu-latest
     steps:

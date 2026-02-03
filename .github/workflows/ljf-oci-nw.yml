@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       OCI_CLI_USER: ${{ vars.OCID_NETWORK_UPDATER_SA_USER }}
-      OCI_CLI_TENANCY: ${{ vars.OCI_TENANT }}
+      OCI_CLI_TENANCY: ${{ vars.OCID_TENANT }}
       OCI_CLI_FINGERPRINT: ${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}
       OCI_CLI_KEY_CONTENT: ${{ secrets.NETWORKUPDATERSA_API_KEY }}
       OCI_CLI_REGION: 'uk-london-1'

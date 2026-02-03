@@ -41,7 +41,7 @@ jobs:
           [DEFAULT]
           user=${{ vars.OCID_NETWORK_UPDATER_SA_USER }}
           fingerprint=${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}
-          tenancy=${{ vars.OCI_TENANT }}
+          tenancy=${{ vars.OCID_TENANT }}
           region=${{ env.OCI_CLI_REGION }}
           key_file=~/.oci/key.pem
           EOF

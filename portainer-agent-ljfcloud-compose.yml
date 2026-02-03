@@ -1,6 +1,7 @@
 services:
   portainer-agent:
     image: portainer/agent:latest
+    container_name: portainer_agent
     restart: always
     ports:
       - "9001:9001"
@@ -12,4 +13,5 @@ services:
       - "$CERT_DIR/server-key.pem:/certs/server.key"
     environment:
       - AGENT_PORT=9001
+      - AGENT_SECRET=${PORTAINER_AGENT_SECRET}
     command: --mtlscacert /certs/ca.pem --mtlscert /certs/server.crt --mtlskey /certs/server.key

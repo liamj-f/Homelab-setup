@@ -48,7 +48,7 @@ jobs:
       
       - name: Update Security List
         run: |
-          SECURITY_LIST_ID="${{ vars.OCI_SECURITY_LIST_ID }}"
+          SECURITY_LIST_ID="${{ vars.OCID_SECURITY_LIST }}"
           IP="${{ steps.resolve_ip.outputs.ip_address }}"
           
           # Get current security list

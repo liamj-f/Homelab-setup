@@ -86,75 +86,6 @@ jobs:
             sudo systemctl enable --now docker
             sudo systemctl status docker --no-pager
 
-      - name: Generate TLS certificates on VPS
-        run: |
-         set -e
-          mkdir -p /tmp/portainer-certs
-          cd /tmp/portainer-certs
-
-          # --- CA ---
-          openssl req -new -x509 -days 3650 -nodes \
-            -out ca.pem \
-            -keyout ca-key.pem \
-            -subj "/CN=portainer-ca"
-
-          # --- Server cert (for the agent on the VPS) ---
-          openssl req -new -nodes \
-            -out server.csr \
-            -keyout server-key.pem \
-            -subj "/CN=${{ vars.LJFCLOUD_IP }}"
-
-          echo "subjectAltName=IP:${{ vars.LJFCLOUD_IP }}" > server-ext.cnf
-
-          openssl x509 -req -days 3650 \
-            -in server.csr \
-            -CA ca.pem \
-            -CAkey ca-key.pem \
-            -CAcreateserial \
-            -out server-cert.pem \
-            -extfile server-ext.cnf
-
-          # --- Client cert (for Portainer on the Pi) ---
-          openssl req -new -nodes \
-            -out client.csr \
-            -keyout client-key.pem \
-            -subj "/CN=portainer-client"
-
-          echo "extendedKeyUsage=clientAuth" > client-ext.cnf
-
-          openssl x509 -req -days 3650 \
-            -in client.csr \
-            -CA ca.pem \
-            -CAkey ca-key.pem \
-            -CAcreateserial \
-            -out client-cert.pem \
-            -extfile client-ext.cnf
-            
-      - name: Verify server cert SAN
-        run: |
-          echo "=== Server cert SAN ==="
-          openssl x509 -in /tmp/portainer-certs/server-cert.pem -text -noout | grep -A2 "Subject Alternative"
-  
-      - name: Debug — inspect cert files on runner
-        run: |
-          echo "=== Files ==="
-          ls -la /tmp/portainer-certs/
-          echo "=== ca.pem ==="
-          cat /tmp/portainer-certs/ca.pem
-          echo "=== client-cert.pem ==="
-          cat /tmp/portainer-certs/client-cert.pem
-          echo "=== client-key.pem ==="
-          cat /tmp/portainer-certs/client-key.pem
-
-      - name: Create cert directory on VPS
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ vars.LJFCLOUD_IP }}
-          username: ${{ vars.LJFCLOUD_USER }}
-          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
-          script: |
-            mkdir -p /home/${{ vars.LJFCLOUD_USER }}/portainer-certs
-
       - name: Copy compose file from runner to VPS
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -175,17 +106,7 @@ jobs:
             cd /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer
             export CERT_DIR="/home/${{ vars.LJFCLOUD_USER }}/portainer-certs"
             envsubst < portainer-agent-ljfcloud-compose.yml > portainer-agent-ljfcloud-compose-resolved.yml
-            sudo docker compose -f portainer-agent-ljfcloud-compose-resolved.yml up -d
-
-      - name: Copy client certs from runner to Pi
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
-          source: /tmp/portainer-certs/ca.pem,/tmp/portainer-certs/client-cert.pem,/tmp/portainer-certs/client-key.pem
-          target: /home/${{ vars.RPI4_USER }}/portainer-certs/ljfcloud/
-          strip_components: 2         
+            sudo docker compose -f portainer-agent-ljfcloud-compose-resolved.yml up -d         
          
       - name: Authenticate to main Portainer on Pi
         id: auth
@@ -207,12 +128,9 @@ jobs:
             -F "EndpointCreationType=2" \
             -F "URL=tcp://${{ vars.LJFCLOUD_IP }}:9001" \
             -F "TLS=true" \
-            -F "TLSSkipVerify=false" \
-            -F "TLSSkipClientVerify=false" \
-            -F "TLSCACertFile=@/tmp/portainer-certs/ca.pem" \
-            -F "TLSCertFile=@/tmp/portainer-certs/client-cert.pem" \
-            -F "TLSKeyFile=@/tmp/portainer-certs/client-key.pem"
-            
+            -F "TLSSkipVerify=true" \
+            -F "TLSSkipClientVerify=true" 
+                       
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf

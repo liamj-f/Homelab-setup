@@ -68,7 +68,7 @@ jobs:
           IP="${{ steps.resolve_ip.outputs.ip_address }}"
           
           # Get current security list
-          oci network security-list get --security-list-id $SECURITY_LIST_ID --debug > current_rules.json
+          oci network security-list get --security-list-id $SECURITY_LIST_ID > current_rules.json
           
           # Extract existing ingress rules
           EXISTING_RULES=$(cat current_rules.json | jq '.data."ingress-security-rules"')

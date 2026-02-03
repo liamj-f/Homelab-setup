@@ -54,7 +54,7 @@ jobs:
     
           # Try to list security lists in root compartment
           echo "=== Security Lists in Root ==="
-          oci network security-list list --compartment-id ${{ vars.OCI_TENANT }} || true
+          oci network security-list list --compartment-id ${{ vars.OCID_TENANT }} || true
     
           # If you know the VCN OCID, try that
           echo "=== Looking for your security list ==="

@@ -23,8 +23,7 @@ services:
       - OCI_FINGERPRINT=${OCI_FINGERPRINT}
       - OCI_TENANCY=${OCI_TENANCY}
       - OCI_REGION=uk-london-1
-      - OCI_KEY_CONTENT=${OCI_KEY_CONTENT}
-    
+      - OCI_KEY_CONTENT_BASE64=${OCI_KEY_CONTENT_BASE64}    
     logging:
       driver: "json-file"
       options:

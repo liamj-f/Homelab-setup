@@ -5,6 +5,7 @@ import time
 import socket
 import json
 import oci
+import base64
 from datetime import datetime
 
 # Configuration from environment variables
@@ -13,13 +14,20 @@ SECURITY_LIST_ID = os.getenv('SECURITY_LIST_ID')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '300'))  # Default: 5 minutes
 PORT = int(os.getenv('PORT', '9001'))
 
+
+oci_key_base64 = os.getenv('OCI_KEY_CONTENT_BASE64')
+if oci_key_base64:
+    oci_key_decoded = base64.b64decode(oci_key_base64).decode('utf-8')
+else:
+    oci_key_decoded = os.getenv('OCI_KEY_CONTENT')  # Fallback
+
 # OCI Configuration
 config = {
     "user": os.getenv('OCI_USER'),
     "fingerprint": os.getenv('OCI_FINGERPRINT'),
     "tenancy": os.getenv('OCI_TENANCY'),
     "region": os.getenv('OCI_REGION', 'uk-london-1'),
-    "key_content": os.getenv('OCI_KEY_CONTENT')
+    "key_content": oci_key_decoded
 }
 
 def log(message):

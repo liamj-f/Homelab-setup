@@ -292,92 +292,88 @@ jobs:
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
-          # Write the private key to a file
-          echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" > /tmp/oci_key.pem
-          OCI_KEY_CONTENT=$(cat /tmp/oci_key.pem)
-          
-          # Create the JSON payload using jq
-          PAYLOAD=$(jq -n \
-            --arg name "dynamic-ip-updater" \
-            --arg repo "https://github.com/liamj-f/homelab-setup" \
-            --arg branch "${{ inputs.branch_name }}" \
-            --arg compose "dynamic-ip-updater/dynamic-ip-updater-compose.yml" \
-            --arg webhook "f279d609-cb28-458f-94f3-54129d5bbde7" \
-            --arg oci_user "${{ vars.OCID_NETWORK_UPDATER_SA_USER }}" \
-            --arg oci_fingerprint "${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}" \
-            --arg oci_tenancy "${{ vars.OCID_TENANT }}" \
-            --arg oci_key "$OCI_KEY_CONTENT" \
-            --arg security_list "${{ vars.OCID_SECURITY_LIST }}" \
-            '{
-              "Name": $name,
-              "RepositoryURL": $repo,
-              "RepositoryReferenceName": $branch,
-              "ComposeFile": $compose,
-              "RepositoryAuthentication": false,
-              "AutoUpdate": {
-                "forcePullImage": true,
-                "forceUpdate": true,
-                "Webhook": $webhook
-              },
-              "Env": [
-                {"name": "OCI_USER", "value": $oci_user},
-                {"name": "OCI_FINGERPRINT", "value": $oci_fingerprint},
-                {"name": "OCI_TENANCY", "value": $oci_tenancy},
-                {"name": "OCI_KEY_CONTENT", "value": $oci_key},
-                {"name": "SECURITY_LIST_ID", "value": $security_list}
-              ],
-              "Prune": true,
-              "StackFileVersion": "3"
-            }')
-          
+          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+
           echo "Creating stack from GitHub..."
           RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD")
-          
-          echo "API Response: $RESPONSE"
-          echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
-          
-          # Clean up
-          rm /tmp/oci_key.pem
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "Name": "dynamic-ip-updater",
+               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
+               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "ComposeFile": "dynamic-ip-updater/dynamic-ip-updater-compose.yml",
+               "RepositoryAuthentication": false,
+               "AutoUpdate": {
+                              "forcePullImage": true,
+                              "forceUpdate": true,
+                              "Webhook": "f279d609-cb28-458f-94f3-54129d5bbde7"
+                             },
+               "Env": [
+                       {
+                       "name":"OCI_USER",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
+                       },
+                       {
+                       "name":"OCI_FINGERPRINT",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"
+                       },
+                       {
+                        "name":"OCI_TENANCY",
+                        "value":"${{ vars.OCID_TENANT }}"
+                        },
+                        {
+                        "name":"OCI_KEY_CONTENT_BASE64",
+                        "value":"'"$OCI_KEY_BASE64"'"
+                        },
+                        {
+                        "name":"SECURITY_LIST_ID",
+                        "value":"${{ vars.OCID_SECURITY_LIST }}"
+                        }
+               ],
+               "Prune": true,
+               "StackFileVersion": "3"
+              }')
+
+            echo "API Response: $RESPONSE"
+            echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
 
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          # Write the private key to a file
-          echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" > /tmp/oci_key.pem
-          OCI_KEY_CONTENT=$(cat /tmp/oci_key.pem)
-          
-          # Create the JSON payload using jq
-          PAYLOAD=$(jq -n \
-            --arg branch "${{ inputs.branch_name }}" \
-            --arg oci_user "${{ vars.OCID_NETWORK_UPDATER_SA_USER }}" \
-            --arg oci_fingerprint "${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}" \
-            --arg oci_tenancy "${{ vars.OCID_TENANT }}" \
-            --arg oci_key "$OCI_KEY_CONTENT" \
-            --arg security_list "${{ vars.OCID_SECURITY_LIST }}" \
-            '{
-              "PullImage": true,
-              "RepositoryReferenceName": $branch,
-              "repositoryAuthentication": false,
-              "Env": [
-                {"name": "OCI_USER", "value": $oci_user},
-                {"name": "OCI_FINGERPRINT", "value": $oci_fingerprint},
-                {"name": "OCI_TENANCY", "value": $oci_tenancy},
-                {"name": "OCI_KEY_CONTENT", "value": $oci_key},
-                {"name": "SECURITY_LIST_ID", "value": $security_list}
-              ],
-              "Prune": true
-            }')
+          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
           
           curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
-          
-          # Clean up
-          rm /tmp/oci_key.pem
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "PullImage": true,
+               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "repositoryAuthentication": false,
+               "Env": [
+                       {
+                       "name":"OCI_USER",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
+                       },
+                       {
+                       "name":"OCI_FINGERPRINT",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"
+                       },
+                       {
+                        "name":"OCI_TENANCY",
+                        "value":"${{ vars.OCID_TENANT }}"
+                        },
+                        {
+                        "name":"OCI_KEY_CONTENT_BASE64",
+                        "value":"'"$OCI_KEY_BASE64"'"
+                        },
+                        {
+                        "name":"SECURITY_LIST_ID",
+                        "value":"${{ vars.OCID_SECURITY_LIST }}"
+                        }
+               ],
+               "Prune": true
+              }'
               
       - name: Bring down VPN
         run: |

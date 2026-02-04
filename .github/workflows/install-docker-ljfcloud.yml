@@ -294,6 +294,8 @@ jobs:
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
+          OCI_KEY_ESCAPED=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | awk '{printf "%s\\n", $0}' | sed 's/\\n$//')
+
           echo "Creating stack from GitHub..."
           RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
@@ -324,7 +326,7 @@ jobs:
                         },
                         {
                         "name":"OCI_KEY_CONTENT",
-                        "value":"${{ secrets.NETWORKUPDATERSA_API_KEY }}"
+                        "value":"${OCI_KEY_ESCAPED}
                         }
                ],
                "Prune": true,

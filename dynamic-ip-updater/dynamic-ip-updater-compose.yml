@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   ip-security-list-updater:
-    image: ip-security-list-updater:latest
+    build:
+      context: .
+      dockerfile: dynamic-ip-updater-dockerfile
     container_name: ip-security-list-updater
     restart: unless-stopped
     environment:

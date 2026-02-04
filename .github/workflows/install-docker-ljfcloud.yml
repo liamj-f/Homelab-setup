@@ -1,5 +1,5 @@
-name: Install Docker on LJFCloud
 
+name: LJF Cloud Network Setup
 on:
   workflow_dispatch:
   push:
@@ -7,10 +7,9 @@ on:
       - main
       - ljfcloud-server-add
     paths:
-      - '.github/workflows/install-docker-ljfcloud.yml'    
-      - 'portainer-agent-ljfcloud-compose.yml'  
+      - '.github/workflows/ljf-oci-nw.yml'    
 jobs:
-  Update_OCI_Security_Lists:
+  Update_Security_Lists:
     runs-on: ubuntu-latest
     env:
       OCI_CLI_USER: ${{ vars.OCID_NETWORK_UPDATER_SA_USER }}
@@ -19,9 +18,6 @@ jobs:
       OCI_CLI_KEY_CONTENT: ${{ secrets.NETWORKUPDATERSA_API_KEY }}
       OCI_CLI_REGION: 'uk-london-1'
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-      
       - name: Resolve IP address
         id: resolve_ip
         run: |
@@ -47,51 +43,62 @@ jobs:
           region=${{ env.OCI_CLI_REGION }}
           key_file=~/.oci/key.pem
           EOF
-
+      
       - name: Update Security List
         run: |
-          SECURITY_LIST_ID="${{ vars.OCID_SECURITY_LIST }}"
-          IP="${{ steps.resolve_ip.outputs.ip_address }}"
-          DESCRIPTION="Allow port 9001 from 14monarch.tplinkdns.com"
+          DESC_PREFIX="14monarch.tplinkdns.com"
           
           echo "Current IP for 14monarch.tplinkdns.com: $IP"
           
           # Get current security list
-          oci network security-list get --security-list-id $SECURITY_LIST_ID > current_rules.json
+          oci network security-list get --security-list-id ${{ vars.OCID_SECURITY_LIST }} > current_rules.json
           
-          # Extract existing ingress rules and remove any with our description
-          FILTERED_RULES=$(cat current_rules.json | jq --arg desc "$DESCRIPTION" '.data."ingress-security-rules" | map(select(.description != $desc))')
+          # Remove any existing rules for 14monarch.tplinkdns.com (both ports)
+          FILTERED_RULES=$(cat current_rules.json | jq --arg prefix "$DESC_PREFIX" '.data."ingress-security-rules" | map(select(.description | contains($prefix) | not))')
           
           echo "Removed old rules for 14monarch.tplinkdns.com"
           
-          # Create new rule with current IP
-          NEW_RULE=$(cat << EOF
-          {
-            "protocol": "6",
-            "source": "${IP}/32",
-            "tcpOptions": {
-              "destinationPortRange": {
-                "min": 9001,
-                "max": 9001
-              }
+          # Create new rules for both ports
+          NEW_RULES=$(cat << EOF
+          [
+            {
+              "protocol": "6",
+              "source": "${{ steps.resolve_ip.outputs.ip_address }}/32",
+              "tcpOptions": {
+                "destinationPortRange": {
+                  "min": 22,
+                  "max": 22
+                }
+              },
+              "description": "14monarch.tplinkdns.com - SSH access"
             },
-            "description": "$DESCRIPTION"
-          }
+            {
+              "protocol": "6",
+              "source": "${{ steps.resolve_ip.outputs.ip_address }}/32",
+              "tcpOptions": {
+                "destinationPortRange": {
+                  "min": 9001,
+                  "max": 9001
+                }
+              },
+              "description": "14monarch.tplinkdns.com - Port 9001"
+            }
+          ]
           EOF
           )
           
-          # Combine filtered rules with new rule
-          UPDATED_RULES=$(echo $FILTERED_RULES | jq ". + [$NEW_RULE]")
+          # Combine filtered rules with new rules
+          UPDATED_RULES=$(jq -s '.[0] + .[1]' <(echo "$FILTERED_RULES") <(echo "$NEW_RULES"))
           
           # Update security list
           oci network security-list update \
-            --security-list-id $SECURITY_LIST_ID \
+            --security-list-id ${{ vars.OCID_SECURITY_LIST }} \
             --ingress-security-rules "$UPDATED_RULES" \
             --force
           
           echo "✓ Security list updated successfully"
-          echo "✓ New rule added for IP: $IP"
-          
+          echo "✓ SSH (port 22) rule added for IP: $IP"
+          echo "✓ Port 9001 rule added for IP: $IP"          
   install_docker_and_add_to_portainer:
     runs-on: ubuntu-latest
     steps:
@@ -202,7 +209,7 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Register ljfcloud agent in Portainer with TLS
+      - name: Register ljfcloud agent in Portainer
         run: |
           curl -s -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
@@ -217,3 +224,9 @@ jobs:
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show   
+  add_dynamic_ip_updater:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - 

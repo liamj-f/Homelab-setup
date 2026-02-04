@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  ip-security-list-updater:
+    image: ip-security-list-updater:latest
+    container_name: ip-security-list-updater
+    restart: unless-stopped
+    environment:
+      # Hostname to monitor
+      - HOSTNAME=14monarch.tplinkdns.com
+      
+      # Port to allow in security list
+      - PORT=9001
+      
+      # Check interval in seconds (default: 300 = 5 minutes)
+      - CHECK_INTERVAL=300
+      
+      # OCI Security List ID
+      - SECURITY_LIST_ID=${SECURITY_LIST_ID}
+      
+      # OCI Credentials
+      - OCI_USER=${OCI_USER}
+      - OCI_FINGERPRINT=${OCI_FINGERPRINT}
+      - OCI_TENANCY=${OCI_TENANCY}
+      - OCI_REGION=uk-london-1
+      - OCI_KEY_CONTENT=${OCI_KEY_CONTENT}
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

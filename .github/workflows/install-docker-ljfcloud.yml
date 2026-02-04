@@ -301,7 +301,7 @@ jobs:
           -d '{
                "Name": "dynamic-ip-updater",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-               "RepositoryReferenceName": "${{ github.ref_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "dynamic-ip-updater/dynamic-ip-updater-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
@@ -348,7 +348,7 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{
                "PullImage": true,
-               "RepositoryReferenceName": "${{ github.ref_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
                "Env": [
                        {

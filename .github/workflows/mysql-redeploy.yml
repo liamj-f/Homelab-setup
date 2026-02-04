@@ -70,7 +70,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="e7270-server") | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub

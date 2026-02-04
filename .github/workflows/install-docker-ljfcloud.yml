@@ -107,9 +107,8 @@ jobs:
         
       - name: Install WireGuard
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wireguard
-          
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
+
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf

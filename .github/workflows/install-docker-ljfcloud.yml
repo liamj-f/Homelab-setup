@@ -7,7 +7,7 @@ on:
       - main
       - ljfcloud-server-add
     paths:
-      - '.github/workflows/ljf-oci-nw.yml'    
+      - '.github/workflows/install-docker-ljfcloud.yml'    
 jobs:
   Update_Security_Lists:
     runs-on: ubuntu-latest

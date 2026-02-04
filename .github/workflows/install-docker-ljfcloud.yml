@@ -48,7 +48,7 @@ jobs:
         run: |
           DESC_PREFIX="14monarch.tplinkdns.com"
           
-          echo "Current IP for 14monarch.tplinkdns.com: $IP"
+          echo "Current IP for 14monarch.tplinkdns.com: ${{ steps.resolve_ip.outputs.ip_address }}"
           
           # Get current security list
           oci network security-list get --security-list-id ${{ vars.OCID_SECURITY_LIST }} > current_rules.json
@@ -97,8 +97,8 @@ jobs:
             --force
           
           echo "✓ Security list updated successfully"
-          echo "✓ SSH (port 22) rule added for IP: $IP"
-          echo "✓ Port 9001 rule added for IP: $IP"          
+          echo "✓ SSH (port 22) rule added for IP: ${{ steps.resolve_ip.outputs.ip_address }}"
+          echo "✓ Port 9001 rule added for IP: ${{ steps.resolve_ip.outputs.ip_address }}"          
   install_docker_and_add_to_portainer:
     runs-on: ubuntu-latest
     needs: Update_Security_Lists

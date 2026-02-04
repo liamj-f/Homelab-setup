@@ -54,8 +54,7 @@ jobs:
           oci network security-list get --security-list-id ${{ vars.OCID_SECURITY_LIST }} > current_rules.json
           
           # Remove any existing rules for 14monarch.tplinkdns.com (both ports)
-          FILTERED_RULES=$(cat current_rules.json | jq --arg prefix "$DESC_PREFIX" '.data."ingress-security-rules" | map(select(.description | contains($prefix) | not))')
-          
+          FILTERED_RULES=$(cat current_rules.json | jq --arg prefix "$DESC_PREFIX" '.data."ingress-security-rules" | map(select(.description // "" | contains($prefix) | not))')          
           echo "Removed old rules for 14monarch.tplinkdns.com"
           
           # Create new rules for both ports

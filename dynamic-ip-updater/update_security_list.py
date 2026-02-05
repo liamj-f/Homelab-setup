@@ -4,24 +4,23 @@ import os
 import time
 import socket
 import json
-import oci
 import base64
+import oci
 from datetime import datetime
 
 # Configuration from environment variables
 HOSTNAME = os.getenv('HOSTNAME', '14monarch.tplinkdns.com')
 SECURITY_LIST_ID = os.getenv('SECURITY_LIST_ID')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '300'))  # Default: 5 minutes
-PORT = int(os.getenv('PORT', '9001'))
+PORTS = [22, 9001]  # SSH and application port
 
-
+# OCI Configuration
 oci_key_base64 = os.getenv('OCI_KEY_CONTENT_BASE64')
 if oci_key_base64:
     oci_key_decoded = base64.b64decode(oci_key_base64).decode('utf-8')
 else:
     oci_key_decoded = os.getenv('OCI_KEY_CONTENT')  # Fallback
 
-# OCI Configuration
 config = {
     "user": os.getenv('OCI_USER'),
     "fingerprint": os.getenv('OCI_FINGERPRINT'),
@@ -34,6 +33,15 @@ def log(message):
     """Print timestamped log message"""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print(f"[{timestamp}] {message}", flush=True)
+
+def get_port_description(port):
+    """Get description for a port"""
+    if port == 22:
+        return f"{HOSTNAME} - SSH access"
+    elif port == 9001:
+        return f"{HOSTNAME} - Port 9001"
+    else:
+        return f"{HOSTNAME} - Port {port}"
 
 def resolve_ip(hostname):
     """Resolve hostname to IP address"""
@@ -55,37 +63,42 @@ def get_current_rules(virtual_network_client):
         return None
 
 def update_security_list(virtual_network_client, new_ip):
-    """Update security list with new IP"""
+    """Update security list with new IP for all configured ports"""
     try:
         # Get current rules
         current_rules = get_current_rules(virtual_network_client)
         if current_rules is None:
             return False
         
-        # Filter out old rules for this hostname
-        description_marker = f"{HOSTNAME} - Port {PORT}"
+        # Filter out old rules for this hostname (all ports)
+        description_prefix = HOSTNAME
         filtered_rules = [
             rule for rule in current_rules 
-            if not (hasattr(rule, 'description') and description_marker in rule.description)
+            if not (hasattr(rule, 'description') and rule.description and description_prefix in rule.description)
         ]
         
-        log(f"Removed {len(current_rules) - len(filtered_rules)} old rule(s) for {HOSTNAME}")
+        removed_count = len(current_rules) - len(filtered_rules)
+        if removed_count > 0:
+            log(f"Removed {removed_count} old rule(s) for {HOSTNAME}")
         
-        # Create new rule
-        new_rule = oci.core.models.IngressSecurityRule(
-            protocol="6",  # TCP
-            source=f"{new_ip}/32",
-            tcp_options=oci.core.models.TcpOptions(
-                destination_port_range=oci.core.models.PortRange(
-                    min=PORT,
-                    max=PORT
-                )
-            ),
-            description=description_marker
-        )
+        # Create new rules for each port
+        new_rules = []
+        for port in PORTS:
+            new_rule = oci.core.models.IngressSecurityRule(
+                protocol="6",  # TCP
+                source=f"{new_ip}/32",
+                tcp_options=oci.core.models.TcpOptions(
+                    destination_port_range=oci.core.models.PortRange(
+                        min=port,
+                        max=port
+                    )
+                ),
+                description=get_port_description(port)
+            )
+            new_rules.append(new_rule)
         
-        # Combine filtered rules with new rule
-        updated_rules = filtered_rules + [new_rule]
+        # Combine filtered rules with new rules
+        updated_rules = filtered_rules + new_rules
         
         # Update security list
         update_details = oci.core.models.UpdateSecurityListDetails(
@@ -98,6 +111,8 @@ def update_security_list(virtual_network_client, new_ip):
         )
         
         log(f"✓ Security list updated successfully with IP: {new_ip}")
+        for port in PORTS:
+            log(f"  - Port {port} rule added")
         return True
         
     except Exception as e:
@@ -108,7 +123,7 @@ def main():
     """Main loop"""
     log("=== IP Security List Updater Starting ===")
     log(f"Hostname: {HOSTNAME}")
-    log(f"Port: {PORT}")
+    log(f"Ports: {', '.join(map(str, PORTS))}")
     log(f"Security List ID: {SECURITY_LIST_ID}")
     log(f"Check Interval: {CHECK_INTERVAL} seconds")
     log(f"Region: {config['region']}")

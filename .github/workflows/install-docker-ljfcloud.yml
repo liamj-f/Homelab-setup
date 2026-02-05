@@ -271,7 +271,7 @@ jobs:
 
             # Build
             cd dynamic-ip-updater
-            docker build -t ip-security-list-updater:latest .
+            sudo docker build -t ip-security-list-updater:latest .
 
             echo "✓ Image built successfully"
 

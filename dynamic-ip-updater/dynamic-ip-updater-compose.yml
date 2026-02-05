@@ -4,7 +4,9 @@ services:
   ip-security-list-updater:
     build:
       context: .
-      dockerfile: dynamic-ip-updater-dockerfile
+      dockerfile: Dockerfile
+      network: host
+      # Don't use buildkit-specific features
     container_name: ip-security-list-updater
     restart: unless-stopped
     environment:

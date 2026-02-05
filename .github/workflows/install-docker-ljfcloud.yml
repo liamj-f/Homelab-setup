@@ -262,17 +262,17 @@ jobs:
           script: |
             cd /tmp
             rm -rf homelab-setup
-            
+
             # Sparse checkout - only get dynamic-ip-updater folder
             git clone --filter=blob:none --sparse https://github.com/liamj-f/homelab-setup.git
             cd homelab-setup
             git sparse-checkout set dynamic-ip-updater
             git checkout ${{ github.ref_name }}
-            
+
             # Build
             cd dynamic-ip-updater
-            DOCKER_BUILDKIT=0 docker build -t ip-security-list-updater:latest .
-            
+            docker build -t ip-security-list-updater:latest .
+
             echo "✓ Image built successfully"
 
       - name: Authenticate to Portainer

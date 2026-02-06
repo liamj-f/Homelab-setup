@@ -1,4 +1,4 @@
-name: Install Docker
+name: Install Docker on RPI4
 
 on:
   workflow_dispatch:

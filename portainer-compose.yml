@@ -13,6 +13,8 @@ services:
       - portainer_data:/data
     networks:
       - nginx_network  
+    environment:
+      - AGENT_SECRET=${PORTAINER_AGENT_SECRET}
     healthcheck:
       test:  ["CMD", "/portainer", "--help"]
       interval: 30s

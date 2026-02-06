@@ -1,0 +1,404 @@
+
+name: LJF Cloud Network Setup
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - ljfcloud-server-add
+    paths:
+      - '.github/workflows/install-docker-ljfcloud.yml'    
+jobs:
+  Update_Security_Lists:
+    runs-on: ubuntu-latest
+    env:
+      OCI_CLI_USER: ${{ vars.OCID_NETWORK_UPDATER_SA_USER }}
+      OCI_CLI_TENANCY: ${{ vars.OCID_TENANT }}
+      OCI_CLI_FINGERPRINT: ${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}
+      OCI_CLI_KEY_CONTENT: ${{ secrets.NETWORKUPDATERSA_API_KEY }}
+      OCI_CLI_REGION: 'uk-london-1'
+    steps:
+      - name: Resolve IP address
+        id: resolve_ip
+        run: |
+          IP=$(dig +short 14monarch.tplinkdns.com | tail -n1)
+          echo "Resolved IP: $IP"
+          echo "ip_address=$IP" >> $GITHUB_OUTPUT
+      
+      - name: Install OCI CLI
+        run: |
+          pip install oci-cli
+      
+      - name: Configure OCI CLI
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" > ~/.oci/key.pem
+          chmod 600 ~/.oci/key.pem
+          
+          cat > ~/.oci/config << EOF
+          [DEFAULT]
+          user=${{ vars.OCID_NETWORK_UPDATER_SA_USER }}
+          fingerprint=${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}
+          tenancy=${{ vars.OCID_TENANT }}
+          region=${{ env.OCI_CLI_REGION }}
+          key_file=~/.oci/key.pem
+          EOF
+      
+      - name: Update Security List
+        run: |
+          DESC_PREFIX="14monarch.tplinkdns.com"
+          
+          echo "Current IP for 14monarch.tplinkdns.com: ${{ steps.resolve_ip.outputs.ip_address }}"
+          
+          # Get current security list
+          oci network security-list get --security-list-id ${{ vars.OCID_SECURITY_LIST }} > current_rules.json
+          
+          # Remove any existing rules for 14monarch.tplinkdns.com (both ports)
+          FILTERED_RULES=$(cat current_rules.json | jq --arg prefix "$DESC_PREFIX" '.data."ingress-security-rules" | map(select(.description // "" | contains($prefix) | not))')          
+          echo "Removed old rules for 14monarch.tplinkdns.com"
+          
+          # Create new rules for both ports
+          NEW_RULES=$(cat << EOF
+          [
+            {
+              "protocol": "6",
+              "source": "${{ steps.resolve_ip.outputs.ip_address }}/32",
+              "tcpOptions": {
+                "destinationPortRange": {
+                  "min": 22,
+                  "max": 22
+                }
+              },
+              "description": "14monarch.tplinkdns.com - SSH access"
+            },
+            {
+              "protocol": "6",
+              "source": "${{ steps.resolve_ip.outputs.ip_address }}/32",
+              "tcpOptions": {
+                "destinationPortRange": {
+                  "min": 9001,
+                  "max": 9001
+                }
+              },
+              "description": "14monarch.tplinkdns.com - Port 9001"
+            }
+          ]
+          EOF
+          )
+          
+          # Combine filtered rules with new rules
+          UPDATED_RULES=$(jq -s '.[0] + .[1]' <(echo "$FILTERED_RULES") <(echo "$NEW_RULES"))
+          
+          # Update security list
+          oci network security-list update \
+            --security-list-id ${{ vars.OCID_SECURITY_LIST }} \
+            --ingress-security-rules "$UPDATED_RULES" \
+            --force
+          
+          echo "✓ Security list updated successfully"
+          echo "✓ SSH (port 22) rule added for IP: ${{ steps.resolve_ip.outputs.ip_address }}"
+          echo "✓ Port 9001 rule added for IP: ${{ steps.resolve_ip.outputs.ip_address }}"          
+  install_docker_and_add_to_portainer:
+    runs-on: ubuntu-latest
+    needs: Update_Security_Lists
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        
+      - name: Install WireGuard
+        run: |
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
+
+      - name: Write WireGuard config
+        run: |
+          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+          
+      - name: Bring up VPN on runner
+        run: |
+          sudo wg-quick up ./wg0.conf
+          sudo wg show  
+
+      - name: Override system DNS resolver on runner
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+          
+      - name: Add host key to known_hosts of runner
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
+     
+      - name: Uninstall old Docker from VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
+              sudo apt remove -y --allow-change-held-packages $pkg || true
+            done 
+            
+      - name: Add Docker repository to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            sudo apt update
+            sudo apt install -y ca-certificates curl
+            sudo install -m 0755 -d /etc/apt/keyrings
+            sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+            sudo chmod a+r /etc/apt/keyrings/docker.asc
+            CODENAME=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+            printf "Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: ${CODENAME}\nComponents: stable\nSigned-By: /etc/apt/keyrings/docker.asc\n" | sudo tee /etc/apt/sources.list.d/docker.sources
+            sudo apt update
+
+      - name: Install Docker packages on VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+      - name: Ensure Docker is running on VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            sudo systemctl enable --now docker
+            sudo systemctl status docker --no-pager
+
+      - name: Copy compose file from runner to VPS
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          source: portainer-agent-ljfcloud-compose.yml
+          target: /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer/
+
+      - name: Deploy Portainer agent on VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer
+            export CERT_DIR="/home/${{ vars.LJFCLOUD_USER }}/portainer-certs"
+            envsubst < portainer-agent-ljfcloud-compose.yml > portainer-agent-ljfcloud-compose-resolved.yml
+            sudo docker compose -f portainer-agent-ljfcloud-compose-resolved.yml up -d                    
+
+      - name: Authenticate to main Portainer on Pi
+        id: auth
+        run: |
+          RESPONSE=$(curl -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "Username":"${{ vars.APP_USER }}", 
+                 "Password":"${{ secrets.APP_PASSWORD }}"
+                }')
+          TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Register ljfcloud agent in Portainer
+        run: |
+          curl -s -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -F "Name=ljfcloud-server" \
+            -F "EndpointCreationType=2" \
+            -F "URL=tcp://${{ vars.LJFCLOUD_IP }}:9001" \
+            -F "TLS=true" \
+            -F "TLSSkipVerify=true" \
+            -F "TLSSkipClientVerify=true" 
+                       
+      - name: Bring down VPN
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show   
+  add_dynamic_ip_updater:
+    runs-on: ubuntu-latest
+    needs: install_docker_and_add_to_portainer
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install WireGuard
+        run: |
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
+          
+      - name: Write WireGuard config
+        run: |
+          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+          
+      - name: Bring up VPN on runner
+        run: |
+          sudo wg-quick up ./wg0.conf
+          sudo wg show  
+
+      - name: Override system DNS resolver on runner
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+          
+      - name: Add host key to known_hosts of runner
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
+
+      - name: Build image on VPS (sparse checkout)
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            cd /tmp
+            rm -rf homelab-setup
+
+            # Sparse checkout - only get dynamic-ip-updater folder
+            git clone --filter=blob:none --sparse https://github.com/liamj-f/homelab-setup.git
+            cd homelab-setup
+            git sparse-checkout set dynamic-ip-updater
+            git checkout ${{ github.ref_name }}
+
+            # Build
+            cd dynamic-ip-updater
+            sudo docker build -t ip-security-list-updater:latest .
+
+            echo "✓ Image built successfully"
+
+      - name: Authenticate to Portainer
+        id: auth
+        run: |
+          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/auth" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "Username":"${{ vars.APP_USER }}",
+                 "Password":"${{ secrets.APP_PASSWORD }}"
+                 }')
+          TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Get Stack ID (if exists)
+        id: get_stack_id
+        run: |
+          STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
+
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="dynamic-ip-updater") | .Id')
+          
+          if [ -z "$STACK_ID" ]; then
+            echo "Stack not found."
+            echo "stack_id=0" >> $GITHUB_OUTPUT
+          else
+            echo "Stack found with ID: $STACK_ID"
+            echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get Portainer EndpointId
+        id: endpoint
+        run: |
+          RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="ljfcloud-server") | .Id')
+          echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
+
+      - name: Create Stack from GitHub
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
+        run: |
+          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+
+          echo "Creating stack from GitHub..."
+          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "Name": "dynamic-ip-updater",
+               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
+               "RepositoryReferenceName": "${{ github.ref }}",
+               "ComposeFile": "dynamic-ip-updater/dynamic-ip-updater-compose.yml",
+               "RepositoryAuthentication": false,
+               "AutoUpdate": {
+                              "forcePullImage": true,
+                              "forceUpdate": true,
+                              "Webhook": "f279d609-cb28-458f-94f3-54129d5bbde7"
+                             },
+               "Env": [
+                       {
+                       "name":"OCI_USER",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
+                       },
+                       {
+                       "name":"OCI_FINGERPRINT",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"
+                       },
+                       {
+                        "name":"OCI_TENANCY",
+                        "value":"${{ vars.OCID_TENANT }}"
+                        },
+                        {
+                        "name":"OCI_KEY_CONTENT_BASE64",
+                        "value":"'"$OCI_KEY_BASE64"'"
+                        },
+                        {
+                        "name":"SECURITY_LIST_ID",
+                        "value":"${{ vars.OCID_SECURITY_LIST }}"
+                        }
+               ],
+               "Prune": true,
+               "StackFileVersion": "3"
+              }')
+
+            echo "API Response: $RESPONSE"
+            echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
+
+      - name: Update Stack
+        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+        run: |
+          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+          
+          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "PullImage": true,
+               "RepositoryReferenceName": "${{ github.ref }}",
+               "repositoryAuthentication": false,
+               "Env": [
+                       {
+                       "name":"OCI_USER",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
+                       },
+                       {
+                       "name":"OCI_FINGERPRINT",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"
+                       },
+                       {
+                        "name":"OCI_TENANCY",
+                        "value":"${{ vars.OCID_TENANT }}"
+                        },
+                        {
+                        "name":"OCI_KEY_CONTENT_BASE64",
+                        "value":"'"$OCI_KEY_BASE64"'"
+                        },
+                        {
+                        "name":"SECURITY_LIST_ID",
+                        "value":"${{ vars.OCID_SECURITY_LIST }}"
+                        }
+               ],
+               "Prune": true
+              }'
+              
+      - name: Bring down VPN
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show   
+

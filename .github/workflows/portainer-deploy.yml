@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - ljfcloud-server-add
     paths:
       - 'portainer-compose.yml'
       - '.github/workflows/portainer-deploy.yml'
@@ -39,7 +40,7 @@ jobs:
 
       - name: Render Portainer compose
         run: |
-          envsubst < portainer-compose.yml > portainer-compose.rendered.yml
+          envsubst < portainer-compose.yml > portainer-compose-rendered.yml
           
       - name: Copy rendered compose
         uses: appleboy/scp-action@master
@@ -47,7 +48,7 @@ jobs:
           host: ${{ vars.RPI4_IP }}
           username: ${{ vars.RPI4_USER }}
           password: ${{ secrets.RPI4_PASSWORD }}
-          source: portainer-compose.rendered.yml
+          source: portainer-compose-rendered.yml
           target: ~/stacks/portainer/
           overwrite: true
           

@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - main
-      - dhcp-failover
     paths:
       - 'pihole/**'
       - '.github/workflows/pihole-redeploy.yml'
@@ -82,7 +81,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="local") | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub
@@ -227,7 +226,7 @@ jobs:
                               "${{ vars.RPI4_IP }} pihole.14monarch.local",
                               "${{ vars.RPI4_IP }} nginx.14monarch.local",
                               "${{ vars.RPI4_IP }} portainer.14monarch.local",
-                              "${{ vars.RPI4_IP }} nextcloud.14monarch.local",
+                              "${{ vars.E7270_IP }} nextcloud.14monarch.local",
                               "${{ vars.RPI4_IP }} adminer.14monarch.local",
                               "${{ vars.RPI4_IP }} pih0le.14monarch.local"
                               ]
@@ -246,7 +245,8 @@ jobs:
                         "ignoreUnknownClients": false,
                         "hosts": [
                                 "dc:a6:32:c8:bb:41,${{ vars.RPI4_IP }},,infinite",
-                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},,infinite"     
+                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},,infinite",
+                                "84:7b:eb:44:ae:c0,${{ vars.E7270_IP }},,infinite"
                                  ]
                           },
                   "misc": {

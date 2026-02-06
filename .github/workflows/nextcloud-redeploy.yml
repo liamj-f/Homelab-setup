@@ -7,8 +7,10 @@ on:
   push:
     branches:
       - main
+      - e7270-server-add
     paths:
       - 'nextcloud-compose.yml'
+      - '.github/workflows/nextcloud-redeploy.yml'
   workflow_dispatch:
   workflow_call:
 jobs:
@@ -34,14 +36,6 @@ jobs:
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
-          
-      - name: Create Nextcloud DB + User
-        run: |
-          docker exec mysql mysql -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} -e "\
-            CREATE DATABASE IF NOT EXISTS nextcloud; \
-            CREATE USER IF NOT EXISTS 'nextcloud_app'@'%' IDENTIFIED BY '${{ secrets.NEXTCLOUD_APP_PASSWORD }}'; \
-            GRANT ALL PRIVILEGES ON nextcloud.* TO 'nextcloud_app'@'%'; \
-            FLUSH PRIVILEGES;"
             
       - name: Authenticate to Portainer
         id: auth
@@ -67,7 +61,7 @@ jobs:
             echo "Stack not found."
             echo "stack_id=0" >> $GITHUB_OUTPUT
           else
-            echo "Stack found with ID: $STACK_ID"
+            echo "Stack found with ID: $STACK_ID" 
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
 
@@ -76,7 +70,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq '.[0].Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="e7270-server") | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub
@@ -89,7 +83,7 @@ jobs:
           -d '{
                "Name": "nextcloud",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "nextcloud-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
@@ -99,19 +93,19 @@ jobs:
                              },
                "Env": [
                        {
-                       "name":"MYSQL_HOST"
+                       "name":"POSTGRES_HOST",
                        "value":"mysql"
                        },
                        {
-                       "name":"MYSQL_DATABASE"
+                       "name":"POSTGRES_DATABASE",
                        "value":"nextcloud"
                        },
                        {
-                       "name":"MYSQL_USER"
+                       "name":"POSTGRES_USER",
                        "value":"nextcloud_app"
                        },
                        {
-                        "name":"MYSQL_PASSWORD",
+                        "name":"POSTGRES_PASSWORD",
                         "value":"${{ secrets.NEXTCLOUD_APP_PASSWORD }}"
                         },
                        {
@@ -123,7 +117,6 @@ jobs:
                         "value":"${{ secrets.APP_PASSWORD }}"
                        }
                        ],
-               ],
                "Prune": true,
                "StackFileVersion": "3"
               }')
@@ -139,23 +132,23 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{
                "PullImage": true,
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
                "Env": [
                        {
-                       "name":"MYSQL_HOST"
+                       "name":"POSTGRES_HOST",
                        "value":"mysql"
                        },
                        {
-                       "name":"MYSQL_DATABASE"
+                       "name":"POSTGRES_DATABASE",
                        "value":"nextcloud"
                        },
                        {
-                       "name":"MYSQL_USER"
+                       "name":"POSTGRES_USER",
                        "value":"nextcloud_app"
                        },
                        {
-                        "name":"MYSQL_PASSWORD",
+                        "name":"POSTGRES_PASSWORD",
                         "value":"${{ secrets.NEXTCLOUD_APP_PASSWORD }}"
                         },
                        {
@@ -167,22 +160,21 @@ jobs:
                         "value":"${{ secrets.APP_PASSWORD }}"
                        }
                        ],
-               ],
                "Prune": true
               }'          
     
 #      - name: Trigger stack redeploy via webhook
 #        run: |
 #          echo "Triggering stack redeploy via webhook..."
-#          RESPONSE=$(curl -s -w "HTTP %{http_code}" -X POST "http://192.168.0.2:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e")
+#          RESPONSE=$(curl -s -w "HTTP %{http_code}" -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e")
 #          echo "$RESPONSE"
 
       - name: Rescan files in external drive
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
+          host: ${{ vars.E7270_IP }}
+          username: ${{ vars.E7270_USER }}
+          password: ${{ secrets.E7270_PASSWORD }}
           script: |
             docker exec -u www-data nextcloud php occ files:scan --all
       - name: Bring down VPN

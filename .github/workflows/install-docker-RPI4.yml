@@ -52,6 +52,7 @@ jobs:
               $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
             sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
             sudo apt-get update
+            
       - name: Install Docker packages
         uses: appleboy/ssh-action@master
         with:
@@ -71,8 +72,7 @@ jobs:
             sudo mkdir -p /etc/docker
             cat <<EOF | sudo tee /etc/docker/daemon.json
             {
-              "dns": ["192.168.0.2", "192.168.0.3", "1.1.1.1", "1.0.0.1"],
-              "min-api-version": "1.24"
+              "dns": ["192.168.0.2", "192.168.0.3", "1.1.1.1", "1.0.0.1"]
             }
             EOF
 

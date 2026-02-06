@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - dhcp-failover
+      - e7270-server-add
     paths:
       - '.github/workflows/install-failover-pihole.yml'
 jobs:
@@ -132,9 +132,10 @@ jobs:
           host: ${{ vars.RPI0_IP }}
           username: ${{ vars.RPI0_USER }}
           password: ${{ secrets.RPI0_PASSWORD }}
-          script: |                   
-                  python3 /home/${{ vars.RPI0_USER }}/pihole_dhcp_failover_rendered.py --setup
-                            
+          script: |
+                  nohup python3 /home/${{ vars.RPI0_USER }}/pihole_dhcp_failover_rendered.py --setup >> /home/pi/failover.log 2>&1 &
+                  sleep 2
+                  pgrep -f "pihole_dhcp_failover_rendered.py" || echo "Script failed to start"            
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf

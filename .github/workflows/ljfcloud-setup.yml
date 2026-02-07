@@ -180,7 +180,7 @@ jobs:
           host: ${{ vars.LJFCLOUD_IP }}
           username: ${{ vars.LJFCLOUD_USER }}
           key: ${{ secrets.LJFCLOUD_SSH_KEY }}
-          source: portainer-agent-ljfcloud-compose.yml
+          source: portainer-agent-compose.yml
           target: /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer/
 
       - name: Deploy Portainer agent on VPS
@@ -192,8 +192,7 @@ jobs:
           script: |
             set -e
             cd /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer
-            export CERT_DIR="/home/${{ vars.LJFCLOUD_USER }}/portainer-certs"
-            envsubst < portainer-agent-ljfcloud-compose.yml > portainer-agent-ljfcloud-compose-resolved.yml
+            envsubst < portainer-agent-compose.yml > portainer-agent-compose-resolved.yml
             sudo docker compose -f portainer-agent-ljfcloud-compose-resolved.yml up -d                    
 
       - name: Authenticate to main Portainer on Pi

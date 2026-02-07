@@ -427,7 +427,7 @@ jobs:
           STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
 
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="DuckDNS") | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="duckdns") | .Id')
           
           if [ -z "$STACK_ID" ]; then
             echo "Stack not found."
@@ -453,7 +453,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "DuckDNS",
+               "Name": "duckdns",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "duckdns-compose.yml",

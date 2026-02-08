@@ -105,8 +105,7 @@ jobs:
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,
-                              "forceUpdate": true,
-                              "Webhook": "85e9c603-75d0-4e93-969d-dc7641c80d83"
+                              "forceUpdate": true
                              },
                "Env": [
                        {

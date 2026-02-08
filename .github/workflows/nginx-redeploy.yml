@@ -105,21 +105,22 @@ jobs:
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "${{ steps.uuid.outputs.uuid }}"                            
+                              "Webhook": "${{ steps.uuid.outputs.uuid }}"q33                            
                              },
-               "Env": [
-                       {
-                       "name":"INITIAL_ADMIN_EMAIL",
-                       "value":"${{ vars.NGINX_EMAIL }}"
-                       },
-                       {
-                       "name":"INITIAL_ADMIN_PASSWORD",
-                       "value":"${{ secrets.APP_PASSWORD }}"
-                       }
-               ],
+                              "Env": [
+                                    {
+                                    "name":"INITIAL_ADMIN_EMAIL",
+                                    "value":"${{ vars.NGINX_EMAIL }}"
+                                    },
+                                    {
+                                    "name":"INITIAL_ADMIN_PASSWORD",
+                                    "value":"${{ secrets.APP_PASSWORD }}"
+                                    }
+                                   ],
                "Prune": true,
                "StackFileVersion": "3"
-              }')
+              }'
+                    )
 
             echo "API Response: $RESPONSE"
             echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT

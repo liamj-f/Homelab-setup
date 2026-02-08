@@ -7,11 +7,21 @@ on:
       - 'pihole/**'
       - '.github/workflows/pihole-redeploy.yml'
   workflow_dispatch:
-  workflow_call:
     inputs:
-      branch_name:
+      host_machine:
+        required: true
+        type: string 
+      subdomain:
         required: true
         type: string
+  workflow_call:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      subdomain:
+        required: true
+        type: string   
         
 jobs:
   deploy:
@@ -21,8 +31,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install WireGuard
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wireguard
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
           
       - name: Write WireGuard config
         run: |
@@ -60,29 +69,36 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
+      - name: Get Portainer EndpointId
+        id: endpoint
+        run: |
+          RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="${{ inputs.host_machine || 'local' }}") | .Id')
+          echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
+
       - name: Get Stack ID (if exists)
         id: get_stack_id
         run: |
           STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="pihole") | .Id')
+          # Filter by both Name AND EndpointId
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="pihole" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
-          if [ -z "$STACK_ID" ]; then
-            echo "Stack not found."
+          if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
+            echo "Stack not found for this endpoint."
             echo "stack_id=0" >> $GITHUB_OUTPUT
           else
             echo "Stack found with ID: $STACK_ID"
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
 
-      - name: Get Portainer EndpointId
-        id: endpoint
+      - name: Generate UUID
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
+        id: uuid
         run: |
-          RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="local") | .Id')
-          echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
+          echo "::set-output name=uuid::$(uuidgen)"
 
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
@@ -100,7 +116,7 @@ jobs:
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "e56041a2-75f6-4a10-85dc-c69424de631e"
+                              "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
                "Env": [
                        {
@@ -211,7 +227,7 @@ jobs:
                   "dns":{
                       "piholePTR":"Hostname",
                       "domain": {
-                                  "name": "14monarch.local",
+                                  "name": "${{ inputs.subdomain }}.local",
                                   "local": true
                                 },
                       "upstreams": [
@@ -222,13 +238,13 @@ jobs:
                       "listeningMode": "single",
                       "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
                       "hosts":[
-                              "192.168.0.1 tplink.14monarch.local",
-                              "${{ vars.RPI4_IP }} pihole.14monarch.local",
-                              "${{ vars.RPI4_IP }} nginx.14monarch.local",
-                              "${{ vars.RPI4_IP }} portainer.14monarch.local",
-                              "${{ vars.E7270_IP }} nextcloud.14monarch.local",
-                              "${{ vars.RPI4_IP }} adminer.14monarch.local",
-                              "${{ vars.RPI4_IP }} pih0le.14monarch.local"
+                              "192.168.0.1 tplink.${{ inputs.subdomain }}.local",
+                              "${{ vars.RPI4_IP }} pihole.${{ inputs.subdomain }}.local",
+                              "${{ vars.RPI4_IP }} nginx.${{ inputs.subdomain }}.local",
+                              "${{ vars.RPI4_IP }} portainer.${{ inputs.subdomain }}.local",
+                              "${{ vars.E7270_IP }} nextcloud.${{ inputs.subdomain }}.local",
+                              "${{ vars.RPI4_IP }} adminer.${{ inputs.subdomain }}.local",
+                              "${{ vars.RPI4_IP }} pih0le.${{ inputs.subdomain }}.local"
                               ]
                            },                          
                   "dhcp": {

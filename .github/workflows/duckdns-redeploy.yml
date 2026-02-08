@@ -145,8 +145,12 @@ jobs:
                        {
                        "name":"DUCKDNS_TOKEN",
                        "value":"${{ secrets.DUCKDNS_TOKEN }}"
+                        },
+                        {
+                        "name":"SUBDOMAIN",
+                        "value":"${{ inputs.subdomain  || '14monarch'}}"
                         }
-               ],
+                     ],
                "Prune": true
               }'
 

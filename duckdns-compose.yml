@@ -1,0 +1,17 @@
+version: "3"
+services:
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: duckdns
+    network_mode: host # optional, needed for IPv6 detection
+    environment:
+    - PUID=1000 # optional
+    - PGID=1000 # optional
+    - TZ=Etc/UTC # optional
+    - SUBDOMAINS=${SUBDOMAIN} # required, comma separated if multiple
+    - TOKEN=${DUCKDNS_TOKEN} # required
+    - UPDATE_IP=ipv4 # optional: ipv4, ipv6, or both
+    - LOG_FILE=false # optional
+    volumes:
+    - /path/to/duckdns/config:/config # optional
+    restart: unless-stopped

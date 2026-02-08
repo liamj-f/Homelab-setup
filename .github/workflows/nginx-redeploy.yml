@@ -83,6 +83,12 @@ jobs:
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
 
+      - name: Generate UUID
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
+        id: uuid
+        run: |
+          echo "::set-output name=uuid::$(uuidgen)"
+
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
@@ -99,7 +105,7 @@ jobs:
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "e0ac1738-d609-4ef9-9865-2c73be74fbc0"
+                              "Webhook": "${{ steps.uuid.outputs.uuid }}"                            
                              },
                "Env": [
                        {

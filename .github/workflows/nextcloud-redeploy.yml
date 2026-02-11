@@ -84,7 +84,7 @@ jobs:
             echo "Stack not found for this endpoint."
             echo "stack_id=0" >> $GITHUB_OUTPUT
           else
-            echo "Stack found with ID: $STACK_ID"
+            echo "Stack found with ID: $STACK_ID" 
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
           

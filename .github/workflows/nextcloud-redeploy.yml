@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - main
-      - e7270-server-add
+      - fix-e7270 
     paths:
       - 'nextcloud-compose.yml'
       - '.github/workflows/nextcloud-redeploy.yml'
@@ -68,7 +68,8 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="{${{ inputs.host_machine || 'e7270-server'}}}") | .Id')
+          HOST_NAME="${{ inputs.host_machine || 'e7270-server' }}"
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="$HOST_NAME") | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)

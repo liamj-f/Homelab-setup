@@ -200,7 +200,7 @@ jobs:
           username: ${{ vars.E7270_USER }}
           password: ${{ secrets.E7270_PASSWORD }}
           script: |
-            docker exec -u www-data nextcloud php occ files:scan --all
+            sudo docker exec -u www-data nextcloud php occ files:scan --all
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf

@@ -11,8 +11,22 @@ on:
     paths:
       - 'nextcloud-compose.yml'
       - '.github/workflows/nextcloud-redeploy.yml'
-  workflow_dispatch:
   workflow_call:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      subdomain:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      subdomain:
+        required: true
+        type: string   
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -21,8 +35,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Install WireGuard
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wireguard 
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
+
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
@@ -49,29 +63,36 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Get Stack ID (if exists)
-        id: get_stack_id
-        run: |
-          STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "")
-
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="nextcloud") | .Id')
-          
-          if [ -z "$STACK_ID" ]; then
-            echo "Stack not found."
-            echo "stack_id=0" >> $GITHUB_OUTPUT
-          else
-            echo "Stack found with ID: $STACK_ID" 
-            echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
-          fi
-
       - name: Get Portainer EndpointId
         id: endpoint
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="e7270-server") | .Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="{${{ inputs.host_machine || 'e7270-server'}}}") | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
+
+      - name: Get Stack ID (if exists)
+        id: get_stack_id
+        run: |
+          STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
+
+          # Filter by both Name AND EndpointId
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="nextcloud" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          
+          if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
+            echo "Stack not found for this endpoint."
+            echo "stack_id=0" >> $GITHUB_OUTPUT
+          else
+            echo "Stack found with ID: $STACK_ID" 
+            echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Generate UUID
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
+        id: uuid
+        run: |
+          echo "::set-output name=uuid::$(uuidgen)"
 
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
@@ -89,7 +110,7 @@ jobs:
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "5313a6c3-2e45-44e7-ad69-7bfe677e24fe"
+                              "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
                "Env": [
                        {

@@ -10,8 +10,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Install WireGuard
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wireguard
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
+
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
@@ -72,7 +72,7 @@ jobs:
             sudo mkdir -p /etc/docker
             cat <<EOF | sudo tee /etc/docker/daemon.json
             {
-              "dns": ["192.168.0.2", "192.168.0.3", "1.1.1.1", "1.0.0.1"]
+              "dns": ["${{ vars.RPI4_IP }}", "${{ vars.RPI0_IP }}", "1.1.1.1", "1.0.0.1"]
             }
             EOF
 
@@ -92,29 +92,35 @@ jobs:
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show   
+
   deploy_portainer: 
-    uses: liamj-f/homelab-setup/.github/workflows/portainer-deploy.yml@main
+    uses: ./.github/workflows/portainer-deploy.yml
     needs: install_docker
     secrets: inherit
     with:
-      branch_name: ${{ github.ref }}
+      subdomain: 14monarch
+      host_machine: local
+
   deploy_pihole:
-    uses: liamj-f/homelab-setup/.github/workflows/pihole-redeploy.yml@main
+    uses: ./.github/workflows/pihole-redeploy.yml
     needs: deploy_portainer
-    secrets: inherit
+    secrets: inherit   
     with:
-      branch_name: ${{ github.ref }}    
+      subdomain: 14monarch
+      host_machine: local
+
   deploy_nginx:
-    uses: liamj-f/homelab-setup/.github/workflows/nginx-redeploy.yml@main
+    uses: ./.github/workflows/nginx-redeploy.yml
     needs: deploy_portainer
     secrets: inherit
     with:
-      branch_name: ${{ github.ref }}    
-  deploy_mysql:
-    uses: liamj-f/homelab-setup/.github/workflows/mysql-redeploy.yml@main
-    needs: deploy_portainer
+      subdomain: 14monarch
+      host_machine: local
+
+  deploy_duckdns:
+    uses: ./.github/workflows/duckdns-redeploy.yml
+    needs: install_docker
     secrets: inherit
     with:
-      branch_name: ${{ github.ref }}   
-     
- 
+      subdomain: 14monarch
+      host_machine: local

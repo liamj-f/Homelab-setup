@@ -1,11 +1,6 @@
-name: Redeploy MySQL via Portainer GitOps
+
+name: LJF Cloud Setup
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'mysql-compose.yml'
-      - '.github/workflows/mysql-redeploy.yml'
   workflow_call:
     inputs:
       host_machine:
@@ -21,32 +16,65 @@ on:
         type: string 
       subdomain:
         required: true
-        type: string  
-
+        type: string   
+  push:
+    branches:
+      - main
+      - duckdns-add
+    paths:
+      - '.github/workflows/OCI-dynamic-ip-updater.yml'    
 jobs:
-  deploy:
+  add_dynamic_ip_updater:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
-
+          
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
-
-      - name: Bring up VPN
+          
+      - name: Bring up VPN on runner
         run: |
           sudo wg-quick up ./wg0.conf
-          sudo wg show
-          
-      - name: Override system DNS resolver
+          sudo wg show  
+
+      - name: Override system DNS resolver on runner
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
           
+      - name: Add host key to known_hosts of runner
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
+
+      - name: Build image on VPS (sparse checkout)
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            cd /tmp
+            rm -rf homelab-setup
+
+            # Sparse checkout - only get dynamic-ip-updater folder
+            git clone --filter=blob:none --sparse https://github.com/liamj-f/homelab-setup.git
+            cd homelab-setup
+            git sparse-checkout set dynamic-ip-updater
+            git checkout ${{ github.ref_name }}
+
+            # Build
+            cd dynamic-ip-updater
+            sudo docker build -t ip-security-list-updater:latest .
+
+            echo "✓ Image built successfully"
+
       - name: Authenticate to Portainer
         id: auth
         run: |
@@ -64,8 +92,8 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="{${{ inputs.host_machine || 'e7270-server'}}}") | .Id')
-          echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="${{ inputs.host_machine || 'local' }}") | .Id')
+          echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT          
 
       - name: Get Stack ID (if exists)
         id: get_stack_id
@@ -74,7 +102,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="mysql" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="ip-security-list-updater" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
@@ -83,25 +111,27 @@ jobs:
             echo "Stack found with ID: $STACK_ID"
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
-          
+
       - name: Generate UUID
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         id: uuid
         run: |
           echo "::set-output name=uuid::$(uuidgen)"
-      
+
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
+          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+
           echo "Creating stack from GitHub..."
           RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "mysql",
+               "Name": "ip-security-list-updater",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
-               "ComposeFile": "mysql-compose.yml",
+               "RepositoryReferenceName": "${{ github.ref }}",
+               "ComposeFile": "dynamic-ip-updater/dynamic-ip-updater-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,
@@ -110,9 +140,25 @@ jobs:
                              },
                "Env": [
                        {
-                       "name":"MYSQL_ROOT_PASSWORD",
-                       "value":"${{ secrets.MYSQL_ROOT_PASSWORD }}"
-                       }
+                       "name":"OCI_USER",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
+                       },
+                       {
+                       "name":"OCI_FINGERPRINT",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"
+                       },
+                       {
+                        "name":"OCI_TENANCY",
+                        "value":"${{ vars.OCID_TENANT }}"
+                        },
+                        {
+                        "name":"OCI_KEY_CONTENT_BASE64",
+                        "value":"'"$OCI_KEY_BASE64"'"
+                        },
+                        {
+                        "name":"SECURITY_LIST_ID",
+                        "value":"${{ vars.OCID_SECURITY_LIST }}"
+                        }
                ],
                "Prune": true,
                "StackFileVersion": "3"
@@ -124,42 +170,20 @@ jobs:
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
+          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+          
           curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
                "PullImage": true,
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
-               "Env": [
-                       {
-                       "name":"MYSQL_ROOT_PASSWORD",
-                       "value":"${{ secrets.MYSQL_ROOT_PASSWORD }}"
-                       }
-                       ],
                "Prune": true
               }'
-      - name: Deploy new user
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
-          script: |
-            # Wait for MySQL to be ready
-            sudo docker exec mysql sh -c "until mysqladmin ping -uroot --password='${{ secrets.MYSQL_ROOT_PASSWORD }}' --silent; do
-              echo 'Waiting for MySQL to be ready...'
-              sleep 3
-            done"
-            
-            sudo docker exec -i mysql \
-            mysql -uroot --password="${{ secrets.MYSQL_ROOT_PASSWORD }}"  -e " \
-              CREATE USER IF NOT EXISTS '${{ vars.APP_USER }}'@'%' IDENTIFIED BY '${{ secrets.APP_PASSWORD }}'; \
-              GRANT ALL PRIVILEGES ON *.* TO '${{ vars.APP_USER }}'@'%' with grant option; \
-              FLUSH PRIVILEGES;"
               
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show   
-          
+

@@ -1,19 +1,6 @@
-name: Redeploy MySQL via Portainer GitOps
+
+name: DuckDNS redeploy
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'mysql-compose.yml'
-      - '.github/workflows/mysql-redeploy.yml'
-  workflow_call:
-    inputs:
-      host_machine:
-        required: true
-        type: string 
-      subdomain:
-        required: true
-        type: string
   workflow_dispatch:
     inputs:
       host_machine:
@@ -21,32 +8,51 @@ on:
         type: string 
       subdomain:
         required: true
-        type: string  
-
+        type: string
+  workflow_call:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      subdomain:
+        required: true
+        type: string       
+  push:
+    branches:
+      - main
+      - duckdns-add
+    paths:
+      - '.github/workflows/duckdns-redeploy.yml'    
 jobs:
-  deploy:
+  add_DuckDNS_updater:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
-
+          
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
-
-      - name: Bring up VPN
+          
+      - name: Bring up VPN on runner
         run: |
           sudo wg-quick up ./wg0.conf
-          sudo wg show
-          
-      - name: Override system DNS resolver
+          sudo wg show  
+
+      - name: Override system DNS resolver on runner
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
           
+      - name: Add host key to known_hosts of runner
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
+
       - name: Authenticate to Portainer
         id: auth
         run: |
@@ -64,7 +70,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="{${{ inputs.host_machine || 'e7270-server'}}}") | .Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="${{ inputs.host_machine || 'local' }}") | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)
@@ -74,7 +80,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="mysql" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="duckdns" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
@@ -83,13 +89,13 @@ jobs:
             echo "Stack found with ID: $STACK_ID"
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
-          
+
       - name: Generate UUID
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         id: uuid
         run: |
           echo "::set-output name=uuid::$(uuidgen)"
-      
+
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
@@ -98,22 +104,26 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "mysql",
+               "Name": "duckdns",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
-               "ComposeFile": "mysql-compose.yml",
+               "RepositoryReferenceName": "${{ github.ref }}",
+               "ComposeFile": "duckdns-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "${{ steps.uuid.outputs.uuid }}"
+                              "Webhook": "{${{ steps.uuid.outputs.uuid }}}"
                              },
                "Env": [
                        {
-                       "name":"MYSQL_ROOT_PASSWORD",
-                       "value":"${{ secrets.MYSQL_ROOT_PASSWORD }}"
-                       }
-               ],
+                       "name":"DUCKDNS_TOKEN",
+                       "value":"${{ secrets.DUCKDNS_TOKEN }}"
+                        },
+                        {
+                        "name":"SUBDOMAIN",
+                        "value":"${{ inputs.subdomain  || '14monarch'}}"
+                        }
+                     ],
                "Prune": true,
                "StackFileVersion": "3"
               }')
@@ -123,43 +133,28 @@ jobs:
 
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-        run: |
+        run: |          
           curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
                "PullImage": true,
-               "RepositoryReferenceName": "${{ inputs.branch_name }}",
+               "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
                "Env": [
                        {
-                       "name":"MYSQL_ROOT_PASSWORD",
-                       "value":"${{ secrets.MYSQL_ROOT_PASSWORD }}"
-                       }
-                       ],
+                       "name":"DUCKDNS_TOKEN",
+                       "value":"${{ secrets.DUCKDNS_TOKEN }}"
+                        },
+                        {
+                        "name":"SUBDOMAIN",
+                        "value":"${{ inputs.subdomain  || '14monarch'}}"
+                        }
+                     ],
                "Prune": true
               }'
-      - name: Deploy new user
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
-          script: |
-            # Wait for MySQL to be ready
-            sudo docker exec mysql sh -c "until mysqladmin ping -uroot --password='${{ secrets.MYSQL_ROOT_PASSWORD }}' --silent; do
-              echo 'Waiting for MySQL to be ready...'
-              sleep 3
-            done"
-            
-            sudo docker exec -i mysql \
-            mysql -uroot --password="${{ secrets.MYSQL_ROOT_PASSWORD }}"  -e " \
-              CREATE USER IF NOT EXISTS '${{ vars.APP_USER }}'@'%' IDENTIFIED BY '${{ secrets.APP_PASSWORD }}'; \
-              GRANT ALL PRIVILEGES ON *.* TO '${{ vars.APP_USER }}'@'%' with grant option; \
-              FLUSH PRIVILEGES;"
-              
+
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show   
-          

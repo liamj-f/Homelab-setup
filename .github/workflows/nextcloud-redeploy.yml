@@ -118,7 +118,7 @@ jobs:
                "Env": [
                        {
                        "name":"POSTGRES_HOST",
-                       "value":"mysql"
+                       "value":"postgres"
                        },
                        {
                        "name":"POSTGRES_DATABASE",
@@ -161,7 +161,7 @@ jobs:
                "Env": [
                        {
                        "name":"POSTGRES_HOST",
-                       "value":"mysql"
+                       "value":"postgres"
                        },
                        {
                        "name":"POSTGRES_DATABASE",

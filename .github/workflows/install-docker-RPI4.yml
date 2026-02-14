@@ -72,7 +72,7 @@ jobs:
             sudo mkdir -p /etc/docker
             cat <<EOF | sudo tee /etc/docker/daemon.json
             {
-              "dns": ["${{ vars.RPI4_IP }}", "${{ vars.RPI0_IP }}", "1.1.1.1", "1.0.0.1"]
+              "dns": ["1.1.1.1", "1.0.0.1","${{ vars.RPI4_IP }}", "${{ vars.RPI0_IP }}"]
             }
             EOF
 

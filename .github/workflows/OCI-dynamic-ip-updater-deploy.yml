@@ -6,7 +6,7 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string
   workflow_dispatch:
@@ -14,7 +14,7 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string   
   push:

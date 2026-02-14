@@ -6,7 +6,7 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string
   workflow_call:
@@ -14,7 +14,7 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string       
   push:
@@ -52,6 +52,12 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
+
+      - name: Extract Subdomain
+        id: subdomain
+        run: |
+          SUBDOMAIN=$(echo "${{ inputs.domain || '14monarch' }}" | cut -d'.' -f1)
+          echo "subdomain=$SUBDOMAIN" >> $GITHUB_OUTPUT
 
       - name: Authenticate to Portainer
         id: auth
@@ -121,7 +127,7 @@ jobs:
                         },
                         {
                         "name":"SUBDOMAIN",
-                        "value":"${{ inputs.subdomain  || '14monarch'}}"
+                        "value":"${{ steps.subdomain.outputs.subdomain}}"
                         }
                      ],
                "Prune": true,
@@ -148,7 +154,7 @@ jobs:
                         },
                         {
                         "name":"SUBDOMAIN",
-                        "value":"${{ inputs.subdomain  || '14monarch'}}"
+                        "value":"${{ steps.subdomain.outputs.subdomain}}"
                         }
                      ],
                "Prune": true

@@ -98,7 +98,7 @@ jobs:
     needs: install_docker
     secrets: inherit
     with:
-      subdomain: 14monarch
+      domain: 14monarch.duckdns.org
       host_machine: local
 
   deploy_pihole:
@@ -106,7 +106,7 @@ jobs:
     needs: deploy_portainer
     secrets: inherit   
     with:
-      subdomain: 14monarch
+      domain: 14monarch.duckdns.org
       host_machine: local
 
   deploy_nginx:
@@ -114,7 +114,7 @@ jobs:
     needs: deploy_portainer
     secrets: inherit
     with:
-      subdomain: 14monarch
+      domain: 14monarch.duckdns.org
       host_machine: local
 
   deploy_duckdns:
@@ -122,5 +122,5 @@ jobs:
     needs: install_docker
     secrets: inherit
     with:
-      subdomain: 14monarch
+      domain: 14monarch.duckdns.org
       host_machine: local

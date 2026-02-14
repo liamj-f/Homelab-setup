@@ -11,7 +11,7 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string
   workflow_call:
@@ -19,7 +19,7 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string   
         
@@ -227,7 +227,7 @@ jobs:
                   "dns":{
                       "piholePTR":"Hostname",
                       "domain": {
-                                  "name": "${{ inputs.subdomain }}.local",
+                                  "name": "${{ inputs.domain }}",
                                   "local": true
                                 },
                       "upstreams": [
@@ -238,13 +238,13 @@ jobs:
                       "listeningMode": "single",
                       "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
                       "hosts":[
-                              "192.168.0.1 tplink.${{ inputs.subdomain }}.local",
-                              "${{ vars.RPI4_IP }} pihole.${{ inputs.subdomain }}.local",
-                              "${{ vars.RPI4_IP }} nginx.${{ inputs.subdomain }}.local",
-                              "${{ vars.RPI4_IP }} portainer.${{ inputs.subdomain }}.local",
-                              "${{ vars.E7270_IP }} nextcloud.${{ inputs.subdomain }}.local",
-                              "${{ vars.RPI4_IP }} adminer.${{ inputs.subdomain }}.local",
-                              "${{ vars.RPI4_IP }} pih0le.${{ inputs.subdomain }}.local"
+                              "192.168.0.1 tplink.${{ inputs.domain }}",
+                              "${{ vars.RPI4_IP }} pihole.${{ inputs.domain }}",
+                              "${{ vars.RPI4_IP }} nginx.${{ inputs.domain }}",
+                              "${{ vars.RPI4_IP }} portainer.${{ inputs.domain }}",
+                              "${{ vars.E7270_IP }} nextcloud.${{ inputs.domain }}",
+                              "${{ vars.RPI4_IP }} adminer.${{ inputs.domain }}",
+                              "${{ vars.RPI4_IP }} pih0le.${{ inputs.domain }}"
                               ]
                            },                          
                   "dhcp": {
@@ -262,7 +262,7 @@ jobs:
                         "hosts": [
                                 "dc:a6:32:c8:bb:41,${{ vars.RPI4_IP }},,infinite",
                                 "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},,infinite",
-                                "84:7b:eb:44:ae:c0,${{ vars.E7270_IP }},,infinite"
+                                "3c:6a:a7:87:f4:0b,${{ vars.E7270_IP }},,infinite"
                                  ]
                           },
                   "misc": {

@@ -218,6 +218,8 @@ jobs:
             -F "TLSSkipVerify=true" \
             -F "TLSSkipClientVerify=true" 
                        
+
+            
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf
@@ -229,12 +231,12 @@ jobs:
     secrets: inherit
     with:
       host_machine: ljfcloud-server
-      subdomain: ljfcloud
+      domain: ljfcloud.duckdns.org
       
   deploy_duckdns:
     uses: ./.github/workflows/duckdns-redeploy.yml
     needs: install_docker_and_add_to_portainer
     secrets: inherit
     with:
-      subdomain: ljfcloud
+      domain: ljfcloud.duckdns.org
       host_machine: ljfcloud-server

@@ -23,6 +23,7 @@ on:
       - duckdns-add
     paths:
       - '.github/workflows/duckdns-redeploy.yml'    
+    
 jobs:
   add_DuckDNS_updater:
     runs-on: ubuntu-latest
@@ -76,7 +77,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="${{ inputs.host_machine || 'local' }}") | .Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="${{ inputs.host_machine }}") | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)

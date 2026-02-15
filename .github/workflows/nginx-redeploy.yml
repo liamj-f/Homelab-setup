@@ -106,7 +106,7 @@ jobs:
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "${{ steps.uuid.outputs.uuid }}"q33                            
+                              "Webhook": "${{ steps.uuid.outputs.uuid }}"                           
                              },
                               "Env": [
                                     {

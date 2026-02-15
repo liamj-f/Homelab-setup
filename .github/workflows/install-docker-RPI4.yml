@@ -2,6 +2,21 @@ name: Install Docker on RPI4
 
 on:
   workflow_dispatch:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string  
+  workflow_call:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string
 jobs:
   install_docker:
     runs-on: ubuntu-latest
@@ -98,29 +113,29 @@ jobs:
     needs: install_docker
     secrets: inherit
     with:
-      domain: 14monarch.duckdns.org
-      host_machine: local
+      domain: ${{ inputs.domain }}
+      host_machine: ${{ inputs.host_machine }}
 
   deploy_pihole:
     uses: ./.github/workflows/pihole-redeploy.yml
     needs: deploy_portainer
     secrets: inherit   
     with:
-      domain: 14monarch.duckdns.org
-      host_machine: local
+      domain: ${{ inputs.domain }}
+      host_machine: ${{ inputs.host_machine }}
 
   deploy_nginx:
     uses: ./.github/workflows/nginx-redeploy.yml
     needs: deploy_portainer
     secrets: inherit
     with:
-      domain: 14monarch.duckdns.org
-      host_machine: local
-
+      domain: ${{ inputs.domain }}
+      host_machine: ${{ inputs.host_machine }}
+      
   deploy_duckdns:
     uses: ./.github/workflows/duckdns-redeploy.yml
     needs: install_docker
     secrets: inherit
     with:
-      domain: 14monarch.duckdns.org
-      host_machine: local
+      domain: ${{ inputs.domain }}
+      host_machine: ${{ inputs.host_machine }}

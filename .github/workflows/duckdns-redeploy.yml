@@ -1,5 +1,5 @@
 
-name: DuckDNS redeploy
+name: Redeploy DuckDNS via Portainer GitOps 
 on:
   workflow_dispatch:
     inputs:

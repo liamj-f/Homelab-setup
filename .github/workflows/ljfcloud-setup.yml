@@ -2,6 +2,21 @@
 name: LJF Cloud Setup
 on:
   workflow_dispatch:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string  
+  workflow_call:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string
   push:
     branches:
       - main
@@ -207,16 +222,20 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Register ljfcloud agent in Portainer
+      - name: Add Agent to Portainer
         run: |
-          curl -s -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -F "Name=ljfcloud-server" \
-            -F "EndpointCreationType=2" \
-            -F "URL=tcp://${{ vars.LJFCLOUD_IP }}:9001" \
-            -F "TLS=true" \
-            -F "TLSSkipVerify=true" \
-            -F "TLSSkipClientVerify=true" 
+            -H "Content-Type: application/json" \
+            -d '{
+              "Name": "${{ inputs.host_machine }},
+              "EndpointCreationType": 2,
+              "URL": tcp://"${{ vars.LJFCLOUD_IP }}:9001",
+              "TLS": true,
+              "TLSSkipVerify": true,
+              "TLSSkipClientVerify": true
+            }')
+            echo "$RESPONSE"
                        
 
             
@@ -230,13 +249,13 @@ jobs:
     needs: install_docker_and_add_to_portainer
     secrets: inherit
     with:
-      host_machine: ljfcloud-server
-      domain: ljfcloud.duckdns.org
+      host_machine: ${{ inputs.host_machine }}
+      domain: ${{ inputs.domain }}
       
   deploy_duckdns:
     uses: ./.github/workflows/duckdns-redeploy.yml
     needs: install_docker_and_add_to_portainer
     secrets: inherit
     with:
-      domain: ljfcloud.duckdns.org
-      host_machine: ljfcloud-server
+      domain: ${{ inputs.domain }}
+      host_machine: ${{ inputs.host_machine }}

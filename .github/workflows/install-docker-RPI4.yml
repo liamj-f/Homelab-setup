@@ -131,10 +131,10 @@ jobs:
     with:
       domain: ${{ inputs.domain }}
       host_machine: ${{ inputs.host_machine }}
-      
+
   deploy_duckdns:
     uses: ./.github/workflows/duckdns-redeploy.yml
-    needs: install_docker
+    needs: deploy_portainer
     secrets: inherit
     with:
       domain: ${{ inputs.domain }}

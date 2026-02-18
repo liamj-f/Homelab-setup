@@ -142,7 +142,7 @@ jobs:
           username: ${{ vars.E7270_USER }}
           password: ${{ secrets.E7270_PASSWORD }}
           source: portainer-agent-compose-rendered.yml
-          target: /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer/
+          target: /home/${{ vars.E7270_USER }}/stacks/portainer/
           overwrite: true
           
       - name: Deploy Portainer agent on E7270

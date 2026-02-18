@@ -1,5 +1,5 @@
 
-name: LJF Cloud Setup
+name: Install Docker on LJFCloud
 on:
   workflow_dispatch:
     inputs:

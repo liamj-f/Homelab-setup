@@ -114,7 +114,7 @@ jobs:
             sudo mkdir -p /etc/docker
             cat <<EOF | sudo tee /etc/docker/daemon.json
             {
-              "dns": ["192.168.0.2", "192.168.0.3", "1.1.1.1", "1.0.0.1"]
+              "dns": ["1.1.1.1", "1.0.0.1","192.168.0.2", "192.168.0.3"]
             }
             EOF
 
@@ -135,26 +135,37 @@ jobs:
         run: |
           envsubst < portainer-agent-compose.yml > portainer-agent-compose-rendered.yml
 
-      - name: Copy rendered compose
+      - name: Copy rendered compose file from runner to E7270
         uses: appleboy/scp-action@master
         with:
           host: ${{ vars.E7270_IP }}
           username: ${{ vars.E7270_USER }}
           password: ${{ secrets.E7270_PASSWORD }}
           source: portainer-agent-compose-rendered.yml
-          target: ~/stacks/portainer/
+          target: /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer/
           overwrite: true
           
-      - name: Deploy via SSH
+      - name: Deploy Portainer agent on E7270
         id: deploy_portainer
         uses: appleboy/ssh-action@master
         with:
           host: ${{ vars.E7270_IP }}
           username: ${{ vars.E7270_USER }}
-          password: ${{ secrets.E7270_PASSWORD }}
+          password: ${{ secrets.E7270_PASSWORD }}    
           script: |
-            cd ~/stacks/portainer
-            sudo docker compose -f portainer-agent-compose-rendered.yml up -d
+             set -e
+             cd /home/${{ vars.E7270_USER }}/stacks/portainer
+
+             # Check if container is already running
+             RUNNING=$(sudo docker inspect -f '{{.State.Running}}' portainer_agent 2>/dev/null || echo "false")
+
+             if [ "$RUNNING" = "true" ]; then
+               echo "portainer_agent is already running. Skipping deploy."
+               exit 0
+             fi
+
+             echo "Deploying Portainer agent..."
+             sudo docker compose -f portainer-agent-compose-rendered.yml up -d
 
       - name: Authenticate to main Portainer
         id: auth

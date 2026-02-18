@@ -26,6 +26,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -64,7 +67,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="${{ inputs.host_machine }}") | .Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name==$host_machine") | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)
@@ -173,7 +176,7 @@ jobs:
 #            -d '{
 #                "provider": "letsencrypt",
 #                "nice_name": "Wildcard Cert",
-#                "domain_names": ["*.${{ inputs.domain }}", "${{ inputs.domain}}"],
+#                "domain_names": ["*.$domain", "$domain"],
 #                "meta": {
 #                  "letsencrypt_email": "${{ vars.NGINX_EMAIL}}",
 #                  "letsencrypt_agree": true,
@@ -189,13 +192,13 @@ jobs:
       - name: Create Proxy Hosts
         run: |
           declare -A hosts
-          hosts["tplink.${{ inputs.domain }}"]="192.168.0.1:80"
-          hosts["nginx.${{ inputs.domain }}"]="${{ vars.RPI4_IP }}:81"
-          hosts["pihole.${{ inputs.domain }}"]="${{ vars.RPI4_IP }}:82"
-          hosts["portainer.${{ inputs.domain }}"]="${{ vars.RPI4_IP }}:83"
-          hosts["adminer.${{ inputs.domain }}"]="${{ vars.RPI4_IP }}:84"
-          hosts["nextcloud.${{ inputs.domain }}"]="${{ vars.E7270_IP }}:80"
-          hosts["pih0le.${{ inputs.domain }}"]="${{ vars.RPI0_IP }}:82"
+          hosts["tplink.$domain"]="192.168.0.1:80"
+          hosts["nginx.$domain"]="${{ vars.RPI4_IP }}:81"
+          hosts["pihole.$domain"]="${{ vars.RPI4_IP }}:82"
+          hosts["portainer.$domain"]="${{ vars.RPI4_IP }}:83"
+          hosts["adminer.$domain"]="${{ vars.RPI4_IP }}:84"
+          hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:80"
+          hosts["pih0le.$domain"]="${{ vars.RPI0_IP }}:82"
           
           for domain in "${!hosts[@]}"; do
             host="${hosts[$domain]}"

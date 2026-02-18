@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - fix-e7270
     paths:
       - 'mysql-compose.yml'
       - '.github/workflows/mysql-redeploy.yml'
@@ -26,6 +27,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      subdomain: ${{ inputs.subdomain || '14monarch.local' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -64,7 +68,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="{${{ inputs.host_machine || 'e7270-server'}}}") | .Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="$host_machine") | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)

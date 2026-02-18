@@ -27,6 +27,9 @@ on:
 jobs:
   install_docker_and_add_to_portainer:
     runs-on: ubuntu-latest
+    env:
+      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -185,7 +188,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "Name": "${{ inputs.host_machine }},
+              "Name": "$host_machine",
               "EndpointCreationType": 2,
               "URL": tcp://"${{ vars.E7270_IP }}:9001",
               "TLS": true,
@@ -215,5 +218,5 @@ jobs:
     needs: install_docker_and_add_to_portainer
     secrets: inherit
     with:
-      domain: ${{ inputs.domain || '14monarch.local'}}
-      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+      host_machine: $host_machine
+      domain: $domain

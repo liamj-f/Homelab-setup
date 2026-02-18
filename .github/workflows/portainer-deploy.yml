@@ -26,6 +26,9 @@ on:
 jobs:
   Deploy_Portainer_Container:
     runs-on: ubuntu-latest
+    env:
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -134,7 +137,7 @@ jobs:
             echo "No Docker endpoint found. Creating..."
             curl -s -X POST http://${{ vars.RPI4_IP }}:83/api/endpoints \
               -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-              -F "Name=${{ inputs.host_machine }}" \
+              -F "Name=$host_machine" \
               -F "EndpointCreationType=1" \
               -F "ContainerEngine=docker"
           else

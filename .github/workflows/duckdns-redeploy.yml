@@ -27,6 +27,9 @@ on:
 jobs:
   add_DuckDNS_updater:
     runs-on: ubuntu-latest
+    env:
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -57,7 +60,7 @@ jobs:
       - name: Extract Subdomain
         id: subdomain
         run: |
-          SUBDOMAIN=$(echo "${{ inputs.domain || '14monarch' }}" | cut -d'.' -f1)
+          SUBDOMAIN=$(echo "$domain" | cut -d'.' -f1)
           echo "subdomain=$SUBDOMAIN" >> $GITHUB_OUTPUT
 
       - name: Authenticate to Portainer
@@ -77,7 +80,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="${{ inputs.host_machine }}") | .Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name==$host_machine) | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)

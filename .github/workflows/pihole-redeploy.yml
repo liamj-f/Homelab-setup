@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - fix-e7270
     paths:
       - 'pihole/**'
       - '.github/workflows/pihole-redeploy.yml'
@@ -26,6 +27,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      domain: $domain
+      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -74,7 +78,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="${{ inputs.host_machine }}") | .Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name==$host_machine) | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)
@@ -227,7 +231,7 @@ jobs:
                   "dns":{
                       "piholePTR":"Hostname",
                       "domain": {
-                                  "name": "${{ inputs.domain }}",
+                                  "name": "$domain",
                                   "local": true
                                 },
                       "upstreams": [
@@ -238,13 +242,13 @@ jobs:
                       "listeningMode": "single",
                       "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
                       "hosts":[
-                              "192.168.0.1 tplink.${{ inputs.domain }}",
-                              "${{ vars.RPI4_IP }} pihole.${{ inputs.domain }}",
-                              "${{ vars.RPI4_IP }} nginx.${{ inputs.domain }}",
-                              "${{ vars.RPI4_IP }} portainer.${{ inputs.domain }}",
-                              "${{ vars.E7270_IP }} nextcloud.${{ inputs.domain }}",
-                              "${{ vars.RPI4_IP }} adminer.${{ inputs.domain }}",
-                              "${{ vars.RPI4_IP }} pih0le.${{ inputs.domain }}"
+                              "192.168.0.1 tplink.$domain' }}",
+                              "${{ vars.RPI4_IP }} pihole.$domain",
+                              "${{ vars.RPI4_IP }} nginx.$domain",
+                              "${{ vars.RPI4_IP }} portainer.$domain",
+                              "${{ vars.RPI4_IP }} nextcloud.$domain",
+                              "${{ vars.RPI4_IP }} adminer.$domain",
+                              "${{ vars.RPI4_IP }} pih0le.$domain"
                               ]
                            },                          
                   "dhcp": {

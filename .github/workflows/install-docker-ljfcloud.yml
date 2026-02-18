@@ -20,9 +20,9 @@ on:
   push:
     branches:
       - main
-      - duckdns-add
+      - fix-e7270
     paths:
-      - '.github/workflows/ljfcloud-setup.yml'    
+      - '.github/workflows/install-docker-ljfcloud.yml'    
 jobs:
   Update_Security_Lists:
     runs-on: ubuntu-latest

@@ -20,7 +20,7 @@ on:
   push:
     branches:
       - main
-      - e7270-server-add
+      - fix-e7270
     paths:
       - '.github/workflows/install-docker-e7270.yml'  
 

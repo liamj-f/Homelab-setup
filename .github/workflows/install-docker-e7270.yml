@@ -204,5 +204,5 @@ jobs:
     needs: install_docker_and_add_to_portainer
     secrets: inherit
     with:
-      domain: ${{ inputs.domain }}
-      host_machine: ${{ inputs.host_machine }}
+      domain: ${{ inputs.domain || '14monarch.local'}}
+      host_machine: ${{ inputs.host_machine || 'e7270-server' }}

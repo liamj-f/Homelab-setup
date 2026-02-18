@@ -197,7 +197,7 @@ jobs:
           hosts["pihole.$domain"]="${{ vars.RPI4_IP }}:82"
           hosts["portainer.$domain"]="${{ vars.RPI4_IP }}:83"
           hosts["adminer.$domain"]="${{ vars.RPI4_IP }}:84"
-          hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:80"
+          hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:85"
           hosts["pih0le.$domain"]="${{ vars.RPI0_IP }}:82"
           
           for domain in "${!hosts[@]}"; do

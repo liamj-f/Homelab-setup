@@ -76,6 +76,7 @@ jobs:
             for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
               sudo apt remove -y --allow-change-held-packages $pkg || true
             done
+
       - name: Add Docker repository
         uses: appleboy/ssh-action@master
         with:
@@ -218,5 +219,5 @@ jobs:
     needs: install_docker_and_add_to_portainer
     secrets: inherit
     with:
-      host_machine: $host_machine
-      domain: $domain
+      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}

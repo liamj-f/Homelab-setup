@@ -281,13 +281,13 @@ jobs:
     needs: install_docker_and_add_to_portainer
     secrets: inherit
     with:
-      host_machine: $host_machine
-      domain: $domain
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
       
   deploy_duckdns:
     uses: ./.github/workflows/duckdns-redeploy.yml
     needs: install_docker_and_add_to_portainer
     secrets: inherit
     with:
-      host_machine: $host_machine
-      domain: $domain
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}

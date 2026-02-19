@@ -122,29 +122,29 @@ jobs:
     needs: install_docker
     secrets: inherit
     with:
-      host_machine: $host_machine
-      domain: $domain
+      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
 
   deploy_pihole:
     uses: ./.github/workflows/pihole-redeploy.yml
     needs: deploy_portainer
     secrets: inherit   
     with:
-      host_machine: $host_machine
-      domain: $domain
+      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
 
   deploy_nginx:
     uses: ./.github/workflows/nginx-redeploy.yml
     needs: deploy_portainer
     secrets: inherit
     with:
-      host_machine: $host_machine
-      domain: $domain
+      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
 
   deploy_duckdns:
     uses: ./.github/workflows/duckdns-redeploy.yml
     needs: deploy_portainer
     secrets: inherit
     with:
-      host_machine: $host_machine
-      domain: $domain
+      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}

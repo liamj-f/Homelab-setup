@@ -262,7 +262,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "Name": "$host_machine",
+              "Name": $host_machine,
               "EndpointCreationType": 2,
               "URL": tcp://"${{ vars.LJFCLOUD_IP }}:9001",
               "TLS": true,

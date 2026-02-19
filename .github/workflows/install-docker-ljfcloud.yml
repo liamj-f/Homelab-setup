@@ -256,19 +256,16 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Add Agent to Portainer
+      - name: Add E7270 Agent to Portainer
         run: |
-          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+          curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "Name": $host_machine,
-              "EndpointCreationType": 2,
-              "URL": tcp://"${{ vars.LJFCLOUD_IP }}:9001",
-              "TLS": true,
-              "TLSSkipVerify": true,
-              "TLSSkipClientVerify": true
-            }')
+            -F "Name=$host_machine" \
+            -F "EndpointCreationType=2" \
+            -F "URL=tcp://${{ vars.E7270_IP }}:9001" \
+            -F "TLS=true" \
+            -F "TLSSkipVerify=true" \
+            -F "TLSSkipClientVerify=true"
             echo "$RESPONSE"
                        
       - name: Bring down VPN

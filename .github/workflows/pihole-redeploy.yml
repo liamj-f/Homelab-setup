@@ -242,7 +242,7 @@ jobs:
                       "listeningMode": "single",
                       "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
                       "hosts":[
-                              "192.168.0.1 tplink.$domain' }}",
+                              "192.168.0.1 tplink.$domain",
                               "${{ vars.RPI4_IP }} pihole.$domain",
                               "${{ vars.RPI4_IP }} nginx.$domain",
                               "${{ vars.RPI4_IP }} portainer.$domain",

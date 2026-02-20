@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - main
-      - /*
+      - '**'
     paths:
       - 'nextcloud-compose.yml'
       - '.github/workflows/nextcloud-redeploy.yml'

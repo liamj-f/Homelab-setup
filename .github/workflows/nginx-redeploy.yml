@@ -191,6 +191,7 @@ jobs:
                   "dns_provider_credentials": "dns_duckdns_api_token=${{ secrets.DUCKDNS_TOKEN }}"
                 }
               }'
+              )
           TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
           

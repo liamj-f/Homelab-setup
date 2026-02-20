@@ -1,10 +1,34 @@
 name: Install Docker on RPI4
 
 on:
+  push:
+    branches:
+      - main
+      - fix-e7270
+    paths:
+      - '.github/workflows/install-docker-RPI4.yml'
   workflow_dispatch:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string  
+  workflow_call:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string
 jobs:
   install_docker:
     runs-on: ubuntu-latest
+    env:
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -72,7 +96,7 @@ jobs:
             sudo mkdir -p /etc/docker
             cat <<EOF | sudo tee /etc/docker/daemon.json
             {
-              "dns": ["${{ vars.RPI4_IP }}", "${{ vars.RPI0_IP }}", "1.1.1.1", "1.0.0.1"]
+              "dns": ["1.1.1.1", "1.0.0.1","${{ vars.RPI4_IP }}", "${{ vars.RPI0_IP }}"]
             }
             EOF
 
@@ -98,29 +122,29 @@ jobs:
     needs: install_docker
     secrets: inherit
     with:
-      subdomain: 14monarch
-      host_machine: local
+      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
 
   deploy_pihole:
     uses: ./.github/workflows/pihole-redeploy.yml
     needs: deploy_portainer
     secrets: inherit   
     with:
-      subdomain: 14monarch
-      host_machine: local
+      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
 
   deploy_nginx:
     uses: ./.github/workflows/nginx-redeploy.yml
     needs: deploy_portainer
     secrets: inherit
     with:
-      subdomain: 14monarch
-      host_machine: local
+      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
 
   deploy_duckdns:
     uses: ./.github/workflows/duckdns-redeploy.yml
-    needs: install_docker
+    needs: deploy_portainer
     secrets: inherit
     with:
-      subdomain: 14monarch
-      host_machine: local
+      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}

@@ -1,12 +1,12 @@
 
-name: DuckDNS redeploy
+name: Redeploy DuckDNS via Portainer GitOps 
 on:
   workflow_dispatch:
     inputs:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string
   workflow_call:
@@ -14,7 +14,7 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string       
   push:
@@ -23,9 +23,13 @@ on:
       - duckdns-add
     paths:
       - '.github/workflows/duckdns-redeploy.yml'    
+    
 jobs:
   add_DuckDNS_updater:
     runs-on: ubuntu-latest
+    env:
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -53,6 +57,12 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
 
+      - name: Extract Subdomain
+        id: subdomain
+        run: |
+          SUBDOMAIN=$(echo "$domain" | cut -d'.' -f1)
+          echo "subdomain=$SUBDOMAIN" >> $GITHUB_OUTPUT
+
       - name: Authenticate to Portainer
         id: auth
         run: |
@@ -70,7 +80,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="${{ inputs.host_machine || 'local' }}") | .Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)
@@ -121,7 +131,7 @@ jobs:
                         },
                         {
                         "name":"SUBDOMAIN",
-                        "value":"${{ inputs.subdomain  || '14monarch'}}"
+                        "value":"${{ steps.subdomain.outputs.subdomain}}"
                         }
                      ],
                "Prune": true,
@@ -148,7 +158,7 @@ jobs:
                         },
                         {
                         "name":"SUBDOMAIN",
-                        "value":"${{ inputs.subdomain  || '14monarch'}}"
+                        "value":"${{ steps.subdomain.outputs.subdomain}}"
                         }
                      ],
                "Prune": true

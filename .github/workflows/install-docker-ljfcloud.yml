@@ -1,13 +1,28 @@
 
-name: LJF Cloud Setup
+name: Install Docker on LJFCloud
 on:
   workflow_dispatch:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string  
+  workflow_call:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string
   push:
     branches:
       - main
-      - duckdns-add
+      - fix-e7270
     paths:
-      - '.github/workflows/ljfcloud-setup.yml'    
+      - '.github/workflows/install-docker-ljfcloud.yml'    
 jobs:
   Update_Security_Lists:
     runs-on: ubuntu-latest
@@ -101,6 +116,9 @@ jobs:
   install_docker_and_add_to_portainer:
     runs-on: ubuntu-latest
     needs: Update_Security_Lists
+    env:
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -164,6 +182,23 @@ jobs:
           script: |
             sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+      - name: Configure Docker DNS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.E7270_IP }}
+          username: ${{ vars.E7270_USER }}
+          password: ${{ secrets.E7270_PASSWORD }}
+          script: |
+            sudo mkdir -p /etc/docker
+            cat <<EOF | sudo tee /etc/docker/daemon.json
+            {
+              "dns": ["1.1.1.1", "1.0.0.1","192.168.0.2", "192.168.0.3"]
+            }
+            EOF
+
+            sudo systemctl daemon-reload
+            sudo systemctl restart docker
+
       - name: Ensure Docker is running on VPS
         uses: appleboy/ssh-action@master
         with:
@@ -174,14 +209,19 @@ jobs:
             sudo systemctl enable --now docker
             sudo systemctl status docker --no-pager
 
-      - name: Copy compose file from runner to VPS
+      - name: Render Portainer agent compose
+        run: |
+          envsubst < portainer-agent-compose.yml > portainer-agent-compose-rendered.yml
+
+      - name: Copy rendered compose file from runner to VPS
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ vars.LJFCLOUD_IP }}
           username: ${{ vars.LJFCLOUD_USER }}
           key: ${{ secrets.LJFCLOUD_SSH_KEY }}
-          source: portainer-agent-compose.yml
+          source: portainer-agent-compose-rendered.yml
           target: /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer/
+          overwrite: true
 
       - name: Deploy Portainer agent on VPS
         uses: appleboy/ssh-action@master
@@ -192,8 +232,17 @@ jobs:
           script: |
             set -e
             cd /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer
-            envsubst < portainer-agent-compose.yml > portainer-agent-compose-resolved.yml
-            sudo docker compose -f portainer-agent-ljfcloud-compose-resolved.yml up -d                    
+
+            # Check if container is already running
+            RUNNING=$(sudo docker inspect -f '{{.State.Running}}' portainer_agent 2>/dev/null || echo "false")
+
+            if [ "$RUNNING" = "true" ]; then
+              echo "portainer_agent is already running. Skipping deploy."
+              exit 0
+            fi
+
+            echo "Deploying Portainer agent..."
+            sudo docker compose -f portainer-agent-compose-rendered.yml up -d
 
       - name: Authenticate to main Portainer on Pi
         id: auth
@@ -207,16 +256,17 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Register ljfcloud agent in Portainer
+      - name: Add E7270 Agent to Portainer
         run: |
-          curl -s -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+          curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            -F "Name=ljfcloud-server" \
+            -F "Name=$host_machine" \
             -F "EndpointCreationType=2" \
-            -F "URL=tcp://${{ vars.LJFCLOUD_IP }}:9001" \
+            -F "URL=tcp://${{ vars.E7270_IP }}:9001" \
             -F "TLS=true" \
             -F "TLSSkipVerify=true" \
-            -F "TLSSkipClientVerify=true" 
+            -F "TLSSkipClientVerify=true"
+            echo "$RESPONSE"
                        
       - name: Bring down VPN
         run: |
@@ -228,13 +278,13 @@ jobs:
     needs: install_docker_and_add_to_portainer
     secrets: inherit
     with:
-      host_machine: ljfcloud-server
-      subdomain: ljfcloud
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
       
   deploy_duckdns:
     uses: ./.github/workflows/duckdns-redeploy.yml
     needs: install_docker_and_add_to_portainer
     secrets: inherit
     with:
-      subdomain: ljfcloud
-      host_machine: ljfcloud-server
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}

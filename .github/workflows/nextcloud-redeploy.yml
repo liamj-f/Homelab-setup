@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - main
-      - e7270-server-add
+      - fix-e7270 
     paths:
       - 'nextcloud-compose.yml'
       - '.github/workflows/nextcloud-redeploy.yml'
@@ -16,7 +16,7 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string
   workflow_dispatch:
@@ -24,12 +24,15 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string   
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -65,10 +68,13 @@ jobs:
 
       - name: Get Portainer EndpointId
         id: endpoint
+        env:
+          HOST_MACHINE: ${{ inputs.host_machine || 'e7270-server' }}
         run: |
+          echo "Looking for endpoint with name: $HOST_MACHINE"
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="{${{ inputs.host_machine || 'e7270-server'}}}") | .Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)
@@ -115,7 +121,7 @@ jobs:
                "Env": [
                        {
                        "name":"POSTGRES_HOST",
-                       "value":"mysql"
+                       "value":"postgres"
                        },
                        {
                        "name":"POSTGRES_DATABASE",
@@ -158,7 +164,7 @@ jobs:
                "Env": [
                        {
                        "name":"POSTGRES_HOST",
-                       "value":"mysql"
+                       "value":"postgres"
                        },
                        {
                        "name":"POSTGRES_DATABASE",
@@ -197,7 +203,7 @@ jobs:
           username: ${{ vars.E7270_USER }}
           password: ${{ secrets.E7270_PASSWORD }}
           script: |
-            docker exec -u www-data nextcloud php occ files:scan --all
+            sudo docker exec -u www-data nextcloud php occ files:scan --all
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf

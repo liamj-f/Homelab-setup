@@ -165,28 +165,34 @@ jobs:
         
           TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Extract Subdomain for duckdns certificate
+        id: subdomain
+        run: |
+          SUBDOMAIN=$(echo "$domain" | cut -d'.' -f1)
+          echo "subdomain=$SUBDOMAIN" >> $GITHUB_OUTPUT
       
-#      - name: Create Certificate for domain
-#        id: certificate
-#        run: |
-#          sleep 20
-#          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/certificates" \
-#            -H "Content-Type: application/json" \
-#            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-#            -d '{
-#                "provider": "letsencrypt",
-#                "nice_name": "Wildcard Cert",
-#                "domain_names": ["*.$domain", "$domain"],
-#                "meta": {
-#                  "letsencrypt_email": "${{ vars.NGINX_EMAIL}}",
-#                  "letsencrypt_agree": true,
-#                  "dns_challenge": true,
-#                  "dns_provider": "DuckDNS",
-#                  "dns_provider_credentials": "dns_duckdns_api_token=${{ secrets.DUCKDNS_TOKEN }}"
-#                }
-#              }'
-#          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
-#          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+      - name: Create Certificate for domain
+        id: certificate
+        run: |
+          sleep 20
+          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/certificates" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+            -d '{
+                "provider": "letsencrypt",
+                "nice_name": "Wildcard Cert",
+                "domain_names": ["*.$subdomain.duckdns.org", "$subdomain.duckdns.org"],
+                "meta": {
+                  "letsencrypt_email": "${{ vars.NGINX_EMAIL}}",
+                  "letsencrypt_agree": true,
+                  "dns_challenge": true,
+                  "dns_provider": "DuckDNS",
+                  "dns_provider_credentials": "dns_duckdns_api_token=${{ secrets.DUCKDNS_TOKEN }}"
+                }
+              }'
+          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
           
 
       - name: Create Proxy Hosts
@@ -199,6 +205,7 @@ jobs:
           hosts["adminer.$domain"]="${{ vars.RPI4_IP }}:84"
           hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:85"
           hosts["pih0le.$domain"]="${{ vars.RPI0_IP }}:82"
+          hosts["adminer.$domain"]="${{ vars.E7270_IP }}:86"
           
           for domain in "${!hosts[@]}"; do
             host="${hosts[$domain]}"

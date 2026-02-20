@@ -170,6 +170,7 @@ jobs:
         id: subdomain
         run: |
           SUBDOMAIN=$(echo "$domain" | cut -d'.' -f1)
+          echo "DEBUG: subdomain is [$subdomain]"
           echo "subdomain=$SUBDOMAIN" >> $GITHUB_OUTPUT
       
       - name: Create Certificate for domain
@@ -183,8 +184,6 @@ jobs:
             "provider": "letsencrypt",
             "domain_names": ["*.$subdomain.duckdns.org", "$subdomain.duckdns.org"],
             "meta": {
-              "letsencrypt_email": "liamjamesfagg+nginx@gmail.com",
-              "letsencrypt_agree": true,
               "dns_challenge": true,
               "dns_provider": "duckdns",
               "dns_provider_credentials": "dns_duckdns_token=${{ secrets.DUCKDNS_TOKEN }}",

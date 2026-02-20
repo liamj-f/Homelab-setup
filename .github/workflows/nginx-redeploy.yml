@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - fix-e7270
     paths:
       - 'nginx-compose.yml'
       - '.github/workflows/nginx-redeploy.yml'
@@ -11,7 +12,7 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string
   workflow_call:
@@ -19,12 +20,15 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -63,7 +67,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r '.[] | select(.Name=="${{ inputs.host_machine || 'local' }}") | .Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)
@@ -105,7 +109,7 @@ jobs:
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "${{ steps.uuid.outputs.uuid }}"q33                            
+                              "Webhook": "${{ steps.uuid.outputs.uuid }}"                           
                              },
                               "Env": [
                                     {
@@ -161,18 +165,40 @@ jobs:
         
           TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
-            
+      
+#      - name: Create Certificate for domain
+#        id: certificate
+#        run: |
+#          sleep 20
+#          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/certificates" \
+#            -H "Content-Type: application/json" \
+#            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+#            -d '{
+#                "provider": "letsencrypt",
+#                "nice_name": "Wildcard Cert",
+#                "domain_names": ["*.$domain", "$domain"],
+#                "meta": {
+#                  "letsencrypt_email": "${{ vars.NGINX_EMAIL}}",
+#                  "letsencrypt_agree": true,
+#                  "dns_challenge": true,
+#                  "dns_provider": "DuckDNS",
+#                  "dns_provider_credentials": "dns_duckdns_api_token=${{ secrets.DUCKDNS_TOKEN }}"
+#                }
+#              }'
+#          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
+#          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          
+
       - name: Create Proxy Hosts
         run: |
-          TOKEN="${{ steps.token.outputs.token }}"
           declare -A hosts
-          hosts["tplink.${{ inputs.subdomain }}.local"]="192.168.0.1:80"
-          hosts["nginx.${{ inputs.subdomain }}.local"]="${{ vars.RPI4_IP }}:81"
-          hosts["pihole.${{ inputs.subdomain }}.local"]="${{ vars.RPI4_IP }}:82"
-          hosts["portainer.${{ inputs.subdomain }}.local"]="${{ vars.RPI4_IP }}:83"
-          hosts["adminer.${{ inputs.subdomain }}.local"]="${{ vars.RPI4_IP }}:84"
-          hosts["nextcloud.${{ inputs.subdomain }}.local"]="${{ vars.E7270_IP }}:80"
-          hosts["pih0le.${{ inputs.subdomain }}.local"]="${{ vars.RPI0_IP }}:82"
+          hosts["tplink.$domain"]="192.168.0.1:80"
+          hosts["nginx.$domain"]="${{ vars.RPI4_IP }}:81"
+          hosts["pihole.$domain"]="${{ vars.RPI4_IP }}:82"
+          hosts["portainer.$domain"]="${{ vars.RPI4_IP }}:83"
+          hosts["adminer.$domain"]="${{ vars.RPI4_IP }}:84"
+          hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:85"
+          hosts["pih0le.$domain"]="${{ vars.RPI0_IP }}:82"
           
           for domain in "${!hosts[@]}"; do
             host="${hosts[$domain]}"
@@ -180,7 +206,7 @@ jobs:
             host_port="${host##*:}"
 
             curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts" \
-              -H "Authorization: Bearer $TOKEN" \
+              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
               -H "Content-Type: application/json" \
               -d '{
                 "domain_names": ["'"$domain"'"],

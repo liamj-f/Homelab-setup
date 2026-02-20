@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - main
-      - ljfcloud-server-add
+      - fix-e7270
     paths:
       - 'portainer-compose.yml'
       - '.github/workflows/portainer-deploy.yml'
@@ -12,7 +12,7 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string  
   workflow_call:
@@ -20,12 +20,15 @@ on:
       host_machine:
         required: true
         type: string 
-      subdomain:
+      domain:
         required: true
         type: string
 jobs:
   Deploy_Portainer_Container:
     runs-on: ubuntu-latest
+    env:
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -134,7 +137,7 @@ jobs:
             echo "No Docker endpoint found. Creating..."
             curl -s -X POST http://${{ vars.RPI4_IP }}:83/api/endpoints \
               -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-              -F "Name=${{ inputs.host_machine }}" \
+              -F "Name=$host_machine" \
               -F "EndpointCreationType=1" \
               -F "ContainerEngine=docker"
           else

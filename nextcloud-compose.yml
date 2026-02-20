@@ -6,7 +6,7 @@ services:
     container_name: nextcloud
     restart: unless-stopped
     ports:
-      - "80:80"   # Web UI
+      - "85:80"   # Web UI
       - "8443:443"  # HTTPS if you set up TLS
     volumes:
       - /mnt/Nextcloud:/var/www/html/data
@@ -18,18 +18,19 @@ services:
       retries: 5
       start_period: 30s
     environment:
-      - POSTGRES_HOST=postgresql
+      - POSTGRES_HOST=postgres
       - POSTGRES_DB=nextcloud
       - POSTGRES_USER=nextcloud_app
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PASSWORD=${MYSQL_PASSWORD}
       - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
       - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
     networks:
-      - nginx_network
+      - nextcloud_network
     depends_on:
-      - db
-  db:
+      - postgres
+  postgres:
     image: postgres:latest
+    container_name: postgres
     restart: always
     volumes:
       - nextcloud_db_data:/var/lib/postgresql
@@ -37,11 +38,11 @@ services:
       - POSTGRES_DB=nextcloud
       - POSTGRES_USER=nextcloud_app
       - POSTGRES_PASSWORD=${MYSQL_PASSWORD}
-
+    networks:
+       - nextcloud_network
 
 networks:
-  nginx_network:
-    external: true
+  nextcloud_network:     
 
 volumes:
   nextcloud_db_data:

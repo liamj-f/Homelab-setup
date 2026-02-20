@@ -181,18 +181,18 @@ jobs:
           PAYLOAD=$(cat <<EOF
           {
             "provider": "letsencrypt",
-            "nice_name": "DuckDNS Wildcard",
             "domain_names": ["*.$subdomain.duckdns.org", "$subdomain.duckdns.org"],
             "meta": {
               "letsencrypt_email": "liamjamesfagg+nginx@gmail.com",
-              "letsencrypt_agree": true
-            },
-            "dns_challenge": true,
-            "dns_provider": "duckdns",
-            "dns_provider_credentials": "dns_duckdns_token=${{ secrets.DUCKDNS_TOKEN }}"
+              "letsencrypt_agree": true,
+              "dns_challenge": true,
+              "dns_provider": "duckdns",
+              "dns_provider_credentials": "dns_duckdns_token=${{ secrets.DUCKDNS_TOKEN }}",
+              "propagation_seconds": 120
+            }
           }
           EOF
-          )
+          )   
             
           RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/nginx/certificates" \
             -H "Content-Type: application/json" \

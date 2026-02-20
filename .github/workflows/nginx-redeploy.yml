@@ -152,6 +152,13 @@ jobs:
                "Prune": true
               }'               
 
+      - name: Extract Subdomain for duckdns certificate
+        id: subdomain
+        run: |
+          subdomain=$(echo "${domain}" | cut -d'.' -f1)          
+          echo "DEBUG: extracted value is [$subdomain]"
+          echo "subdomain=$subdomain" >> $GITHUB_OUTPUT
+
       - name: Authenticate as nginx user
         id: token
         run: |
@@ -165,20 +172,10 @@ jobs:
         
           TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
-
-      - name: Extract Subdomain for duckdns certificate
-        id: subdomain
-        run: |
-          SUBDOMAIN=$(echo "$domain" | cut -d'.' -f1)
-          echo "DEBUG: subdomain is [$subdomain]"
-          echo "subdomain=$SUBDOMAIN" >> $GITHUB_OUTPUT
       
       - name: Create Certificate for domain
         id: certificate
         run: |
-          # Use double quotes for the JSON body so the shell variable $subdomain expands
-          # We also remove the 'nice_name' from the body if it causes issues (NPM usually ignores it in POST)
-
           PAYLOAD=$(cat <<EOF
           {
             "provider": "letsencrypt",

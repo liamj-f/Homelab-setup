@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       domain: ${{ inputs.domain || '14monarch.local' }}
-      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4

@@ -194,7 +194,6 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
           
-
       - name: Create Proxy Hosts
         run: |
           declare -A hosts

@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - main
-      - fix-e7270
+      - '**'
     paths:
       - 'nginx-compose.yml'
       - '.github/workflows/nginx-redeploy.yml'

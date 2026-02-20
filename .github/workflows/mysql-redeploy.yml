@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - main
-      - fix-e7270
+      - '**'
     paths:
       - 'mysql-compose.yml'
       - '.github/workflows/mysql-redeploy.yml'

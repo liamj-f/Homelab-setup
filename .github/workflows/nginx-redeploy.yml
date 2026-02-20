@@ -192,8 +192,8 @@ jobs:
                 }
               }'
               )
-          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "Certificate API Response: $RESPONSE"
+          CERT_ID=$(echo "$RESPONSE" | jq -r '.Id // empty')
           
       - name: Create Proxy Hosts
         run: |

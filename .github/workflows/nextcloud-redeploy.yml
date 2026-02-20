@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - main
-      - fix-e7270 
+      - /*
     paths:
       - 'nextcloud-compose.yml'
       - '.github/workflows/nextcloud-redeploy.yml'

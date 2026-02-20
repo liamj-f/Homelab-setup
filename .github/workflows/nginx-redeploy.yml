@@ -175,6 +175,8 @@ jobs:
       
       - name: Create Certificate for domain
         id: certificate
+        env:
+          subdomain: ${{ steps.subdomain.outputs.subdomain }}
         run: |
           PAYLOAD=$(cat <<EOF
           {

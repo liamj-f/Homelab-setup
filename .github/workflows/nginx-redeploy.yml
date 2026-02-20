@@ -176,7 +176,7 @@ jobs:
         id: certificate
         run: |
           sleep 20
-          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/certificates" \
+          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/nginx/certificates" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
             -d '{

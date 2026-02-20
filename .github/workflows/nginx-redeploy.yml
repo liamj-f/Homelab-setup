@@ -175,25 +175,39 @@ jobs:
       - name: Create Certificate for domain
         id: certificate
         run: |
-          sleep 20
+          # Use double quotes for the JSON body so the shell variable $subdomain expands
+          # We also remove the 'nice_name' from the body if it causes issues (NPM usually ignores it in POST)
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "provider": "letsencrypt",
+            "domain_names": ["*.$subdomain.duckdns.org", "$subdomain.duckdns.org"],
+            "meta": {
+              "letsencrypt_email": "${{ vars.NGINX_EMAIL }}",
+              "letsencrypt_agree": true,
+              "dns_challenge": true,
+              "dns_provider": "duckdns",
+              "dns_provider_credentials": "dns_duckdns_token=${{ secrets.DUCKDNS_TOKEN }}"
+            }
+          }
+          EOF
+          )
+            
           RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/nginx/certificates" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-            -d '{
-                "provider": "letsencrypt",
-                "nice_name": "Wildcard Cert",
-                "domain_names": ["*.$subdomain.duckdns.org", "$subdomain.duckdns.org"],
-                "meta": {
-                  "letsencrypt_email": "${{ vars.NGINX_EMAIL}}",
-                  "letsencrypt_agree": true,
-                  "dns_challenge": true,
-                  "dns_provider": "DuckDNS",
-                  "dns_provider_credentials": "dns_duckdns_api_token=${{ secrets.DUCKDNS_TOKEN }}"
-                }
-              }'
-              )
+            -d "$PAYLOAD")
+            
           echo "Certificate API Response: $RESPONSE"
-          CERT_ID=$(echo "$RESPONSE" | jq -r '.Id // empty')
+            
+          # Check for error before proceeding
+          if echo "$RESPONSE" | grep -q "error"; then
+            echo "Failed to create certificate"
+            exit 1
+          fi
+            
+          CERT_ID=$(echo "$RESPONSE" | jq -r '.id // empty')
+          echo "cert_id=$CERT_ID" >> $GITHUB_OUTPUT
           
       - name: Create Proxy Hosts
         run: |

@@ -211,7 +211,6 @@ jobs:
       - name: Add DNS records to Pihole via API
         # should add wg0 back in as interface here "eth0,wg0
         run: |
-
           cat <<EOF > pihole_config.json
           {
               "config":{
@@ -268,7 +267,7 @@ jobs:
                     }
                 }
           EOF
-                                    "
+                                    
           curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \

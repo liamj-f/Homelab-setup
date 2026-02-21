@@ -206,7 +206,7 @@ jobs:
           fi
             
           CERT_ID=$(echo "$RESPONSE" | jq -r '.id // empty')
-          echo "cert_id=$CERT_ID" >> $GITHUB_OUTPUT
+          echo "cert_id=$CERT_ID" >> $GITHUB_ENV
           
       - name: Create Proxy Hosts
         run: |
@@ -252,17 +252,22 @@ jobs:
             host="${hosts[$domain]}"
             host_ip="${host%%:*}"
             host_port="${host##*:}"
-
-            body = "{
-                "domain_names": ["'"$domain"'"],
-                "forward_host": "'"$host_ip"'",
-                "forward_port": '"$host_port"',
-                "forward_scheme": "http",
-                "ssl_forced": true,
-                "enabled": true,
-                "certificate_id": "'"${{ steps.certificate.outputs.cert_id }}"'",
-                "block_exploits": true
-              }"
+            BODY=$(jq -n \
+                          --arg domain "$domain" \
+                          --arg host_ip "$host_ip" \
+                          --argjson host_port "$host_port" \
+                          --argjson cert "$CERT_ID" \
+                          '{
+                            domain_names: [$domain],
+                            forward_host: $host_ip,
+                            forward_port: $host_port,
+                            forward_scheme: "http",
+                            ssl_forced: true,
+                            enabled: true,
+                            certificate_id: $cert,
+                            block_exploits: true,
+                            meta: { letsencrypt_agree: false, dns_challenge: false }
+                          }')
 
             echo "Attempting to create Proxy Host: $domain"
             

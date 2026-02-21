@@ -267,6 +267,7 @@ jobs:
                           }  
                     }
                 }
+          EOF
                                     "
           curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \

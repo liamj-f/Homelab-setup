@@ -186,22 +186,12 @@ jobs:
                "Prune": true
               }'    
               
-#      - name: Copy config into dnsmasq volume
-#        uses: appleboy/ssh-action@master
-#        with:
-#          host: ${{ vars.RPI4_IP }}
-#          username: ${{ vars.RPI4_USER }}
-#          password: ${{ secrets.RPI4_PASSWORD }}
-#          script: |
-#            # Copy the config file directly into the volume
-#            sudo cp /home/pi/stacks/pihole/99-pihole-custom.conf /var/lib/docker/volumes/dnsmasq_data/_data/99-custom.conf
-#            sudo docker restart pihole    
-
-#      - name: Trigger stack redeploy via webhook
-#        run: |
-#          echo "Triggering stack redeploy via webhook..."
-#          RESPONSE=$(curl -s -w "HTTP %{http_code}" -X POST "http://192.168.0.2:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e")
-#          echo "$RESPONSE"
+      - name: Extract Subdomain for duckdns certificate
+        id: subdomain
+        run: |
+          subdomain=$(echo "${domain}" | cut -d'.' -f1)          
+          echo "DEBUG: extracted value is [$subdomain]"
+          echo "subdomain=$subdomain" >> $GITHUB_ENV
 
       - name: Pihole Api Auth
         id: pihole_auth
@@ -249,6 +239,12 @@ jobs:
                               "${{ vars.RPI4_IP }} nextcloud.$domain",
                               "${{ vars.RPI4_IP }} adminer.$domain",
                               "${{ vars.RPI4_IP }} pih0le.$domain"
+                              "${{ vars.RPI4_IP }} pihole.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} nginx.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} portainer.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} nextcloud.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} adminer.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} pih0le.$subdomain.duckdns.org"
                               ]
                            },                          
                   "dhcp": {

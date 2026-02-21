@@ -22,7 +22,7 @@ on:
       - main
       - '**'
     paths:
-      - '.github/workflows/OCI-dynamic-ip-updater.yml'  
+      - '.github/workflows/OCI-dynamic-ip-updater-deploy.yml'  
       - 'dynamic-ip-updater/**'  
 jobs:
   add_dynamic_ip_updater:

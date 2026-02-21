@@ -238,7 +238,7 @@ jobs:
                               "${{ vars.RPI4_IP }} portainer.$domain",
                               "${{ vars.RPI4_IP }} nextcloud.$domain",
                               "${{ vars.RPI4_IP }} adminer.$domain",
-                              "${{ vars.RPI4_IP }} pih0le.$domain"
+                              "${{ vars.RPI4_IP }} pih0le.$domain",
                               "${{ vars.RPI4_IP }} pihole.$subdomain.duckdns.org",
                               "${{ vars.RPI4_IP }} nginx.$subdomain.duckdns.org",
                               "${{ vars.RPI4_IP }} portainer.$subdomain.duckdns.org",

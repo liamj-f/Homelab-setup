@@ -253,10 +253,7 @@ jobs:
             host_ip="${host%%:*}"
             host_port="${host##*:}"
 
-            curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts" \
-              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-              -H "Content-Type: application/json" \
-              -d '{
+            body = "{
                 "domain_names": ["'"$domain"'"],
                 "forward_host": "'"$host_ip"'",
                 "forward_port": '"$host_port"',
@@ -265,7 +262,37 @@ jobs:
                 "enabled": true,
                 "certificate_id": "'"${{ steps.certificate.outputs.cert_id }}"'",
                 "block_exploits": true
-              }' | jq
+              }"
+
+            echo "Attempting to create Proxy Host: $domain"
+            
+            RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts" \
+              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+              -H "Content-Type: application/json" \
+              -d "$DATA_JSON")
+
+            # 2. Check if creation failed because the domain exists
+            if echo "$RESPONSE" | grep -qE "already in use|400"; then
+              echo "Domain $domain already exists. Fetching ID to perform UPDATE (PUT) instead..."
+              
+              # Find the ID of the existing host by filtering the list
+              EXISTING_ID=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
+                jq -r ".[] | select(.domain_names[] == \"$domain\") | .id")
+
+              if [ "$EXISTING_ID" != "null" ] && [ -n "$EXISTING_ID" ]; then
+                echo "Updating existing host ID: $EXISTING_ID"
+                curl -s -X PUT "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts/$EXISTING_ID" \
+                  -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                  -H "Content-Type: application/json" \
+                  -d "$DATA_JSON" | jq
+              else
+                echo "Error: Could not find the ID for $domain even though it's 'in use'."
+              fi
+            else
+              echo "Successfully created $domain"
+              echo "$RESPONSE" | jq
+            fi
           done
 
       - name: Bring down VPN

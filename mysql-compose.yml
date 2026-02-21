@@ -23,7 +23,7 @@ services:
       mysql:
         condition: service_healthy
     ports:
-      - "85:8080"
+      - "86:8080"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080"]
 

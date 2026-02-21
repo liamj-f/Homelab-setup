@@ -20,7 +20,7 @@ on:
   push:
     branches:
       - main
-      - duckdns-add
+      - '**'
     paths:
       - '.github/workflows/duckdns-redeploy.yml'    
     

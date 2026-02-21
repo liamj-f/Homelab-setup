@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - fix-e7270
+      - '**'
     paths:
       - '.github/workflows/install-docker-RPI4.yml'
   workflow_dispatch:
@@ -122,7 +122,7 @@ jobs:
     needs: install_docker
     secrets: inherit
     with:
-      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
       domain: ${{ inputs.domain || '14monarch.local' }}
 
   deploy_pihole:
@@ -130,7 +130,7 @@ jobs:
     needs: deploy_portainer
     secrets: inherit   
     with:
-      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
       domain: ${{ inputs.domain || '14monarch.local' }}
 
   deploy_nginx:
@@ -138,7 +138,7 @@ jobs:
     needs: deploy_portainer
     secrets: inherit
     with:
-      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
       domain: ${{ inputs.domain || '14monarch.local' }}
 
   deploy_duckdns:
@@ -146,5 +146,5 @@ jobs:
     needs: deploy_portainer
     secrets: inherit
     with:
-      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
       domain: ${{ inputs.domain || '14monarch.local' }}

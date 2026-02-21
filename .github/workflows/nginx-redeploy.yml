@@ -291,7 +291,7 @@ jobs:
             RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts" \
               -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
               -H "Content-Type: application/json" \
-              -d "$DATA_JSON")
+              -d "$BODY")
 
             # 2. Check if creation failed because the domain exists
             if echo "$RESPONSE" | grep -qE "already in use|400"; then

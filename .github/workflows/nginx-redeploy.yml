@@ -298,6 +298,7 @@ jobs:
               echo "Domain $domain already exists. Fetching ID to perform UPDATE (PUT) instead..."
               
               # Find the ID of the existing host by filtering the list
+              
               EXISTING_ID=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts" \
                 -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
                 jq -r ".[] | select(.domain_names[] == \"$domain\") | .id")
@@ -307,7 +308,7 @@ jobs:
                 curl -s -X PUT "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts/$EXISTING_ID" \
                   -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
                   -H "Content-Type: application/json" \
-                  -d "$DATA_JSON" | jq
+                  -d "$BODY" | jq
               else
                 echo "Error: Could not find the ID for $domain even though it's 'in use'."
               fi

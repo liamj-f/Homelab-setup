@@ -29,6 +29,8 @@ jobs:
     env:
       host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
       domain: ${{ inputs.domain || '14monarch.local' }}
+      subdomain: $(echo "${{ inputs.domain || '14monarch.local' }}" | cut -d'.' -f1)
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -157,7 +159,7 @@ jobs:
         run: |
           subdomain=$(echo "${domain}" | cut -d'.' -f1)          
           echo "DEBUG: extracted value is [$subdomain]"
-          echo "subdomain=$subdomain" >> $GITHUB_OUTPUT
+          echo "subdomain=$subdomain" >> $GITHUB_ENV
 
       - name: Authenticate as nginx user
         id: token
@@ -173,10 +175,8 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
       
-      - name: Create Certificate for domain
+      - name: Create Certificate for duckdns domain
         id: certificate
-        env:
-          subdomain: ${{ steps.subdomain.outputs.subdomain }}
         run: |
           PAYLOAD=$(cat <<EOF
           {
@@ -234,7 +234,38 @@ jobs:
                 "forward_port": '"$host_port"',
                 "forward_scheme": "http",
                 "ssl_forced": false,
-                "enabled": true
+                "enabled": true,
+              }' | jq
+          done
+
+      - name: Create DuckDNS Proxy Hosts
+        run: |
+          declare -A hosts
+          hosts["tplink.$subdomain.duckdns.org"]="192.168.0.1:80"
+          hosts["nginx.$subdomain.duckdns.org"]="${{ vars.RPI4_IP }}:81"
+          hosts["pihole.$subdomain.duckdns.org"]="${{ vars.RPI4_IP }}:82"
+          hosts["portainer.$subdomain.duckdns.org"]="${{ vars.RPI4_IP }}:83"
+          hosts["nextcloud.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:85"
+          hosts["pih0le.$subdomain.duckdns.org"]="${{ vars.RPI0_IP }}:82"
+          hosts["adminer.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:86"
+          
+          for domain in "${!hosts[@]}"; do
+            host="${hosts[$domain]}"
+            host_ip="${host%%:*}"
+            host_port="${host##*:}"
+
+            curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts" \
+              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "domain_names": ["'"$domain"'"],
+                "forward_host": "'"$host_ip"'",
+                "forward_port": '"$host_port"',
+                "forward_scheme": "http",
+                "ssl_forced": false,
+                "enabled": true,
+                "certificate_id": "'"${{ steps.certificate.outputs.cert_id }}"'",
+                "block_exploits": true
               }' | jq
           done
 

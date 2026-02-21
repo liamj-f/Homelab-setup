@@ -256,7 +256,7 @@ jobs:
                           --arg domain "$domain" \
                           --arg host_ip "$host_ip" \
                           --argjson host_port "$host_port" \
-                          --argjson cert "$CERT_ID" \
+                          --argjson cert_id "$cert_id" \
                           '{
                             domain_names: [$domain],
                             forward_host: $host_ip,
@@ -264,7 +264,7 @@ jobs:
                             forward_scheme: "http",
                             ssl_forced: true,
                             enabled: true,
-                            certificate_id: $cert,
+                            certificate_id: $cert_id,
                             block_exploits: true,
                             meta: { letsencrypt_agree: false, dns_challenge: false }
                           }')

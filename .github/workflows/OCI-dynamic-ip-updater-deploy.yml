@@ -1,5 +1,5 @@
 
-name: Deploy OCI Dynamic IP Updater via Portainer GitOps 
+name: Redeploy OCI Dynamic IP Updater via Portainer GitOps 
 on:
   workflow_call:
     inputs:

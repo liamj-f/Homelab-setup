@@ -211,12 +211,9 @@ jobs:
       - name: Add DNS records to Pihole via API
         # should add wg0 back in as interface here "eth0,wg0
         run: |
-          curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \
-          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
-          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-          -H 'accept: application/json' \
-          -H 'content-type: application/json' \
-          -d '{
+
+          cat << EOF > pihole_config.json
+          {
               "config":{
                   "dns":{
                       "piholePTR":"Hostname",
@@ -269,7 +266,16 @@ jobs:
                           "dnsmasq_lines": ["dhcp-option=6,192.168.0.2,192.168.0.3"]
                           }  
                     }
-                }'
+                }
+                                    "
+          curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d "@pihole_config.json"
+
+
       - name: Add Blocklists to Pihole via API
         run: |
           curl -X POST "http://${{ vars.RPI4_IP }}:82/api/lists?type=block" \
@@ -287,6 +293,7 @@ jobs:
               "groups": [0],
               "enabled": true
               }'
+
       - name: Update Gravity via API
         run: |
           curl -X POST "http://${{ vars.RPI4_IP }}:82/api/action/gravity" \

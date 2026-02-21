@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - main
-      - fix-e7270
+      - '**'
     paths:
       - 'nginx-compose.yml'
       - '.github/workflows/nginx-redeploy.yml'
@@ -29,6 +29,8 @@ jobs:
     env:
       host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
       domain: ${{ inputs.domain || '14monarch.local' }}
+      subdomain: $(echo "${{ inputs.domain || '14monarch.local' }}" | cut -d'.' -f1)
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -152,6 +154,13 @@ jobs:
                "Prune": true
               }'               
 
+      - name: Extract Subdomain for duckdns certificate
+        id: subdomain
+        run: |
+          subdomain=$(echo "${domain}" | cut -d'.' -f1)          
+          echo "DEBUG: extracted value is [$subdomain]"
+          echo "subdomain=$subdomain" >> $GITHUB_ENV
+
       - name: Authenticate as nginx user
         id: token
         run: |
@@ -165,30 +174,57 @@ jobs:
         
           TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
-      
-#      - name: Create Certificate for domain
-#        id: certificate
-#        run: |
-#          sleep 20
-#          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/certificates" \
-#            -H "Content-Type: application/json" \
-#            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-#            -d '{
-#                "provider": "letsencrypt",
-#                "nice_name": "Wildcard Cert",
-#                "domain_names": ["*.$domain", "$domain"],
-#                "meta": {
-#                  "letsencrypt_email": "${{ vars.NGINX_EMAIL}}",
-#                  "letsencrypt_agree": true,
-#                  "dns_challenge": true,
-#                  "dns_provider": "DuckDNS",
-#                  "dns_provider_credentials": "dns_duckdns_api_token=${{ secrets.DUCKDNS_TOKEN }}"
-#                }
-#              }'
-#          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
-#          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-          
 
+      - name: Check for Existing DuckDNS Certificate
+        id: check_cert
+        run: |
+          cert_id=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:81/api/nginx/certificates" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
+            jq -r --arg fulldomain "*.$subdomain.duckdns.org" '.[] | select(.domain_names[] == $fulldomain) | .id' | head -n 1)
+
+          if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
+            echo "Found existing cert! ID: $cert_id"
+            echo "cert_id=$cert_id" >> $GITHUB_ENV
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "No matching certificate found."
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create Certificate for duckdns domain
+        id: certificate
+        if: ${{ steps.check_cert.outputs.exists == 'false' }}
+        run: |
+          PAYLOAD=$(cat <<EOF
+          {
+            "provider": "letsencrypt",
+            "domain_names": ["*.$subdomain.duckdns.org", "$subdomain.duckdns.org"],
+            "meta": {
+              "dns_challenge": true,
+              "dns_provider": "duckdns",
+              "dns_provider_credentials": "dns_duckdns_token=${{ secrets.DUCKDNS_TOKEN }}",
+              "propagation_seconds": 120
+            }
+          }
+          EOF
+          )   
+            
+          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/nginx/certificates" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+            -d "$PAYLOAD")
+            
+          echo "Certificate API Response: $RESPONSE"
+            
+          # Check for error before proceeding
+          if echo "$RESPONSE" | grep -q "error"; then
+            echo "Failed to create certificate"
+            exit 1
+          fi
+            
+          cert_id=$(echo "$RESPONSE" | jq -r '.id // empty')
+          echo "cert_id=$cert_id" >> $GITHUB_ENV
+          
       - name: Create Proxy Hosts
         run: |
           declare -A hosts
@@ -196,9 +232,9 @@ jobs:
           hosts["nginx.$domain"]="${{ vars.RPI4_IP }}:81"
           hosts["pihole.$domain"]="${{ vars.RPI4_IP }}:82"
           hosts["portainer.$domain"]="${{ vars.RPI4_IP }}:83"
-          hosts["adminer.$domain"]="${{ vars.RPI4_IP }}:84"
           hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:85"
           hosts["pih0le.$domain"]="${{ vars.RPI0_IP }}:82"
+          hosts["adminer.$domain"]="${{ vars.E7270_IP }}:86"
           
           for domain in "${!hosts[@]}"; do
             host="${hosts[$domain]}"
@@ -214,8 +250,72 @@ jobs:
                 "forward_port": '"$host_port"',
                 "forward_scheme": "http",
                 "ssl_forced": false,
-                "enabled": true
+                "enabled": true,
               }' | jq
+          done
+
+      - name: Create DuckDNS Proxy Hosts
+        run: |
+          declare -A hosts
+          hosts["tplink.$subdomain.duckdns.org"]="192.168.0.1:80"
+          hosts["nginx.$subdomain.duckdns.org"]="${{ vars.RPI4_IP }}:81"
+          hosts["pihole.$subdomain.duckdns.org"]="${{ vars.RPI4_IP }}:82"
+          hosts["portainer.$subdomain.duckdns.org"]="${{ vars.RPI4_IP }}:83"
+          hosts["nextcloud.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:85"
+          hosts["pih0le.$subdomain.duckdns.org"]="${{ vars.RPI0_IP }}:82"
+          hosts["adminer.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:86"
+          
+          for domain in "${!hosts[@]}"; do
+            host="${hosts[$domain]}"
+            host_ip="${host%%:*}"
+            host_port="${host##*:}"
+            BODY=$(jq -n \
+                          --arg domain "$domain" \
+                          --arg host_ip "$host_ip" \
+                          --argjson host_port "$host_port" \
+                          --argjson cert_id "$cert_id" \
+                          '{
+                            domain_names: [$domain],
+                            forward_host: $host_ip,
+                            forward_port: $host_port,
+                            forward_scheme: "http",
+                            ssl_forced: true,
+                            enabled: true,
+                            certificate_id: $cert_id,
+                            block_exploits: true,
+                            meta: { letsencrypt_agree: false, dns_challenge: false }
+                          }')
+
+            echo "Attempting to create Proxy Host: $domain"
+            
+            RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts" \
+              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+              -H "Content-Type: application/json" \
+              -d "$BODY")
+
+            # 2. Check if creation failed because the domain exists
+            if echo "$RESPONSE" | grep -qE "already in use|400"; then
+              echo "Domain $domain already exists. Fetching ID to perform UPDATE (PUT) instead..."
+              
+              # Find the ID of the existing host by filtering the list
+              
+              EXISTING_ID=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
+                jq -r ".[] | select(.domain_names[] == \"$domain\") | .id")
+
+              if [ "$EXISTING_ID" != "null" ] && [ -n "$EXISTING_ID" ]; then
+                echo "Updating existing host ID: $EXISTING_ID"
+                curl -s -X PUT "http://${{ vars.RPI4_IP }}:81/api/nginx/proxy-hosts/$EXISTING_ID" \
+                  -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                  -H "Content-Type: application/json" \
+                  -d "$BODY" | jq
+              else
+                echo "Error: Could not find the ID for $domain even though it's 'in use'."
+              fi
+            else
+              echo "Successfully created $domain"
+              echo "$RESPONSE" | jq
+            fi
           done
 
       - name: Bring down VPN

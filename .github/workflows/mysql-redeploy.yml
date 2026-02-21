@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - main
-      - fix-e7270
+      - '**'
     paths:
       - 'mysql-compose.yml'
       - '.github/workflows/mysql-redeploy.yml'
@@ -28,7 +28,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
       subdomain: ${{ inputs.subdomain || '14monarch.local' }}
     steps:
       - name: Checkout repo

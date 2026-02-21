@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - main
-      - fix-e7270
+      - '**'
     paths:
       - 'pihole/**'
       - '.github/workflows/pihole-redeploy.yml'
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       domain: ${{ inputs.domain || '14monarch.local' }}
-      host_machine: ${{ inputs.host_machine || 'RPI4-server' }}
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -186,22 +186,12 @@ jobs:
                "Prune": true
               }'    
               
-#      - name: Copy config into dnsmasq volume
-#        uses: appleboy/ssh-action@master
-#        with:
-#          host: ${{ vars.RPI4_IP }}
-#          username: ${{ vars.RPI4_USER }}
-#          password: ${{ secrets.RPI4_PASSWORD }}
-#          script: |
-#            # Copy the config file directly into the volume
-#            sudo cp /home/pi/stacks/pihole/99-pihole-custom.conf /var/lib/docker/volumes/dnsmasq_data/_data/99-custom.conf
-#            sudo docker restart pihole    
-
-#      - name: Trigger stack redeploy via webhook
-#        run: |
-#          echo "Triggering stack redeploy via webhook..."
-#          RESPONSE=$(curl -s -w "HTTP %{http_code}" -X POST "http://192.168.0.2:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e")
-#          echo "$RESPONSE"
+      - name: Extract Subdomain for duckdns certificate
+        id: subdomain
+        run: |
+          subdomain=$(echo "${domain}" | cut -d'.' -f1)          
+          echo "DEBUG: extracted value is [$subdomain]"
+          echo "subdomain=$subdomain" >> $GITHUB_ENV
 
       - name: Pihole Api Auth
         id: pihole_auth
@@ -221,12 +211,8 @@ jobs:
       - name: Add DNS records to Pihole via API
         # should add wg0 back in as interface here "eth0,wg0
         run: |
-          curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \
-          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
-          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-          -H 'accept: application/json' \
-          -H 'content-type: application/json' \
-          -d '{
+          cat <<EOF > pihole_config.json
+          {
               "config":{
                   "dns":{
                       "piholePTR":"Hostname",
@@ -248,7 +234,13 @@ jobs:
                               "${{ vars.RPI4_IP }} portainer.$domain",
                               "${{ vars.RPI4_IP }} nextcloud.$domain",
                               "${{ vars.RPI4_IP }} adminer.$domain",
-                              "${{ vars.RPI4_IP }} pih0le.$domain"
+                              "${{ vars.RPI4_IP }} pih0le.$domain",
+                              "${{ vars.RPI4_IP }} pihole.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} nginx.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} portainer.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} nextcloud.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} adminer.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} pih0le.$subdomain.duckdns.org"
                               ]
                            },                          
                   "dhcp": {
@@ -273,7 +265,17 @@ jobs:
                           "dnsmasq_lines": ["dhcp-option=6,192.168.0.2,192.168.0.3"]
                           }  
                     }
-                }'
+                }
+          EOF
+                                    
+          curl -X PATCH "http://${{ vars.RPI4_IP }}:82/api/config" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d "@pihole_config.json"
+
+
       - name: Add Blocklists to Pihole via API
         run: |
           curl -X POST "http://${{ vars.RPI4_IP }}:82/api/lists?type=block" \
@@ -291,6 +293,7 @@ jobs:
               "groups": [0],
               "enabled": true
               }'
+
       - name: Update Gravity via API
         run: |
           curl -X POST "http://${{ vars.RPI4_IP }}:82/api/action/gravity" \

@@ -1,5 +1,5 @@
 
-name: Deploy OCI Dynamic IP Updater via Portainer GitOps 
+name: Redeploy OCI Dynamic IP Updater via Portainer GitOps 
 on:
   workflow_call:
     inputs:
@@ -20,9 +20,10 @@ on:
   push:
     branches:
       - main
-      - fix-e7270
+      - '**'
     paths:
-      - '.github/workflows/OCI-dynamic-ip-updater.yml'    
+      - '.github/workflows/OCI-dynamic-ip-updater-deploy.yml'  
+      - 'dynamic-ip-updater/**'  
 jobs:
   add_dynamic_ip_updater:
     runs-on: ubuntu-latest

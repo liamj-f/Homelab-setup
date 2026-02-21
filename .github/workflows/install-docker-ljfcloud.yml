@@ -20,7 +20,7 @@ on:
   push:
     branches:
       - main
-      - fix-e7270
+      - '**'
     paths:
       - '.github/workflows/install-docker-ljfcloud.yml'    
 jobs:

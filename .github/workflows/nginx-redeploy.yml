@@ -215,7 +215,6 @@ jobs:
           hosts["nginx.$domain"]="${{ vars.RPI4_IP }}:81"
           hosts["pihole.$domain"]="${{ vars.RPI4_IP }}:82"
           hosts["portainer.$domain"]="${{ vars.RPI4_IP }}:83"
-          hosts["adminer.$domain"]="${{ vars.RPI4_IP }}:84"
           hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:85"
           hosts["pih0le.$domain"]="${{ vars.RPI0_IP }}:82"
           hosts["adminer.$domain"]="${{ vars.E7270_IP }}:86"
@@ -262,7 +261,7 @@ jobs:
                 "forward_host": "'"$host_ip"'",
                 "forward_port": '"$host_port"',
                 "forward_scheme": "http",
-                "ssl_forced": false,
+                "ssl_forced": true,
                 "enabled": true,
                 "certificate_id": "'"${{ steps.certificate.outputs.cert_id }}"'",
                 "block_exploits": true

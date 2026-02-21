@@ -174,9 +174,26 @@ jobs:
         
           TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Check for Existing DuckDNS Certificate
+        id: check_cert
+        run: |
+          cert_id=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:81/api/nginx/certificates" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
+            jq -r --arg fulldomain "*.$subdomain.duckdns.org" '.[] | select(.domain_names[] == $fulldomain) | .id' | head -n 1)
+
+          if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
+            echo "Found existing cert! ID: $cert_id"
+            echo "cert_id=$cert_id" >> $GITHUB_ENV
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "No matching certificate found."
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
       
       - name: Create Certificate for duckdns domain
         id: certificate
+        if: ${{ steps.check_cert.outputs.exists == 'false' }}
         run: |
           PAYLOAD=$(cat <<EOF
           {
@@ -205,8 +222,8 @@ jobs:
             exit 1
           fi
             
-          CERT_ID=$(echo "$RESPONSE" | jq -r '.id // empty')
-          echo "cert_id=$CERT_ID" >> $GITHUB_ENV
+          cert_id=$(echo "$RESPONSE" | jq -r '.id // empty')
+          echo "cert_id=$cert_id" >> $GITHUB_ENV
           
       - name: Create Proxy Hosts
         run: |

@@ -1,0 +1,247 @@
+name: Redeploy Keepalived, Pihole and Nginx via Portainer GitOps
+
+on:
+  push:
+    branches:
+      - main
+#      - '**'
+    paths:
+      - '.github/workflows/keepalived-deploy.yml'
+      - 'keepalived/**'
+  workflow_dispatch:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string  
+  workflow_call:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    outputs:
+      keepalived_state: ${{ steps.node_config.outputs.keepalived_state }}
+    env:
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set node config
+        id: node_config
+        run: |
+          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
+            echo "keepalived_state=MASTER" >> $GITHUB_OUTPUT
+            echo "keepalived_priority=150" >> $GITHUB_OUTPUT
+            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_password=${{ secrets.RPI4_PASSWORD }}" >> $GITHUB_OUTPUT
+          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
+            echo "keepalived_state=BACKUP" >> $GITHUB_OUTPUT
+            echo "keepalived_priority=100" >> $GITHUB_OUTPUT
+            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_password=${{ secrets.E7270_PASSWORD }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install WireGuard
+        run: |
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
+
+      - name: Write WireGuard config
+        run: |
+          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+
+      - name: Bring up VPN
+        run: |
+          sudo wg-quick up ./wg0.conf
+          sudo wg show
+          
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+
+      - name: Copy files to host
+        uses: appleboy/scp-action@master
+        with:
+            host: ${{ steps.node_config.outputs.ssh_host }}
+            username: ${{ steps.node_config.outputs.ssh_user }}
+            password: ${{ steps.node_config.outputs.ssh_password }}
+            source: "keepalived/state.sh"
+            target: "/opt/keepalived/"
+            
+      - name: Make state script executable and set permissions
+        uses: appleboy/ssh-action@master
+        with:
+            host: ${{ steps.node_config.outputs.ssh_host }}
+            username: ${{ steps.node_config.outputs.ssh_user }}
+            password: ${{ steps.node_config.outputs.ssh_password }}
+            script: chmod +x /opt/keepalived/state.sh          
+
+      - name: Authenticate to Portainer
+        id: auth
+        run: |
+          RESPONSE=$(curl -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "Username":"${{ vars.APP_USER }}", 
+                 "Password":"${{ secrets.APP_PASSWORD }}"
+                }')
+          TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Get Portainer EndpointId
+        id: endpoint
+        env:
+          HOST_MACHINE: ${{ inputs.host_machine || 'rpi4-server' }}
+        run: |
+          echo "Looking for endpoint with name: $HOST_MACHINE"
+          RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')
+          echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
+
+      - name: Get Stack ID (if exists)
+        id: get_stack_id
+        run: |
+          STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
+
+          # Filter by both Name AND EndpointId
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="keepalived" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          
+          if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
+            echo "Stack not found for this endpoint."
+            echo "stack_id=0" >> $GITHUB_OUTPUT
+          else
+            echo "Stack found with ID: $STACK_ID" 
+            echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Generate UUID
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
+        id: uuid
+        run: |
+          echo "uuid=$(uuidgen)" >> $GITHUB_OUTPUT
+
+      - name: Create Stack from GitHub
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
+        run: |
+          echo "Creating stack from GitHub..."
+          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "Name": "keepalived",
+               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
+               "RepositoryReferenceName": "${{ github.ref }}",
+               "ComposeFile": "keepalived/keepalived-compose.yml",
+               "RepositoryAuthentication": false,
+               "AutoUpdate": {
+                              "forcePullImage": true,
+                              "forceUpdate": true,
+                              "Webhook": "${{ steps.uuid.outputs.uuid }}"
+                             },
+               "Env": [
+                       {
+                       "name":"KEEPALIVED_VIRTUAL_IP",
+                       "value":"${{ vars.KEEPALIVED_IP }}"
+                       },
+                       {
+                       "name":"KEEPALIVED_AUTH_PASS",
+                       "value":"${{ secrets.PORTAINER_AGENT_SECRET}}"
+                       },
+                       {
+                       "name":"MASTER_OR_BACKUP_STATE",
+                       "value":"${{ steps.node_config.outputs.keepalived_state }}"
+                       },
+                       {
+                        "name":"KEEPALIVED_PRIORITY",
+                        "value":"${{ steps.node_config.outputs.keepalived_priority }}"
+                        },
+                       {
+                        "name":"PIHOLE_WEBPASSWORD",
+                        "value":"${{ secrets.APP_PASSWORD }}"
+                        },
+                       {
+                        "name":"PIHOLE_HOST",
+                        "value":"${{ steps.node_config.outputs.ssh_host }}"
+                        },
+                       {
+                        "name":"INITIAL_ADMIN_EMAIL",
+                        "value":"${{ vars.NGINX_EMAIL }}"
+                        }
+                       ],
+               "Prune": true,
+               "StackFileVersion": "3"
+              }')
+
+            echo "API Response: $RESPONSE"
+            echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
+
+      - name: Update Stack
+        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+        run: |
+          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "PullImage": true,
+               "RepositoryReferenceName": "${{ github.ref }}",
+               "repositoryAuthentication": false,
+               "Env": [
+                       {
+                       "name":"KEEPALIVED_VIRTUAL_IP",
+                       "value":"${{ vars.KEEPALIVED_IP }}"
+                       },
+                       {
+                       "name":"KEEPALIVED_AUTH_PASS",
+                       "value":"${{ secrets.PORTAINER_AGENT_SECRET}}"
+                       },
+                       {
+                       "name":"MASTER_OR_BACKUP_STATE",
+                       "value":"${{ steps.node_config.outputs.keepalived_state }}"
+                       },
+                       {
+                        "name":"KEEPALIVED_PRIORITY",
+                        "value":"${{ steps.node_config.outputs.keepalived_priority }}"
+                        },
+                       {
+                        "name":"PIHOLE_WEBPASSWORD",
+                        "value":"${{ secrets.APP_PASSWORD }}"
+                        },
+                       {
+                        "name":"PIHOLE_HOST",
+                        "value":"${{ steps.node_config.outputs.ssh_host }}"
+                        },
+                       {
+                        "name":"INITIAL_ADMIN_EMAIL",
+                        "value":"${{ vars.NGINX_EMAIL }}"
+                        }
+                       ],
+               "Prune": true
+              }'          
+
+      - name: Bring down VPN
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show   
+
+  deploy_keepalived_sync:
+    needs: deploy
+    if: needs.deploy.outputs.keepalived_state == 'MASTER'
+    uses: ./.github/workflows/keepalived-master-deploy.yml
+    with:
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      domain: ${{ inputs.domain || '14monarch.local' }}
+      keepalived_state: ${{ needs.deploy.outputs.keepalived_state }}

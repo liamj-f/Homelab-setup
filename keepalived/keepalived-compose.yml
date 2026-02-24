@@ -1,0 +1,97 @@
+version: "3.9"
+
+services:
+  keepalived:
+    image: shawly/keepalived:latest
+    container_name: keepalived
+    network_mode: host
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+    environment:
+      TZ: Europe/London
+      KEEPALIVED_VIRTUAL_IP: ${KEEPALIVED_VIRTUAL_IP}
+      KEEPALIVED_VIRTUAL_MASK: 24
+      KEEPALIVED_VRID: 51
+      KEEPALIVED_INTERFACE: auto
+      KEEPALIVED_PRIORITY: ${KEEPALIVED_PRIORITY}
+      KEEPALIVED_STATE: ${MASTER_OR_BACKUP_STATE}
+      KEEPALIVED_AUTH_TYPE: PASS
+      KEEPALIVED_AUTH_PASS: ${KEEPALIVED_AUTH_PASS}
+    volumes:
+      - ./keepalived/state.sh:/state.sh
+      - keepalived_state:/shared
+    restart: unless-stopped
+
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    network_mode: "host"
+    ports:
+      # DNS Ports
+      - "53:53/tcp"
+      - "53:53/udp"
+      # Default HTTP Port
+      - "80:80/tcp"
+      # Default HTTPs Port. FTL will generate a self-signed certificate
+      - "443:443/tcp"
+      # Uncomment the line below if you are using Pi-hole as your DHCP server
+      - "67:67/udp"
+    environment:
+      TZ: 'Europe/London'
+      FTLCONF_webserver_api_password: ${PIHOLE_WEBPASSWORD}
+      FTLCONF_webserver_port: 82
+#      FTLCONF_misc_etc_dnsmasq_d: true
+    cap_add:
+      - NET_ADMIN
+      - NET_BIND_SERVICE
+    volumes:
+      - pihole_data:/etc/pihole
+      - dnsmasq_data:/etc/dnsmasq.d
+#      - /home/pi/stacks/pihole/99-pihole-custom.conf:/etc/dnsmasq.d/99-custom.conf
+
+  dhcp-checker:
+    build:
+      context: ./keepalived
+      dockerfile: dhcp_checker_dockerfile
+    container_name: dhcp-checker
+    restart: unless-stopped
+    environment:
+      PIHOLE_URL: ${PIHOLE_HOST:-http://localhost:82}
+      PIHOLE_PASSWORD: ${PIHOLE_WEBPASSWORD}
+      CHECK_INTERVAL: ${CHECK_INTERVAL:-30}
+    volumes:
+      - keepalived_state:/shared
+
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    environment:
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
+      INITIAL_ADMIN_PASSWORD:  ${PIHOLE_WEBPASSWORD}
+    ports:
+      - "80:80"     # HTTP
+      - "443:443"   # HTTPS
+      - "81:81"     # Admin UI
+    volumes:
+      - nginx_data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - nginx_network
+    healthcheck:
+      test: ["CMD", "/usr/bin/check-health"]
+      interval: 10s
+      timeout: 3s
+
+volumes:
+  nginx_data:
+    name: nginx_data
+  keepalived_state:
+    name: keepalived_state
+  pihole_data:
+    name: pihole_data
+  dnsmasq_data:
+    name: dnsmasq_data

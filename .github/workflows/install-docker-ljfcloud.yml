@@ -256,13 +256,13 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Add E7270 Agent to Portainer
+      - name: Add ljfcloud Agent to Portainer
         run: |
           curl -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -F "Name=$host_machine" \
             -F "EndpointCreationType=2" \
-            -F "URL=tcp://${{ vars.E7270_IP }}:9001" \
+            -F "URL=tcp://${{ vars.LJFCLOUD_IP }}:9001" \
             -F "TLS=true" \
             -F "TLSSkipVerify=true" \
             -F "TLSSkipClientVerify=true"

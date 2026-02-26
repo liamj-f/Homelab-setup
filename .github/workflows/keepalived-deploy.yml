@@ -140,7 +140,7 @@ jobs:
       - name: Get Portainer EndpointId
         id: endpoint
         env:
-          HOST_MACHINE: ${{ inputs.host_machine || 'rpi4-server' }}
+          HOST_MACHINE: ${{ matrix.host_machine || 'rpi4-server' }}
         run: |
           echo "Looking for endpoint with name: $HOST_MACHINE"
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \

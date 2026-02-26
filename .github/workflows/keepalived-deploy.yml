@@ -38,24 +38,31 @@ jobs:
         id: node_config
         run: |
           if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
-            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
-            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_key=${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
+            echo "ssh_host=192.168.0.2" >> $GITHUB_OUTPUT
+            echo "ssh_user=liam" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ secrets.RPI4_SSH_KEY }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
             echo "keepalived_priority=110" >> $GITHUB_OUTPUT
             echo "keepalived_state=MASTER" >> $GITHUB_OUTPUT
-            echo "rsync_target_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
-            echo "rsync_target_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "rsync_target_key=${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
-            
+            echo "rsync_target_host=192.168.0.4" >> $GITHUB_OUTPUT
+            echo "rsync_target_user=liam" >> $GITHUB_OUTPUT
+            echo "rsync_target_key<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ secrets.E7270_SSH_KEY }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
-            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
-            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_key=${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "ssh_host=192.168.0.4" >> $GITHUB_OUTPUT
+            echo "ssh_user=liam" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ secrets.E7270_SSH_KEY }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
             echo "keepalived_priority=100" >> $GITHUB_OUTPUT
             echo "keepalived_state=BACKUP" >> $GITHUB_OUTPUT
-            echo "rsync_target_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
-            echo "rsync_target_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "rsync_target_key=${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
+            echo "rsync_target_host=192.168.0.2" >> $GITHUB_OUTPUT
+            echo "rsync_target_user=liam" >> $GITHUB_OUTPUT
+            echo "rsync_target_key<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ secrets.RPI4_SSH_KEY }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           fi
 
       - name: Render keepalived config

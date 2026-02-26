@@ -11,20 +11,15 @@ services:
       - NET_BROADCAST
     environment:
       TZ: Europe/London
-      KEEPALIVED_VIRTUAL_IP: ${KEEPALIVED_VIRTUAL_IP}
-      KEEPALIVED_VIRTUAL_MASK: 24
-      KEEPALIVED_VRID: 51
-      KEEPALIVED_INTERFACE: auto
-      KEEPALIVED_PRIORITY: ${KEEPALIVED_PRIORITY}
-      KEEPALIVED_STATE: ${MASTER_OR_BACKUP_STATE}
-      KEEPALIVED_AUTH_TYPE: PASS
-      KEEPALIVED_AUTH_PASS: ${KEEPALIVED_AUTH_PASS}
+      KEEPALIVED_CUSTOM_CONFIG: true
     volumes:
-      - ./keepalived/state.sh:/state.sh
-      - keepalived_state:/shared
-    restart: unless-stopped
+      - /opt/stacks/keepalived/keepalived.conf:/etc/keepalived/keepalived.conf:ro
+      - /opt/stacks/keepalived/notify.sh:/etc/keepalived/notify.sh:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
   pihole:
+    depends_on:
+      keepalived:
     image: pihole/pihole:latest
     container_name: pihole
     restart: unless-stopped
@@ -52,20 +47,9 @@ services:
       - dnsmasq_data:/etc/dnsmasq.d
 #      - /home/pi/stacks/pihole/99-pihole-custom.conf:/etc/dnsmasq.d/99-custom.conf
 
-  dhcp-checker:
-    build:
-      context: ./keepalived
-      dockerfile: dhcp_checker_dockerfile
-    container_name: dhcp-checker
-    restart: unless-stopped
-    environment:
-      PIHOLE_URL: ${PIHOLE_HOST:-http://localhost:82}
-      PIHOLE_PASSWORD: ${PIHOLE_WEBPASSWORD}
-      CHECK_INTERVAL: ${CHECK_INTERVAL:-30}
-    volumes:
-      - keepalived_state:/shared
-
   nginx-proxy-manager:
+    depends_on:
+      keepalived:
     image: jc21/nginx-proxy-manager:latest
     container_name: nginx-proxy-manager
     restart: unless-stopped
@@ -86,11 +70,63 @@ services:
       interval: 10s
       timeout: 3s
 
+  nebula-sync:
+    depends_on:
+      pihole:
+    image: ghcr.io/lovelaze/nebula-sync:latest
+    depends_on:
+      pihole:
+        condition: service_healthy
+    container_name: nebula-sync
+    environment:
+      PRIMARY: http://${PRIMARY_IP}:82|${PIHOLE_WEBPASSWORD}
+      REPLICAS: http://${SECONDARY_IP}:82|${PIHOLE_WEBPASSWORD}
+      FULL_SYNC: false
+      SYNC_CONFIG_DNS: true	#Synchronize DNS settings
+      SYNC_CONFIG_DNS_EXCLUDE: "interface" #Keep pi0 on wlan0 and wg0
+      SYNC_CONFIG_DHCP: true	#Synchronize DHCP settings
+      SYNC_CONFIG_DHCP_EXCLUDE: "active" #eclude syncing the active state of the DHCP server to prevent conflicts
+      SYNC_CONFIG_NTP: true	#Synchronize NTP settings
+      SYNC_CONFIG_RESOLVER: true	#Synchronize resolver settings
+      SYNC_CONFIG_DATABASE: true	#Synchronize database settings
+      SYNC_CONFIG_MISC: true	#Synchronize miscellaneous settings
+      SYNC_CONFIG_DEBUG: true	#Synchronize debug settings
+      SYNC_GRAVITY_DHCP_LEASES: true	#Synchronize DHCP leases
+      SYNC_GRAVITY_GROUP: true	#Synchronize groups
+      SYNC_GRAVITY_AD_LIST: true	#Synchronize ad lists
+      SYNC_GRAVITY_AD_LIST_BY_GROUP: true	#Synchronize ad lists by group
+      SYNC_GRAVITY_DOMAIN_LIST: true	#Synchronize domain lists
+      SYNC_GRAVITY_DOMAIN_LIST_BY_GROUP: true	#Synchronize domain lists by group
+      SYNC_GRAVITY_CLIENT: true	#Synchronize clients
+      SYNC_GRAVITY_CLIENT_BY_GROUP: true	#Synchronize clients by group
+      RUN_GRAVITY: true
+      CRON: "*/5 * * * *"
+      CLIENT_TIMEOUT_SECONDS: 60
+      TZ: "Europe/London"
+    restart: unless-stopped
+
+  rsync:
+    image: instrumentisto/rsync-ssh
+    container_name: rsync
+    restart: unless-stopped
+    volumes:
+      - nginx_data:/data
+      - ./letsencrypt:/etc/letsencrypt
+      - ~/.ssh:/root/.ssh:ro
+    environment:
+      - RSYNC_TARGET=${SSH_USER}@${SECONDARY_IP} 
+    command: >
+      sh -c "while true; do
+        rsync -avz --delete
+          /data/ ${SSH_USER}@${SECONDARY_IP}:/data/ &&
+        rsync -avz --delete
+          /etc/letsencrypt/ ${SSH_USER}@${SECONDARY_IP}:/etc/letsencrypt/;
+        sleep 300;
+      done"
+
 volumes:
   nginx_data:
     name: nginx_data
-  keepalived_state:
-    name: keepalived_state
   pihole_data:
     name: pihole_data
   dnsmasq_data:

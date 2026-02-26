@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-#      - '**'
+      - '**'
     paths:
       - '.github/workflows/keepalived-deploy.yml'
       - 'keepalived/**'
@@ -18,20 +18,18 @@ on:
         type: string  
   workflow_call:
     inputs:
-      host_machine:
-        required: true
-        type: string 
       domain:
         required: true
         type: string
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    outputs:
-      keepalived_state: ${{ steps.node_config.outputs.keepalived_state }}
+    strategy:
+      matrix:
+        host_machine: [rpi4-server, e7270-server]
     env:
-      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
       domain: ${{ inputs.domain || '14monarch.local' }}
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -39,19 +37,34 @@ jobs:
       - name: Set node config
         id: node_config
         run: |
-          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
-            echo "keepalived_state=MASTER" >> $GITHUB_OUTPUT
-            echo "keepalived_priority=150" >> $GITHUB_OUTPUT
+          if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
             echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_password=${{ secrets.RPI4_PASSWORD }}" >> $GITHUB_OUTPUT
-          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
-            echo "keepalived_state=BACKUP" >> $GITHUB_OUTPUT
-            echo "keepalived_priority=100" >> $GITHUB_OUTPUT
+            echo "ssh_key=${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
+            echo "keepalived_priority=110" >> $GITHUB_OUTPUT
+            echo "keepalived_state=MASTER" >> $GITHUB_OUTPUT
+            echo "rsync_target_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "rsync_target_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "rsync_target_key=${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            
+          elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_password=${{ secrets.E7270_PASSWORD }}" >> $GITHUB_OUTPUT
+            echo "ssh_key=${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "keepalived_priority=100" >> $GITHUB_OUTPUT
+            echo "keepalived_state=BACKUP" >> $GITHUB_OUTPUT
+            echo "rsync_target_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "rsync_target_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
+            echo "rsync_target_key=${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
           fi
+
+      - name: Render keepalived config
+        run: |
+          export KEEPALIVED_VIRTUAL_IP=${{ vars.KEEPALIVED_IP }}
+          export KEEPALIVED_AUTH_PASS=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          export KEEPALIVED_PRIORITY=${{ steps.node_config.outputs.keepalived_priority }}
+          export MASTER_OR_BACKUP_STATE=${{ steps.node_config.outputs.keepalived_state }}
+          envsubst < keepalived/keepalived.conf.template > keepalived/keepalived.conf
 
       - name: Install WireGuard
         run: |
@@ -71,22 +84,23 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
-      - name: Copy files to host
-        uses: appleboy/scp-action@master
+      - name: Copy configs to host
+        uses: appleboy/scp-action@v0.1.7
         with:
-            host: ${{ steps.node_config.outputs.ssh_host }}
-            username: ${{ steps.node_config.outputs.ssh_user }}
-            password: ${{ steps.node_config.outputs.ssh_password }}
-            source: "keepalived/state.sh"
-            target: "/opt/keepalived/"
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          source: "keepalived/keepalived.conf,keepalived/notify.sh"
+          target: /opt/stacks/keepalived/
+          strip_components: 1
             
       - name: Make state script executable and set permissions
         uses: appleboy/ssh-action@master
         with:
             host: ${{ steps.node_config.outputs.ssh_host }}
             username: ${{ steps.node_config.outputs.ssh_user }}
-            password: ${{ steps.node_config.outputs.ssh_password }}
-            script: chmod +x /opt/keepalived/state.sh          
+            key: ${{ steps.node_config.outputs.ssh_key }}
+            script: chmod +x /opt/stacks/keepalived/notify.sh          
 
       - name: Authenticate to Portainer
         id: auth
@@ -154,28 +168,20 @@ jobs:
                              },
                "Env": [
                        {
-                       "name":"KEEPALIVED_VIRTUAL_IP",
-                       "value":"${{ vars.KEEPALIVED_IP }}"
-                       },
-                       {
-                       "name":"KEEPALIVED_AUTH_PASS",
-                       "value":"${{ secrets.PORTAINER_AGENT_SECRET}}"
-                       },
-                       {
-                       "name":"MASTER_OR_BACKUP_STATE",
-                       "value":"${{ steps.node_config.outputs.keepalived_state }}"
-                       },
-                       {
-                        "name":"KEEPALIVED_PRIORITY",
-                        "value":"${{ steps.node_config.outputs.keepalived_priority }}"
+                        "name":"SSH_USER",
+                        "value":"${{ steps.node_config.outputs.ssh_user }}"
                         },
                        {
                         "name":"PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },
                        {
-                        "name":"PIHOLE_HOST",
+                        "name":"Primary_IP",
                         "value":"${{ steps.node_config.outputs.ssh_host }}"
+                        },
+                       {
+                        "name":"SECONDARY_IP",
+                        "value":"${{ steps.node_config.outputs.tartget_host }}"
                         },
                        {
                         "name":"INITIAL_ADMIN_EMAIL",
@@ -200,29 +206,21 @@ jobs:
                "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
                "Env": [
-                       {
-                       "name":"KEEPALIVED_VIRTUAL_IP",
-                       "value":"${{ vars.KEEPALIVED_IP }}"
-                       },
-                       {
-                       "name":"KEEPALIVED_AUTH_PASS",
-                       "value":"${{ secrets.PORTAINER_AGENT_SECRET}}"
-                       },
-                       {
-                       "name":"MASTER_OR_BACKUP_STATE",
-                       "value":"${{ steps.node_config.outputs.keepalived_state }}"
-                       },
-                       {
-                        "name":"KEEPALIVED_PRIORITY",
-                        "value":"${{ steps.node_config.outputs.keepalived_priority }}"
+                        {
+                        "name":"SSH_USER",
+                        "value":"${{ steps.node_config.outputs.ssh_user }}"
                         },
                        {
                         "name":"PIHOLE_WEBPASSWORD",
                         "value":"${{ secrets.APP_PASSWORD }}"
                         },
                        {
-                        "name":"PIHOLE_HOST",
+                        "name":"Primary_IP",
                         "value":"${{ steps.node_config.outputs.ssh_host }}"
+                        },
+                       {
+                        "name":"SECONDARY_IP",
+                        "value":"${{ steps.node_config.outputs.target_host }}"
                         },
                        {
                         "name":"INITIAL_ADMIN_EMAIL",
@@ -232,16 +230,283 @@ jobs:
                "Prune": true
               }'          
 
+      - name: Pihole Api Auth
+        id: pihole_auth
+        run: |
+          sleep 20
+          RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \
+              -H "Content-Type: application/json" \
+              -d '{
+                  "password": "${{ secrets.APP_PASSWORD }}"
+                  }' )
+
+          CSRF=$(echo "$RESPONSE" | jq -r '.session.csrf')
+          SID=$(echo "$RESPONSE" | jq -r '.session.sid')
+          echo "sid=$SID" >> $GITHUB_OUTPUT
+          echo "csrf=$CSRF" >> $GITHUB_OUTPUT         
+          
+      - name: Add DNS records to Pihole via API
+        # should add wg0 back in as interface here "eth0,wg0
+        run: |
+          cat <<EOF > pihole_config.json
+          {
+              "config":{
+                  "dns":{
+                      "piholePTR":"Hostname",
+                      "domain": {
+                                  "name": "$domain",
+                                  "local": true
+                                },
+                      "upstreams": [
+                                    "1.1.1.1",
+                                    "8.8.8.8"
+                                    ],
+                      "interface": "eth0", 
+                      "listeningMode": "single",
+                      "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
+                      "hosts":[
+                              "192.168.0.1 tplink.$domain",
+                              "${{ vars.RPI4_IP }} pihole1.$domain",
+                              "${{ vars.E7270_IP }} pihole2.$domain",
+                              "${{ vars.KEEPALIVED_IP }} nginx.$domain",
+                              "${{ vars.RPI4_IP }} portainer.$domain",
+                              "${{ vars.E7270_IP }} nextcloud.$domain",
+                              "${{ vars.RPI4_IP }} adminer.$domain",
+                              "${{ vars.RPI4_IP }} pihole1.$subdomain.duckdns.org",
+                              "${{ vars.E7270_IP }} pihole2.$subdomain.duckdns.org",
+                              "${{ vars.KEEPALIVED_IP }} nginx.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} portainer.$subdomain.duckdns.org",
+                              "${{ vars.E7270_IP }} nextcloud.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} adminer.$subdomain.duckdns.org",
+                              ]
+                           },                          
+                  "dhcp": {
+                        "active": true,
+                        "start": "192.168.0.10",
+                        "end": "192.168.0.254",
+                        "router": "192.168.0.1",
+                        "netmask": "",
+                        "leaseTime": "2h",
+                        "ipv6": false,
+                        "rapidCommit": false,
+                        "multiDNS": false,
+                        "logging": false,
+                        "ignoreUnknownClients": false,
+                        "hosts": [
+                                "dc:a6:32:c8:bb:41,${{ vars.RPI4_IP }},,infinite",
+                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},,infinite",
+                                "3c:6a:a7:87:f4:0b,${{ vars.E7270_IP }},,infinite"
+                                 ]
+                          },
+                  "misc": {
+                          "dnsmasq_lines": ["dhcp-option=6,${{ vars.KEEPALIVED_IP }}"]
+                          }  
+                    }
+                }
+          EOF
+                                    
+          curl -X PATCH "http://${{ steps.node_config.outputs.ssh_host }}:82/api/config" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d "@pihole_config.json"
+
+
+      - name: Add Blocklists to Pihole via API
+        run: |
+          curl -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/lists?type=block" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d '{
+              "address": [
+                          "https://v.firebog.net/hosts/Easylist.txt",
+                          "https://media.githubusercontent.com/media/zachlagden/Pi-hole-Optimized-Blocklists/refs/heads/main/lists/advertising.txt",
+                          "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts"
+                          ],
+              "comment": "Added via API",
+              "groups": [0],
+              "enabled": true
+              }'
+
+      - name: Update Gravity via API
+        run: |
+          curl -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/action/gravity" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: text/plain' \
+          -H 'content-type: application/json' \
+          
+      - name: End Pihole API Session
+        run: |
+          curl -X DELETE "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+
+      - name: Authenticate as nginx user
+        id: token
+        run: |
+          sleep 20
+          RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/tokens" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "identity":"${{ vars.NGINX_EMAIL }}",
+                 "secret":"${{ secrets.APP_PASSWORD }}"
+                 }')
+        
+          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Check for Existing DuckDNS Certificate
+        id: check_cert
+        run: |
+          cert_id=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
+            jq -r --arg fulldomain "*.$subdomain.duckdns.org" '.[] | select(.domain_names[] == $fulldomain) | .id' | head -n 1)
+
+          if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
+            echo "Found existing cert! ID: $cert_id"
+            echo "cert_id=$cert_id" >> $GITHUB_ENV
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "No matching certificate found."
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create Certificate for duckdns domain
+        id: certificate
+        if: ${{ steps.check_cert.outputs.exists == 'false' }}
+        run: |
+          PAYLOAD=$(cat <<EOF
+          {
+            "provider": "letsencrypt",
+            "domain_names": ["*.$subdomain.duckdns.org", "$subdomain.duckdns.org"],
+            "meta": {
+              "dns_challenge": true,
+              "dns_provider": "duckdns",
+              "dns_provider_credentials": "dns_duckdns_token=${{ secrets.DUCKDNS_TOKEN }}",
+              "propagation_seconds": 120
+            }
+          }
+          EOF
+          )   
+            
+          RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+            -d "$PAYLOAD")
+            
+          echo "Certificate API Response: $RESPONSE"
+            
+          # Check for error before proceeding
+          if echo "$RESPONSE" | grep -q "error"; then
+            echo "Failed to create certificate"
+            exit 1
+          fi
+            
+          cert_id=$(echo "$RESPONSE" | jq -r '.id // empty')
+          echo "cert_id=$cert_id" >> $GITHUB_ENV
+          
+      - name: Create Proxy Hosts
+        run: |
+          declare -A hosts
+          hosts["tplink.$domain"]="192.168.0.1:80"
+          hosts["nginx.$domain"]="${{ vars.KEEPALIVED_IP }}:81"
+          hosts["pihole1.$domain"]="${{ vars.RPI4_IP }}:82"
+          hosts["pihole2.$domain"]="${{ vars.E7270_IP }}:82"
+
+          hosts["portainer.$domain"]="${{ vars.RPI4_IP }}:83"
+          hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:85"
+          hosts["adminer.$domain"]="${{ vars.E7270_IP }}:86"
+          
+          for domain in "${!hosts[@]}"; do
+            host="${hosts[$domain]}"
+            host_ip="${host%%:*}"
+            host_port="${host##*:}"
+
+            curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "domain_names": ["'"$domain"'"],
+                "forward_host": "'"$host_ip"'",
+                "forward_port": '"$host_port"',
+                "forward_scheme": "http",
+                "ssl_forced": false,
+                "enabled": true,
+              }' | jq
+          done
+
+      - name: Create DuckDNS Proxy Hosts
+        run: |
+          declare -A hosts
+          hosts["tplink.$subdomain.duckdns.org"]="192.168.0.1:80"
+          hosts["nginx.$subdomain.duckdns.org"]="${{ vars.KEEPALIVED_IP }}:81"
+          hosts["pihole1.$subdomain.duckdns.org"]="${{ vars.RPI4_IP }}:82"
+          hosts["pihole2.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:82"
+
+          hosts["portainer.$subdomain.duckdns.org"]="${{ vars.RPI4_IP }}:83"
+          hosts["nextcloud.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:85"
+          hosts["adminer.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:86"
+          
+          for domain in "${!hosts[@]}"; do
+            host="${hosts[$domain]}"
+            host_ip="${host%%:*}"
+            host_port="${host##*:}"
+            BODY=$(jq -n \
+                          --arg domain "$domain" \
+                          --arg host_ip "$host_ip" \
+                          --argjson host_port "$host_port" \
+                          --argjson cert_id "$cert_id" \
+                          '{
+                            domain_names: [$domain],
+                            forward_host: $host_ip,
+                            forward_port: $host_port,
+                            forward_scheme: "http",
+                            ssl_forced: true,
+                            enabled: true,
+                            certificate_id: $cert_id,
+                            block_exploits: true,
+                            meta: { letsencrypt_agree: false, dns_challenge: false }
+                          }')
+
+            echo "Attempting to create Proxy Host: $domain"
+            
+            RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+              -H "Content-Type: application/json" \
+              -d "$BODY")
+
+            # 2. Check if creation failed because the domain exists
+            if echo "$RESPONSE" | grep -qE "already in use|400"; then
+              echo "Domain $domain already exists. Fetching ID to perform UPDATE (PUT) instead..."
+              
+              # Find the ID of the existing host by filtering the list
+              
+              EXISTING_ID=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
+                jq -r ".[] | select(.domain_names[] == \"$domain\") | .id")
+
+              if [ "$EXISTING_ID" != "null" ] && [ -n "$EXISTING_ID" ]; then
+                echo "Updating existing host ID: $EXISTING_ID"
+                curl -s -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$EXISTING_ID" \
+                  -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                  -H "Content-Type: application/json" \
+                  -d "$BODY" | jq
+              else
+                echo "Error: Could not find the ID for $domain even though it's 'in use'."
+              fi
+            else
+              echo "Successfully created $domain"
+              echo "$RESPONSE" | jq
+            fi
+          done
+
+
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show   
 
-  deploy_keepalived_sync:
-    needs: deploy
-    if: needs.deploy.outputs.keepalived_state == 'MASTER'
-    uses: ./.github/workflows/keepalived-master-deploy.yml
-    with:
-      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
-      keepalived_state: ${{ needs.deploy.outputs.keepalived_state }}

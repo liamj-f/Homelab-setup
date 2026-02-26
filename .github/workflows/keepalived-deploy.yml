@@ -91,8 +91,18 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
+      - name: Ensure target directory exists
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            sudo mkdir -p /opt/stacks/keepalived
+            sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/
+
       - name: Copy configs to host
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@master
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
@@ -345,6 +355,42 @@ jobs:
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: text/plain' \
           -H 'content-type: application/json' \
+
+      - name: Create Bypass Group in Pihole
+        run: |
+          curl -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d '{
+              "name": "bypass",
+              "comment": "Bypass group - no blocklists",
+              "enabled": true
+              }'
+
+      - name: Get Bypass Group ID
+        id: bypass_group
+        run: |
+          GROUP_ID=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          | jq '.groups[] | select(.name == "bypass") | .id')
+          echo "group_id=$GROUP_ID" >> $GITHUB_OUTPUT
+
+      - name: Add Phone to Bypass Group
+        run: |
+          curl -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/clients" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d '{
+              "client": "B8:A8:25:5E:17:7A",
+              "comment": "HJ-F phone - bypass group",
+              "groups": [${{ steps.bypass_group.outputs.group_id }}]
+              }'
           
       - name: End Pihole API Session
         run: |

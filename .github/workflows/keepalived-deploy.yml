@@ -65,6 +65,11 @@ jobs:
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
+      - name: Write SSH key to file
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
       - name: Render keepalived config
         run: |
           export KEEPALIVED_VIRTUAL_IP="${{ vars.KEEPALIVED_IP }}"
@@ -101,12 +106,13 @@ jobs:
             sudo mkdir -p /opt/stacks/keepalived
             sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/
 
+
       - name: Copy configs to host
         uses: appleboy/scp-action@master
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
+          key_path: /tmp/deploy_key
           source: "keepalived/keepalived.conf,keepalived/notify.sh"
           target: /opt/stacks/keepalived/
           strip_components: 1
@@ -114,10 +120,10 @@ jobs:
       - name: Make state script executable and set permissions
         uses: appleboy/ssh-action@master
         with:
-            host: ${{ steps.node_config.outputs.ssh_host }}
-            username: ${{ steps.node_config.outputs.ssh_user }}
-            key: ${{ steps.node_config.outputs.ssh_key }}
-            script: chmod +x /opt/stacks/keepalived/notify.sh          
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key_path: /tmp/deploy_key
+          script: chmod +x /opt/stacks/keepalived/notify.sh          
 
       - name: Authenticate to Portainer
         id: auth

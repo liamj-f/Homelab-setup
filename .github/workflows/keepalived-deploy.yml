@@ -67,10 +67,10 @@ jobs:
 
       - name: Render keepalived config
         run: |
-          export KEEPALIVED_VIRTUAL_IP=${{ vars.KEEPALIVED_IP }}
-          export KEEPALIVED_AUTH_PASS=${{ secrets.MYSQL_ROOT_PASSWORD }}
-          export KEEPALIVED_PRIORITY=${{ steps.node_config.outputs.keepalived_priority }}
-          export MASTER_OR_BACKUP_STATE=${{ steps.node_config.outputs.keepalived_state }}
+          export KEEPALIVED_VIRTUAL_IP="${{ vars.KEEPALIVED_IP }}"
+          export KEEPALIVED_AUTH_PASS="${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          export KEEPALIVED_PRIORITY="${{ steps.node_config.outputs.keepalived_priority }}"
+          export MASTER_OR_BACKUP_STATE="${{ steps.node_config.outputs.keepalived_state }}"
           envsubst < keepalived/keepalived.conf.template > keepalived/keepalived.conf
 
       - name: Install WireGuard

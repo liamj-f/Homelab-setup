@@ -1,0 +1,18 @@
+vrrp_instance VI_1 {
+  state ${MASTER_OR_BACKUP_STATE}
+  interface auto
+  virtual_router_id 51
+  priority ${KEEPALIVED_PRIORITY}
+  advert_int 1
+
+  authentication {
+    auth_type PASS
+    auth_pass ${KEEPALIVED_AUTH_PASS}
+  }
+
+  virtual_ipaddress {
+    ${KEEPALIVED_VIRTUAL_IP}/24
+  }
+
+  notify /etc/keepalived/notify.sh
+}

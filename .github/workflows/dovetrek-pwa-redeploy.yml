@@ -22,7 +22,7 @@ on:
       - main
       - '**'
     paths:
-      - '.github/workflows/dovetrek-pwa-compose.yml'    
+      - '.github/workflows/dovetrek-pwa-redeploy.yml'    
       - 'dovetrek-pwa-compose.yml'
     
 jobs:

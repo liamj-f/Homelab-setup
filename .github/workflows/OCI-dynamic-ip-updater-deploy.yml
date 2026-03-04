@@ -25,11 +25,45 @@ on:
       - '.github/workflows/OCI-dynamic-ip-updater-deploy.yml'  
       - 'dynamic-ip-updater/**'  
 jobs:
-  add_dynamic_ip_updater:
+  build-image-and-push:
+    name: Build and push image to ghcr.io
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/OCI-Dynamic-IP-Updater
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./dynamic-ip-updater
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy_dynamic_ip_updater:
     runs-on: ubuntu-latest
     env:
       host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
+      domain: ${{ inputs.domain || '14monarch.duckdns.org' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -52,32 +86,32 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
           
-      - name: Add host key to known_hosts of runner
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
-
-      - name: Build image on VPS (sparse checkout)
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ vars.LJFCLOUD_IP }}
-          username: ${{ vars.LJFCLOUD_USER }}
-          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
-          script: |
-            cd /tmp
-            rm -rf homelab-setup
-
-            # Sparse checkout - only get dynamic-ip-updater folder
-            git clone --filter=blob:none --sparse https://github.com/liamj-f/homelab-setup.git
-            cd homelab-setup
-            git sparse-checkout set dynamic-ip-updater
-            git checkout ${{ github.ref_name }}
-
-            # Build
-            cd dynamic-ip-updater
-            sudo docker build -t ip-security-list-updater:latest .
-
-            echo "✓ Image built successfully"
+#      - name: Add host key to known_hosts of runner
+#        run: |
+#          mkdir -p ~/.ssh
+#          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
+#
+#      - name: Build image on VPS (sparse checkout)
+#        uses: appleboy/ssh-action@v1.0.0
+#        with:
+#          host: ${{ vars.LJFCLOUD_IP }}
+#          username: ${{ vars.LJFCLOUD_USER }}
+#          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+#          script: |
+#            cd /tmp
+#            rm -rf homelab-setup
+#
+#            # Sparse checkout - only get dynamic-ip-updater folder
+#            git clone --filter=blob:none --sparse https://github.com/liamj-f/homelab-setup.git
+#            cd homelab-setup
+#            git sparse-checkout set dynamic-ip-updater
+#            git checkout ${{ github.ref_name }}
+#
+#            # Build
+#            cd dynamic-ip-updater
+#            sudo docker build -t ip-security-list-updater:latest .
+#
+#            echo "✓ Image built successfully"
 
       - name: Authenticate to Portainer
         id: auth
@@ -106,7 +140,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="ip-security-list-updater" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="OCI-Dynamic-IP-Updater" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
@@ -132,7 +166,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "ip-security-list-updater",
+               "Name": "OCI-Dynamic-IP-Updater",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "dynamic-ip-updater/dynamic-ip-updater-compose.yml",
@@ -143,6 +177,7 @@ jobs:
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
                "Env": [
+                        {"name":"Domain", "value":"${{ vars.Domain }}"}
                        {
                        "name":"OCI_USER",
                        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"

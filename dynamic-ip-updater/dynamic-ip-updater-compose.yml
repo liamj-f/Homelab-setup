@@ -1,18 +1,13 @@
 version: '3.8'
 
 services:
-  ip-security-list-updater:
-    image: ip-security-list-updater:latest
-    #build:
-    #  context: .
-    #  dockerfile: Dockerfile
-    #  network: host
-    #  # Don't use buildkit-specific features
-    container_name: ip-security-list-updater
+  OCI-Dynamic-IP-Updater:
+    image: ghcr.io/liamj-f/OCI-Dynamic-IP-Updater:latest
+    container_name: oci-dynamic-ip-updater
     restart: unless-stopped
     environment:
       # Hostname to monitor
-      - HOSTNAME=14monarch.tplinkdns.com
+      - HOSTNAME=${DOMAIN}
       # Check interval in seconds (default: 300 = 5 minutes)
       - CHECK_INTERVAL=300
       # OCI Security List ID

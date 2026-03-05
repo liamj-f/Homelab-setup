@@ -60,6 +60,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   deploy_dynamic_ip_updater:
+    needs: build-image-and-push
     runs-on: ubuntu-latest
     env:
       host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
@@ -177,7 +178,7 @@ jobs:
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
                "Env": [
-                        {"name":"Domain", "value":"${{ vars.Domain }}"}
+                      {"name":"Domain", "value":"${{ env.domain }}"},  
                        {
                        "name":"OCI_USER",
                        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
@@ -215,6 +216,29 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
+               "Env": [
+                      {"name":"Domain", "value":"${{ env.domain }}"},  
+                       {
+                       "name":"OCI_USER",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
+                       },
+                       {
+                       "name":"OCI_FINGERPRINT",
+                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"
+                       },
+                       {
+                        "name":"OCI_TENANCY",
+                        "value":"${{ vars.OCID_TENANT }}"
+                        },
+                        {
+                        "name":"OCI_KEY_CONTENT_BASE64",
+                        "value":"'"$OCI_KEY_BASE64"'"
+                        },
+                        {
+                        "name":"SECURITY_LIST_ID",
+                        "value":"${{ vars.OCID_SECURITY_LIST }}"
+                        }
+                ],
                "PullImage": true,
                "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,

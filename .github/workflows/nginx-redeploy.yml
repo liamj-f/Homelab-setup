@@ -124,8 +124,8 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         id: uuid
         run: |
-          echo "::set-output name=uuid::$(uuidgen)"
-
+          echo "uuid=$(uuidgen)" >> $GITHUB_OUTPUT
+          
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |

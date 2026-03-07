@@ -265,6 +265,7 @@ jobs:
           hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:85"
           hosts["pih0le.$domain"]="${{ vars.RPI0_IP }}:82"
           hosts["adminer.$domain"]="${{ vars.E7270_IP }}:86"
+          hosts["dovetrek.$domain"]="${{ vars.LJFCLOUD_IP }}:86"
           
           for domain in "${!hosts[@]}"; do
             host="${hosts[$domain]}"
@@ -294,6 +295,8 @@ jobs:
           hosts["nextcloud.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:85"
           hosts["pih0le.$subdomain.duckdns.org"]="${{ vars.RPI0_IP }}:82"
           hosts["adminer.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:86"
+          hosts["dovetrek.$subdomain.duckdns.org"]="${{ vars.LJFCLOUD_IP }}:86"
+
           
           for domain in "${!hosts[@]}"; do
             host="${hosts[$domain]}"

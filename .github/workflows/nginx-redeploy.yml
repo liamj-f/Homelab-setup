@@ -77,15 +77,13 @@ jobs:
         run: |
           NETWORKS=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-
-          NETWORK_ID=$(echo "$NETWORKS" | jq -r '.[] | select(.Name=="nginx_network") | .Id')
           
-          if [ -z "$NETWORK_ID" ] || [ "$NETWORK_ID" = "null" ]; then
-            echo "Network not found."
-            echo "network_id=0" >> $GITHUB_OUTPUT
+          if echo "$NETWORKS" | jq -e '.[] | select(.Name=="nginx_network")' > /dev/null; then
+            echo "Network found."
+            echo "network_exists=true" >> $GITHUB_OUTPUT
           else
-            echo "Network found with ID: $NETWORK_ID"
-            echo "network_id=$NETWORK_ID" >> $GITHUB_OUTPUT
+            echo "Network not found."
+            echo "network_exists=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Create nginx_network

@@ -90,7 +90,7 @@ jobs:
         if: steps.check_network.outputs.network_exists == 'false'
         run: |
           RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/create" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}") \
           -H "Content-Type: application/json" \
           -d '{
                "Name": "nginx_network",

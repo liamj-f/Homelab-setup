@@ -198,6 +198,10 @@ jobs:
                         {
                         "name":"SECURITY_LIST_ID",
                         "value":"${{ vars.OCID_SECURITY_LIST }}"
+                        },
+                        {
+                        "name":"NSG_ID",
+                        "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
                         }
                ],
                "Prune": true,

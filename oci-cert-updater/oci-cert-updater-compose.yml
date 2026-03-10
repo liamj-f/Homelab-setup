@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  oci-cert-updater:
+    image: ghcr.io/liamj-f/oci-cert-updater:latest
+    container_name: oci-cert-updater
+    restart: unless-stopped
+    environment:
+      - CERT_PATH=${CERT_PATH:-/etc/letsencrypt/live/npm-2}
+      - OCI_CERT_ID=${OCI_CERT_ID}
+      - CHECK_INTERVAL=${CHECK_INTERVAL:-3600}
+      - OCI_USER=${OCI_USER}
+      - OCI_FINGERPRINT=${OCI_FINGERPRINT}
+      - OCI_TENANCY=${OCI_TENANCY}
+      - OCI_REGION=uk-london-1
+      - OCI_KEY_CONTENT_BASE64=${OCI_KEY_CONTENT_BASE64}
+    volumes:
+      - nginx_letsencrypt:/etc/letsencrypt:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  nginx_letsencrypt:
+    name: nginx_letsencrypt
+    external: true

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import time
 import hashlib
 import base64
@@ -85,18 +86,18 @@ def main():
 
     if not OCI_CERT_ID:
         log("ERROR: OCI_CERT_ID not set!")
-        return
+        sys.exit(1)
 
     if not all([config['user'], config['fingerprint'], config['tenancy'], config['key_content']]):
         log("ERROR: OCI credentials not properly configured!")
-        return
+        sys.exit(1)
 
     try:
         client = oci.certificates_management.CertificatesManagementClient(config)
         log("OCI client initialised successfully.")
     except Exception as e:
         log(f"ERROR: Failed to initialise OCI client: {e}")
-        return
+        sys.exit(1)
 
     # Get baseline hash
     try:
@@ -107,7 +108,7 @@ def main():
         upload_certificate(client)
     except Exception as e:
         log(f"ERROR: Failed on startup: {e}")
-        return
+        sys.exit(1)
 
     while True:
         try:

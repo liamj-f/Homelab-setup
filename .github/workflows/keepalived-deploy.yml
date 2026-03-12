@@ -28,7 +28,7 @@ jobs:
       matrix:
         host_machine: [rpi4-server, e7270-server]
     env:
-      domain: ${{ inputs.domain || '14monarch.local' }}
+      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
 
     steps:
       - name: Checkout repo

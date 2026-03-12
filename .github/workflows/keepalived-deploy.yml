@@ -38,28 +38,28 @@ jobs:
         id: node_config
         run: |
           if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
-            echo "ssh_host=192.168.0.2" >> $GITHUB_OUTPUT
-            echo "ssh_user=liam" >> $GITHUB_OUTPUT
+            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
             echo "keepalived_priority=110" >> $GITHUB_OUTPUT
             echo "keepalived_state=MASTER" >> $GITHUB_OUTPUT
-            echo "rsync_target_host=192.168.0.4" >> $GITHUB_OUTPUT
-            echo "rsync_target_user=liam" >> $GITHUB_OUTPUT
+            echo "rsync_target_host=${{ vars.E7270_IP}}" >> $GITHUB_OUTPUT
+            echo "rsync_target_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
             echo "rsync_target_key<<EOF" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
-            echo "ssh_host=192.168.0.4" >> $GITHUB_OUTPUT
-            echo "ssh_user=liam" >> $GITHUB_OUTPUT
+            echo "ssh_host=${{ vars.E7270_IP}}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
             echo "keepalived_priority=100" >> $GITHUB_OUTPUT
             echo "keepalived_state=BACKUP" >> $GITHUB_OUTPUT
-            echo "rsync_target_host=192.168.0.2" >> $GITHUB_OUTPUT
-            echo "rsync_target_user=liam" >> $GITHUB_OUTPUT
+            echo "rsync_target_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "rsync_target_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
             echo "rsync_target_key<<EOF" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
@@ -90,11 +90,6 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show
-          
-      - name: Override system DNS resolver
-        run: |
-          sudo rm /etc/resolv.conf
-          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
       - name: Ensure target directory exists
         uses: appleboy/ssh-action@master
@@ -105,7 +100,6 @@ jobs:
           script: |
             sudo mkdir -p /opt/stacks/keepalived
             sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/
-
 
       - name: Copy configs to host
         uses: appleboy/scp-action@master
@@ -294,13 +288,7 @@ jobs:
                               "${{ vars.KEEPALIVED_IP }} nginx.$domain",
                               "${{ vars.RPI4_IP }} portainer.$domain",
                               "${{ vars.E7270_IP }} nextcloud.$domain",
-                              "${{ vars.RPI4_IP }} adminer.$domain",
-                              "${{ vars.RPI4_IP }} pihole1.$subdomain.duckdns.org",
-                              "${{ vars.E7270_IP }} pihole2.$subdomain.duckdns.org",
-                              "${{ vars.KEEPALIVED_IP }} nginx.$subdomain.duckdns.org",
-                              "${{ vars.RPI4_IP }} portainer.$subdomain.duckdns.org",
-                              "${{ vars.E7270_IP }} nextcloud.$subdomain.duckdns.org",
-                              "${{ vars.RPI4_IP }} adminer.$subdomain.duckdns.org",
+                              "${{ vars.RPI4_IP }} adminer.$domain"
                               ]
                            },                          
                   "dhcp": {
@@ -334,7 +322,6 @@ jobs:
           -H 'accept: application/json' \
           -H 'content-type: application/json' \
           -d "@pihole_config.json"
-
 
       - name: Add Blocklists to Pihole via API
         run: |
@@ -418,12 +405,12 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Check for Existing DuckDNS Certificate
+      - name: Check for Existing SSL Certificate
         id: check_cert
         run: |
           cert_id=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
-            jq -r --arg fulldomain "*.$subdomain.duckdns.org" '.[] | select(.domain_names[] == $fulldomain) | .id' | head -n 1)
+            jq -r --arg fulldomain "*.$domain" '.[] | select(.domain_names[] == $fulldomain) | .id' | head -n 1)
 
           if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
             echo "Found existing cert! ID: $cert_id"
@@ -433,42 +420,146 @@ jobs:
             echo "No matching certificate found."
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
-      
-      - name: Create Certificate for duckdns domain
+
+      - name: Create Certificate for owned domain
         id: certificate
         if: ${{ steps.check_cert.outputs.exists == 'false' }}
         run: |
-          PAYLOAD=$(cat <<EOF
-          {
-            "provider": "letsencrypt",
-            "domain_names": ["*.$subdomain.duckdns.org", "$subdomain.duckdns.org"],
-            "meta": {
-              "dns_challenge": true,
-              "dns_provider": "duckdns",
-              "dns_provider_credentials": "dns_duckdns_token=${{ secrets.DUCKDNS_TOKEN }}",
-              "propagation_seconds": 120
-            }
-          }
-          EOF
-          )   
-            
-          RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-            -d "$PAYLOAD")
-            
-          echo "Certificate API Response: $RESPONSE"
-            
-          # Check for error before proceeding
-          if echo "$RESPONSE" | grep -q "error"; then
-            echo "Failed to create certificate"
+          set -euo pipefail
+
+          if [[ -z "${DOMAIN:-}" ]]; then
+            echo "DOMAIN is not set"; exit 1
+          fi
+          if [[ -z "${PORKBUN_API_KEY:-}" || -z "${PORKBUN_API_SECRET:-}" ]]; then
+            echo "Porkbun secrets are not set"; exit 1
+          fi
+
+          # Build JSON payload safely
+          PAYLOAD=$(jq -n \
+            --arg domain ${{ env.domain }} \
+            --arg key ${{ secrets.PORKBUN_API_KEY }} \
+            --arg secret ${{ secrets.PORKBUN_API_SECRET }} \
+            '{
+              provider: "letsencrypt",
+              domain_names: ["*." + $domain, $domain],
+              meta: {
+                dns_challenge: true,
+                dns_provider: "Porkbun",
+                dns_provider_credentials: ("dns_porkbun_key=" + $key + " dns_porkbun_secret=" + $secret),
+                propagation_seconds: 120
+              }
+            }')
+
+          echo "Creating certificate for domains: *.${DOMAIN}, ${DOMAIN}"
+
+          # Call API with strong error handling; captures HTTP status and body
+          HTTP_STATUS=0
+          RESPONSE=$(
+            curl -sS -X POST "http://${API_HOST}:81/api/nginx/certificates" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+              -d "$PAYLOAD" \
+              -w "\n%{http_code}" \
+              --fail-with-body || true
+          )
+
+          # Split body and status
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "Certificate API HTTP status: $HTTP_STATUS"
+
+          # Basic checks
+          if [[ ! "$HTTP_STATUS" =~ ^2 ]]; then
+            echo "Request failed with status $HTTP_STATUS"
+            # Print safe, redacted body (remove any accidental credentials if echoed back)
+            echo "$BODY" | sed -E 's/(dns_porkbun_key=)[^ "]+/\1*****/g; s/(dns_porkbun_secret=)[^ "]+/\1*****/g'
             exit 1
           fi
-            
-          cert_id=$(echo "$RESPONSE" | jq -r '.id // empty')
-          echo "cert_id=$cert_id" >> $GITHUB_ENV
+
+          # Ensure JSON is valid and extract id
+          if ! echo "$BODY" | jq . >/dev/null 2>&1; then
+            echo "Response was not valid JSON:"
+            echo "$BODY"
+            exit 1
+          fi
+
+          cert_id=$(echo "$BODY" | jq -r '.id // empty')
+          if [[ -z "$cert_id" || "$cert_id" == "null" ]]; then
+            echo "Certificate id not found in response:"
+            echo "$BODY"
+            exit 1
+          fi
+
+          echo "Certificate created with id: $cert_id"
+
+          # Make it available to subsequent steps (choose one or both patterns)
+          echo "cert_id=$cert_id" >> "$GITHUB_OUTPUT"          
+
+#      - name: Create Certificate for Owned domain
+#        if: ${{ steps.check_cert.outputs.exists == 'false' }}
+#        run: |
+#          PAYLOAD=$(cat <<EOF
+#          {
+#            "provider": "letsencrypt",
+#            "domain_names": ["*.$domain", "$domain"],
+#            "meta": {
+#              "dns_challenge": true,
+#              "dns_provider": "duckdns",
+#              "dns_provider_credentials": "dns_duckdns_token=${{ secrets.DUCKDNS_TOKEN }}",
+#              "propagation_seconds": 120
+#            }
+#          }
+#          EOF
+#          )   
+#            
+#          RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
+#            -H "Content-Type: application/json" \
+#            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+#            -d "$PAYLOAD")
+#            
+#          echo "Certificate API Response: $RESPONSE"
+#            
+#          # Check for error before proceeding
+#          if echo "$RESPONSE" | grep -q "error"; then
+#            echo "Failed to create certificate"
+#            exit 1
+#          fi
+#            
+#          cert_id=$(echo "$RESPONSE" | jq -r '.id // empty')
+#          echo "cert_id=$cert_id" >> $GITHUB_ENV
           
-      - name: Create Proxy Hosts
+#      - name: Create Proxy Hosts
+#        run: |
+#          declare -A hosts
+#          hosts["tplink.$domain"]="192.168.0.1:80"
+#          hosts["nginx.$domain"]="${{ vars.KEEPALIVED_IP }}:81"
+#          hosts["pihole1.$domain"]="${{ vars.RPI4_IP }}:82"
+#          hosts["pihole2.$domain"]="${{ vars.E7270_IP }}:82"
+#
+#          hosts["portainer.$domain"]="${{ vars.RPI4_IP }}:83"
+#          hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:85"
+#          hosts["adminer.$domain"]="${{ vars.E7270_IP }}:86"
+#          
+#          for domain in "${!hosts[@]}"; do
+#            host="${hosts[$domain]}"
+#            host_ip="${host%%:*}"
+#            host_port="${host##*:}"
+#
+#            curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+#              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+#              -H "Content-Type: application/json" \
+#              -d '{
+#                "domain_names": ["'"$domain"'"],
+#                "forward_host": "'"$host_ip"'",
+#                "forward_port": '"$host_port"',
+#                "forward_scheme": "http",
+#                "ssl_forced": false,
+#                "enabled": true,
+#              }' | jq
+#          done
+
+      - name: Create SSL Proxy Hosts
         run: |
           declare -A hosts
           hosts["tplink.$domain"]="192.168.0.1:80"
@@ -484,41 +575,11 @@ jobs:
             host="${hosts[$domain]}"
             host_ip="${host%%:*}"
             host_port="${host##*:}"
-
-            curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-              -H "Content-Type: application/json" \
-              -d '{
-                "domain_names": ["'"$domain"'"],
-                "forward_host": "'"$host_ip"'",
-                "forward_port": '"$host_port"',
-                "forward_scheme": "http",
-                "ssl_forced": false,
-                "enabled": true,
-              }' | jq
-          done
-
-      - name: Create DuckDNS Proxy Hosts
-        run: |
-          declare -A hosts
-          hosts["tplink.$subdomain.duckdns.org"]="192.168.0.1:80"
-          hosts["nginx.$subdomain.duckdns.org"]="${{ vars.KEEPALIVED_IP }}:81"
-          hosts["pihole1.$subdomain.duckdns.org"]="${{ vars.RPI4_IP }}:82"
-          hosts["pihole2.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:82"
-
-          hosts["portainer.$subdomain.duckdns.org"]="${{ vars.RPI4_IP }}:83"
-          hosts["nextcloud.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:85"
-          hosts["adminer.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:86"
-          
-          for domain in "${!hosts[@]}"; do
-            host="${hosts[$domain]}"
-            host_ip="${host%%:*}"
-            host_port="${host##*:}"
             BODY=$(jq -n \
                           --arg domain "$domain" \
                           --arg host_ip "$host_ip" \
                           --argjson host_port "$host_port" \
-                          --argjson cert_id "$cert_id" \
+                          --argjson cert_id ${{ steps.certificate.outputs.cert_id }} \
                           '{
                             domain_names: [$domain],
                             forward_host: $host_ip,
@@ -562,7 +623,6 @@ jobs:
               echo "$RESPONSE" | jq
             fi
           done
-
 
       - name: Bring down VPN
         run: |

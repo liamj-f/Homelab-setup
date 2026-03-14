@@ -27,8 +27,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
+      domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
       subdomain: $(echo "${{ inputs.domain || '14monarch.local' }}" | cut -d'.' -f1)
 
     steps:
@@ -41,6 +41,9 @@ jobs:
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+          ENDPOINT_IP=$(dig +short 14monarch.tplinkdns.com | tail -1)
+          echo "Resolved to: $ENDPOINT_IP"
+          sed -i "s/14monarch.tplinkdns.com/$ENDPOINT_IP/" wg0.conf          
 
       - name: Bring up VPN
         run: |

@@ -6,7 +6,6 @@ services:
     container_name: oci-cert-updater
     restart: unless-stopped
     environment:
-      - CERT_PATH=${CERT_PATH:-/etc/letsencrypt/live/npm-2}
       - OCI_CERT_ID=${OCI_CERT_ID}
       - CHECK_INTERVAL=${CHECK_INTERVAL:-3600}
       - OCI_USER=${OCI_USER}

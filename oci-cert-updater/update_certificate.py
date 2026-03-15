@@ -48,7 +48,7 @@ def get_pem_names(fullchain_path: str) -> set:
         names.add(cn_attrs[0].value)
     try:
         san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
-        names.update(name.value for name in san.value.get_values_for_type(x509.DNSName))
+        names.update(san.value.get_values_for_type(x509.DNSName))
     except x509.ExtensionNotFound:
         pass
     return names

@@ -3,7 +3,7 @@ FROM python:3.11-slim
 LABEL maintainer="LJF Cloud"
 LABEL description="Uploads renewed NPM certificates to OCI Certificates Service"
 
-RUN pip install --no-cache-dir oci
+RUN pip install --no-cache-dir oci cryptography
 
 WORKDIR /app
 

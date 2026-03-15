@@ -9,8 +9,22 @@ import oci
 from datetime import datetime
 
 
+def _resolve_cert_path(configured_path: str) -> str:
+    """Return configured_path if it exists, otherwise auto-discover from /etc/letsencrypt/live/."""
+    if os.path.isdir(configured_path):
+        return configured_path
+    live_dir = '/etc/letsencrypt/live'
+    if os.path.isdir(live_dir):
+        for entry in sorted(os.listdir(live_dir)):
+            candidate = os.path.join(live_dir, entry)
+            if os.path.isfile(os.path.join(candidate, 'fullchain.pem')):
+                print(f"[INFO] Configured path '{configured_path}' not found; using auto-discovered '{candidate}'", flush=True)
+                return candidate
+    return configured_path  # Fall back so the original error surfaces clearly
+
+
 # Configuration
-CERT_PATH = os.getenv('CERT_PATH', '/etc/letsencrypt/live/npm-2')
+CERT_PATH = _resolve_cert_path(os.getenv('CERT_PATH', '/etc/letsencrypt/live/npm-2'))
 OCI_CERT_ID = os.getenv('OCI_CERT_ID')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '3600'))
 

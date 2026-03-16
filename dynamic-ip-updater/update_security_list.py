@@ -11,8 +11,9 @@ from datetime import datetime
 # Configuration from environment variables
 HOSTNAME = os.getenv('HOSTNAME', '14monarch.tplinkdns.com')
 SECURITY_LIST_ID = os.getenv('SECURITY_LIST_ID')
+NSG_ID = os.getenv('NSG_ID')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '300'))  # Default: 5 minutes
-PORTS = [22, 9001]  # SSH and application port
+PORTS = [22]  # SSH
 
 # OCI Configuration
 oci_key_base64 = os.getenv('OCI_KEY_CONTENT_BASE64')
@@ -119,12 +120,62 @@ def update_security_list(virtual_network_client, new_ip):
         log(f"ERROR: Failed to update security list: {e}")
         return False
 
+def update_nsg(virtual_network_client, new_ip):
+    """Update NSG rules with new source CIDR for all configured ports"""
+    if not NSG_ID:
+        return True  # Skip silently if not configured
+
+    try:
+        # List current NSG rules
+        response = virtual_network_client.list_network_security_group_security_rules(NSG_ID)
+        current_rules = response.data
+
+        # Find and remove old rules for this hostname
+        old_rule_ids = [
+            rule.id for rule in current_rules
+            if hasattr(rule, 'description') and rule.description and HOSTNAME in rule.description
+        ]
+
+        if old_rule_ids:
+            virtual_network_client.remove_network_security_group_security_rules(
+                NSG_ID,
+                oci.core.models.RemoveNetworkSecurityGroupSecurityRulesDetails(
+                    security_rule_ids=old_rule_ids
+                )
+            )
+            log(f"Removed {len(old_rule_ids)} old NSG rule(s) for {HOSTNAME}")
+
+        # Add a single rule allowing all protocols/ports
+        virtual_network_client.add_network_security_group_security_rules(
+            NSG_ID,
+            oci.core.models.AddNetworkSecurityGroupSecurityRulesDetails(
+                security_rules=[
+                    oci.core.models.AddSecurityRuleDetails(
+                        direction="INGRESS",
+                        protocol="all",
+                        source=f"{new_ip}/32",
+                        source_type="CIDR_BLOCK",
+                        description=f"{HOSTNAME} - all protocols"
+                    )
+                ]
+            )
+        )
+
+        log(f"✓ NSG updated successfully with IP: {new_ip} (all protocols)")
+        return True
+
+    except Exception as e:
+        log(f"ERROR: Failed to update NSG: {e}")
+        return False
+
+
 def main():
     """Main loop"""
     log("=== IP Security List Updater Starting ===")
     log(f"Hostname: {HOSTNAME}")
     log(f"Ports: {', '.join(map(str, PORTS))}")
     log(f"Security List ID: {SECURITY_LIST_ID}")
+    log(f"NSG ID: {NSG_ID or '(not configured)'}")
     log(f"Check Interval: {CHECK_INTERVAL} seconds")
     log(f"Region: {config['region']}")
     
@@ -156,7 +207,9 @@ def main():
                 log(f"Skipping update due to DNS resolution failure")
             elif new_ip != current_ip:
                 log(f"IP change detected: {current_ip} -> {new_ip}")
-                if update_security_list(virtual_network_client, new_ip):
+                sl_ok = update_security_list(virtual_network_client, new_ip)
+                nsg_ok = update_nsg(virtual_network_client, new_ip)
+                if sl_ok and nsg_ok:
                     current_ip = new_ip
             else:
                 log(f"IP unchanged: {current_ip}")

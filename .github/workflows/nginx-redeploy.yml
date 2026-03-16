@@ -27,8 +27,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
+      domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
       subdomain: $(echo "${{ inputs.domain || '14monarch.local' }}" | cut -d'.' -f1)
 
     steps:
@@ -40,17 +40,12 @@ jobs:
 
       - name: Write WireGuard config
         run: |
-          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+          echo "${{ secrets.WG_CONFIG }}" > wg0.conf       
 
       - name: Bring up VPN
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show
-          
-      - name: Override system DNS resolver
-        run: |
-          sudo rm /etc/resolv.conf
-          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
           
       - name: Authenticate to Portainer
         id: auth
@@ -71,6 +66,36 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
+
+      - name: See if Nginx network exists
+        id: check_network
+        run: |
+          NETWORKS=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+          
+          if echo "$NETWORKS" | jq -e '.[] | select(.Name=="nginx_network")' > /dev/null; then
+            echo "Network found."
+            echo "network_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Network not found."
+            echo "network_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create nginx_network
+        if: steps.check_network.outputs.network_exists == 'false'
+        run: |
+          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/create" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "Name": "nginx_network",
+               "Driver": "bridge",
+               "CheckDuplicate": true,
+               "Options": {
+                 "com.docker.network.enable_ipv6": "false"
+                          }
+              }'
+              )
 
       - name: Get Stack ID (if exists)
         id: get_stack_id
@@ -93,7 +118,7 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         id: uuid
         run: |
-          echo "::set-output name=uuid::$(uuidgen)"
+          echo "uuid=$(uuidgen)" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
@@ -235,6 +260,7 @@ jobs:
           hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:85"
           hosts["pih0le.$domain"]="${{ vars.RPI0_IP }}:82"
           hosts["adminer.$domain"]="${{ vars.E7270_IP }}:86"
+          hosts["dovetrek.$domain"]="${{ vars.LJFCLOUD_IP }}:86"
           
           for domain in "${!hosts[@]}"; do
             host="${hosts[$domain]}"
@@ -264,6 +290,8 @@ jobs:
           hosts["nextcloud.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:85"
           hosts["pih0le.$subdomain.duckdns.org"]="${{ vars.RPI0_IP }}:82"
           hosts["adminer.$subdomain.duckdns.org"]="${{ vars.E7270_IP }}:86"
+          hosts["dovetrek.$subdomain.duckdns.org"]="${{ vars.LJFCLOUD_IP }}:86"
+
           
           for domain in "${!hosts[@]}"; do
             host="${hosts[$domain]}"
@@ -319,6 +347,7 @@ jobs:
           done
 
       - name: Bring down VPN
+        if: always()
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show

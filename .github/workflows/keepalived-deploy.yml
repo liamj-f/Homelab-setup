@@ -101,13 +101,6 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
-      - name: Test connectivity to host machine
-        run: |
-          sudo wg show wg0 latest-handshakes
-          # Try to reach the router itself
-          ping -c 3 -W 2 192.168.0.1 || true
-          ping -c 3 -W 2 ${{ steps.node_config.outputs.ssh_host }} || true
-
       - name: Ensure target directory exists
         uses: appleboy/ssh-action@master
         with:
@@ -245,7 +238,7 @@ jobs:
                         },
                        {
                         "name":"SECONDARY_IP",
-                        "value":"${{ steps.node_config.outputs.tartget_host }}"
+                        "value":"${{ steps.node_config.outputs.rsync_target_host }}"
                         },
                        {
                         "name":"INITIAL_ADMIN_EMAIL",
@@ -284,7 +277,7 @@ jobs:
                         },
                        {
                         "name":"SECONDARY_IP",
-                        "value":"${{ steps.node_config.outputs.target_host }}"
+                        "value":"${{ steps.node_config.outputs.rsync_target_host }}"
                         },
                        {
                         "name":"INITIAL_ADMIN_EMAIL",

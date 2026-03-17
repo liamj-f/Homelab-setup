@@ -122,6 +122,10 @@ services:
         sleep 300;
       done"
 
+networks:
+  nginx_network:
+    external: true
+
 volumes:
   nginx_letsencrypt:
     name: nginx_letsencrypt

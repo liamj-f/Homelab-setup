@@ -19,7 +19,7 @@ services:
 
   pihole:
     depends_on:
-      keepalived:
+    - keepalived
     image: pihole/pihole:latest
     container_name: pihole
     restart: unless-stopped
@@ -49,7 +49,7 @@ services:
 
   nginx-proxy-manager:
     depends_on:
-      keepalived:
+    - keepalived
     image: jc21/nginx-proxy-manager:latest
     container_name: nginx-proxy-manager
     restart: unless-stopped

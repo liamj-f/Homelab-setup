@@ -31,7 +31,7 @@ jobs:
       domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set node config
         id: node_config

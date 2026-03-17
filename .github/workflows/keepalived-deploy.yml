@@ -113,7 +113,7 @@ jobs:
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
-          key: /tmp/deploy_key
+          key_path: /tmp/deploy_key
           script: |
             sudo mkdir -p /opt/stacks/keepalived
             sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/

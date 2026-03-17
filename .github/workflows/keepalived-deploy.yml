@@ -101,12 +101,19 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
+      - name: Test connectivity to host machine
+        run: |
+          sudo wg show wg0 latest-handshakes
+          # Try to reach the router itself
+          ping -c 3 -W 2 192.168.0.1 || true
+          ping -c 3 -W 2 ${{ steps.node_config.outputs.ssh_host }} || true
+
       - name: Ensure target directory exists
         uses: appleboy/ssh-action@master
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
+          key: /tmp/deploy_key
           script: |
             sudo mkdir -p /opt/stacks/keepalived
             sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/

@@ -62,7 +62,7 @@ services:
       - "81:81"     # Admin UI
     volumes:
       - nginx_data:/data
-      - nginx_letsencrypt::/etc/letsencrypt
+      - nginx_letsencrypt:/etc/letsencrypt
     networks:
       - nginx_network
     healthcheck:

@@ -29,7 +29,6 @@ jobs:
         host_machine: [rpi4-server, e7270-server]
     env:
       domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4

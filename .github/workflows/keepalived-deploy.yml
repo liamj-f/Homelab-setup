@@ -89,6 +89,12 @@ jobs:
         run: |
           sudo wg-quick up ./wg0.conf
           sudo wg show
+          sleep 5
+          # Check if handshake happened
+          sudo wg show wg0 latest-handshakes
+          # Try to reach the router itself
+          ping -c 3 -W 2 192.168.0.1 || true
+          ping -c 3 -W 2 ${{ steps.node_config.outputs.ssh_host }} || true
 
       - name: Override system DNS resolver
         run: |

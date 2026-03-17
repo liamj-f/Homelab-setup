@@ -138,9 +138,9 @@ jobs:
       - name: Get Portainer EndpointId
         id: endpoint
         env:
-          HOST_MACHINE: ${{ matrix.host_machine || 'rpi4-server' }}
+          host_machine: ${{ matrix.host_machine || 'rpi4-server' }}
         run: |
-          echo "Looking for endpoint with name: $HOST_MACHINE"
+          echo "Looking for endpoint with name: $host_machine"
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')

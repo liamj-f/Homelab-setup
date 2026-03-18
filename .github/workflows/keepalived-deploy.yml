@@ -207,12 +207,12 @@ jobs:
             --arg nginx_email "${{ vars.NGINX_EMAIL }}" \
             --arg webhook "${{ steps.uuid.outputs.uuid }}" \
             '{
-            "Name": "keepalived",
-            "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-            "RepositoryReferenceName": $ref
-            "ComposeFile": "keepalived/keepalived-compose.yml",
-            "RepositoryAuthentication": false,
-            "AutoUpdate": {
+            Name: "keepalived",
+            RepositoryURL: "https://github.com/liamj-f/homelab-setup",
+            RepositoryReferenceName: $ref,
+            ComposeFile: "keepalived/keepalived-compose.yml",
+            RepositoryAuthentication: false,
+            AutoUpdate: {
                           "forcePullImage": true,
                           "forceUpdate": true,
                           "Webhook": $webhook
@@ -224,8 +224,8 @@ jobs:
                 {name: "SECONDARY_IP",        value: $secondary_ip},
                 {name: "INITIAL_ADMIN_EMAIL", value: $nginx_email}
               ],
-            "Prune": true,
-            "StackFileVersion": "3"
+            Prune: true,
+            StackFileVersion: "3"
           }')
           
 

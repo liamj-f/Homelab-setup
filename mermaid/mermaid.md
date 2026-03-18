@@ -25,9 +25,8 @@ flowchart TB
             nginx3(Nginx-Proxy-Manager) --"*.14monarch.james-fagg.uk"--> rathole_s(Rathole Server)
             nginx3 --"dovetrek.oci.james-fagg.uk"--> dvtrk
         end
-            lb e1@-.-> waf --> nginx3
+            lb -.-> waf --> nginx3
             nginx3 -."CertBot".-> oci-cert-up -.->  ocicerts
-            e1{ animate: true }
     end
 
     subgraph monarch14[14monarch]
@@ -43,11 +42,9 @@ flowchart TB
                 rsync1(RSync)
             end
             portainer_s(Portainer Server)
-            rathole_c1(Rathole Client)
             adminer(Adminer)
             duckdns(DuckDNS)
-            nginx1 --> pihole1 & adminer & portainer_s
-
+            rathole_c1(Rathole Client) --> nginx1 --> pihole1 & adminer & portainer_s
         end
 
         subgraph e7270[E7270]
@@ -59,10 +56,9 @@ flowchart TB
                 rsync2(RSync)
             end
             portainer_a2(Portainer Agent)
-            rathole_c2(Rathole Client)
             NxtCld(NextCloud)
             gramps(GrampsWeb)
-            nginx2 --> pihole2 & NxtCld & gramps
+            rathole_c2(Rathole Client) -->  nginx2 --> pihole2 & NxtCld & gramps
         end
 
     end
@@ -70,8 +66,6 @@ flowchart TB
     rathole_s ----> ka_vip
     portainer_a1 & portainer_a2 -.-> portainer_s
     ka_vip --> rathole_c1 & rathole_c2
-    rathole_c1 --> nginx1
-    rathole_c2 --> nginx2
     pbdns --> lb
     duck_ns ~~~~ duckdns -."14monarch.duckdns.org"-.-> duck_ns -.-> oci-ddns -."whitelist".-> nsg
 

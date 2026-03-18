@@ -27,6 +27,7 @@ jobs:
     strategy:
       matrix:
         host_machine: [rpi4-server, e7270-server]
+      max-parallel: 1
     env:
       domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
@@ -199,11 +200,6 @@ jobs:
             echo "Stack found with ID: $STACK_ID" 
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
-
-      - name: Test Portainer API through tunnel
-        run: |
-          curl -v "http://${{ vars.RPI4_IP }}:83/api/system/status" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}"      
 
       - name: Generate UUID
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}

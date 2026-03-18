@@ -89,7 +89,7 @@ jobs:
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
           Address = 10.5.5.5/32
           DNS = 10.5.5.1
-          MTU = 1380
+          MTU = 1300
 
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
@@ -109,6 +109,14 @@ jobs:
           # Try to reach the router itself
           ping -c 3 -W 2 192.168.0.1 || true
           ping -c 3 -W 2 ${{ steps.node_config.outputs.ssh_host }} || true
+
+      - name: Find optimal MTU
+        run: |
+          # Test progressively smaller sizes until ping succeeds
+          for size in 1400 1350 1300 1250; do
+            echo -n "Testing MTU $size: "
+            ping -c 1 -M do -s $size 192.168.0.2 && echo "OK" && break || echo "too large"
+          done
 
       - name: Override system DNS resolver
         run: |

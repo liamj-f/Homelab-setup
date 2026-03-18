@@ -455,8 +455,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ -z "${DOMAIN:-}" ]]; then
-            echo "DOMAIN is not set"; exit 1
+          if [[ -z "${domain:-}" ]]; then
+            echo "domain is not set"; exit 1
           fi
           if [[ -z "${PORKBUN_API_KEY:-}" || -z "${PORKBUN_API_SECRET:-}" ]]; then
             echo "Porkbun secrets are not set"; exit 1

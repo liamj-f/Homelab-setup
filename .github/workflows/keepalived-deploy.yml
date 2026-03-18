@@ -198,45 +198,36 @@ jobs:
         run: |
           echo "Creating stack from GitHub..."
           
-          CREATE_STACK_PAYLOAD=$(cat <<'PAYLOAD'
-          {
+          CREATE_STACK_PAYLOAD=$(jq -n \
+            --arg ref "${{ github.ref }}" \
+            --arg ssh_user "${{ steps.node_config.outputs.ssh_user }}" \
+            --arg app_password "${{ secrets.APP_PASSWORD }}" \
+            --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
+            --arg secondary_ip "${{ steps.node_config.outputs.rsync_target_host }}" \
+            --arg nginx_email "${{ vars.NGINX_EMAIL }}" \
+            --arg webhook "${{ steps.uuid.outputs.uuid }}" \
+            '{
             "Name": "keepalived",
             "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-            "RepositoryReferenceName": "${{ github.ref }}",
+            "RepositoryReferenceName": $ref
             "ComposeFile": "keepalived/keepalived-compose.yml",
             "RepositoryAuthentication": false,
             "AutoUpdate": {
-              "forcePullImage": true,
-              "forceUpdate": true,
-              "Webhook": "${{ steps.uuid.outputs.uuid }}"
-            },
-            "Env": [
-              {
-                "name":"SSH_USER",
-                "value":"${{ steps.node_config.outputs.ssh_user }}"
-              },
-              {
-                "name":"PIHOLE_WEBPASSWORD",
-                "value":"${{ secrets.APP_PASSWORD }}"
-              },
-              {
-                "name":"Primary_IP",
-                "value":"${{ steps.node_config.outputs.ssh_host }}"
-              },
-              {
-                "name":"SECONDARY_IP",
-                "value":"${{ steps.node_config.outputs.rsync_target_host }}"
-              },
-              {
-                "name":"INITIAL_ADMIN_EMAIL",
-                "value":"${{ vars.NGINX_EMAIL }}"
-              }
-            ],
+                          "forcePullImage": true,
+                          "forceUpdate": true,
+                          "Webhook": $webhook
+                          },
+              Env: [
+                {name: "SSH_USER",            value: $ssh_user},
+                {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
+                {name: "Primary_IP",          value: $primary_ip},
+                {name: "SECONDARY_IP",        value: $secondary_ip},
+                {name: "INITIAL_ADMIN_EMAIL", value: $nginx_email}
+              ],
             "Prune": true,
             "StackFileVersion": "3"
-          }
-          PAYLOAD
-          )
+          }')
+          
 
           RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
@@ -244,47 +235,40 @@ jobs:
           -d "$CREATE_STACK_PAYLOAD")
 
           echo "API Response: $RESPONSE"
-          echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
 
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          UPDATE_STACK_PAYLOAD=$(cat <<'PAYLOAD'
-          {
-            "PullImage": true,
-            "RepositoryReferenceName": "${{ github.ref }}",
-            "repositoryAuthentication": false,
-            "Env": [
-              {
-                "name":"SSH_USER",
-                "value":"${{ steps.node_config.outputs.ssh_user }}"
-              },
-              {
-                "name":"PIHOLE_WEBPASSWORD",
-                "value":"${{ secrets.APP_PASSWORD }}"
-              },
-              {
-                "name":"Primary_IP",
-                "value":"${{ steps.node_config.outputs.ssh_host }}"
-              },
-              {
-                "name":"SECONDARY_IP",
-                "value":"${{ steps.node_config.outputs.rsync_target_host }}"
-              },
-              {
-                "name":"INITIAL_ADMIN_EMAIL",
-                "value":"${{ vars.NGINX_EMAIL }}"
-              }
-            ],
-            "Prune": true
-          }
-          PAYLOAD
-          )
+            UPDATE_STACK_PAYLOAD=$(jq -n \
+            --arg ref "${{ github.ref }}" \
+            --arg ssh_user "${{ steps.node_config.outputs.ssh_user }}" \
+            --arg app_password "${{ secrets.APP_PASSWORD }}" \
+            --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
+            --arg secondary_ip "${{ steps.node_config.outputs.rsync_target_host }}" \
+            --arg nginx_email "${{ vars.NGINX_EMAIL }}" \
+            '{
+              PullImage: true,
+              RepositoryReferenceName: $ref,
+              repositoryAuthentication: false,
+              Env: [
+                {name: "SSH_USER",            value: $ssh_user},
+                {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
+                {name: "Primary_IP",          value: $primary_ip},
+                {name: "SECONDARY_IP",        value: $secondary_ip},
+                {name: "INITIAL_ADMIN_EMAIL", value: $nginx_email}
+              ],
+              Prune: true
+              }')
 
-          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-          -H "Content-Type: application/json" \
-          -d "$UPDATE_STACK_PAYLOAD"          
+            echo "Redeploying stack ${{ steps.get_stack_id.outputs.stack_id }} on endpoint ${{ steps.endpoint.outputs.endpoint_id }}"
+
+            RESPONSE=$(curl -s -X PUT \
+              "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+              -H "Content-Type: application/json" \
+              -d "$UPDATE_STACK_PAYLOAD")
+
+            echo "Response: $RESPONSE"       
 
       - name: Pihole Api Auth
         id: pihole_auth

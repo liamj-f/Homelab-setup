@@ -25,9 +25,9 @@ flowchart TB
             nginx3(Nginx-Proxy-Manager) --"*.14monarch.james-fagg.uk"--> rathole_s(Rathole Server)
             nginx3 --"dovetrek.oci.james-fagg.uk"--> dvtrk
         end
-            lb --> waf --> nginx3
+            lb e1@-.-> waf --> nginx3
             nginx3 -."CertBot".-> oci-cert-up -.->  ocicerts
-
+            e1{ animate: true }
     end
 
     subgraph monarch14[14monarch]
@@ -68,6 +68,7 @@ flowchart TB
     end
 
     rathole_s ----> ka_vip
+    portainer_a1 & portainer_a2 -.-> portainer_s
     ka_vip --> rathole_c1 & rathole_c2
     rathole_c1 --> nginx1
     rathole_c2 --> nginx2

@@ -83,7 +83,20 @@ jobs:
 
       - name: Write WireGuard config
         run: |
-          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+          cat > wg0.conf << EOF
+          [Interface]
+          PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
+          Address = 10.5.5.5/32
+          DNS = 10.5.5.1
+          MTU = 1380
+
+          [Peer]
+          PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
+          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
+          AllowedIPs = 192.168.0.0/24, 145.241.244.229/32
+          Endpoint = ${{ vars.WG_ENDPOINT }}:51820
+          PersistentKeepalive = 25
+          EOF
 
       - name: Bring up VPN
         run: |
@@ -191,7 +204,7 @@ jobs:
         run: |
           curl -v "http://${{ vars.RPI4_IP }}:83/api/system/status" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}"      
-                
+
       - name: Generate UUID
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         id: uuid

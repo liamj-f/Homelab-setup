@@ -111,6 +111,14 @@ jobs:
             sudo mkdir -p /opt/stacks/keepalived
             sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/
 
+      - name: Debug SSH output on rpi4
+        run: |
+          ssh -i /tmp/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            ${{ steps.node_config.outputs.ssh_user }}@192.168.0.2 \
+            "echo CLEAN" 2>&1
+
       - name: Copy configs to host
         uses: appleboy/scp-action@master
         with:

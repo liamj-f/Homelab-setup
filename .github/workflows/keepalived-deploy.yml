@@ -488,7 +488,7 @@ jobs:
               }
             }')
 
-          echo "Creating certificate for domains: *.${DOMAIN}, ${DOMAIN}"
+          echo "Creating certificate for domains: *.${domain}, ${domain}"
 
           # Call API with strong error handling; captures HTTP status and body
           HTTP_STATUS=0

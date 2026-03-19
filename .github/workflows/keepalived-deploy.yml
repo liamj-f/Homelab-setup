@@ -142,7 +142,7 @@ jobs:
       - name: Authenticate to Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
+          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
             -d '{
                  "Username":"${{ vars.APP_USER }}", 
@@ -165,7 +165,7 @@ jobs:
       - name: See if Nginx network exists
         id: check_network
         run: |
-          NETWORKS=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks" \
+          NETWORKS=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           
           if echo "$NETWORKS" | jq -e '.[] | select(.Name=="nginx_network")' > /dev/null; then
@@ -179,7 +179,7 @@ jobs:
       - name: Create nginx_network
         if: steps.check_network.outputs.network_exists == 'false'
         run: |
-          RESPONSE=$(curl -s -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/create" \
+          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ vars.RPI4_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/create" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -242,7 +242,7 @@ jobs:
               Env: [
                 {name: "SSH_USER",            value: $ssh_user},
                 {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
-                {name: "Primary_IP",          value: $primary_ip},
+                {name: "PRIMARY_IP",          value: $primary_ip},
                 {name: "SECONDARY_IP",        value: $secondary_ip},
                 {name: "INITIAL_ADMIN_EMAIL", value: $nginx_email}
               ],
@@ -251,7 +251,7 @@ jobs:
           }')
           
 
-          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d "$CREATE_STACK_PAYLOAD")
@@ -275,7 +275,7 @@ jobs:
               Env: [
                 {name: "SSH_USER",            value: $ssh_user},
                 {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
-                {name: "Primary_IP",          value: $primary_ip},
+                {name: "PRIMARY_IP",          value: $primary_ip},
                 {name: "SECONDARY_IP",        value: $secondary_ip},
                 {name: "INITIAL_ADMIN_EMAIL", value: $nginx_email}
               ],
@@ -284,7 +284,7 @@ jobs:
 
             echo "Redeploying stack ${{ steps.get_stack_id.outputs.stack_id }} on endpoint ${{ steps.endpoint.outputs.endpoint_id }}"
 
-            RESPONSE=$(curl -s -X PUT \
+            RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X PUT \
               "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
               -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
               -H "Content-Type: application/json" \
@@ -296,7 +296,7 @@ jobs:
         id: pihole_auth
         run: |
           sleep 20
-          RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \
+          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \
               -H "Content-Type: application/json" \
               -d '{
                   "password": "${{ secrets.APP_PASSWORD }}"
@@ -361,7 +361,7 @@ jobs:
                 }
           EOF
                                     
-          curl -X PATCH "http://${{ steps.node_config.outputs.ssh_host }}:82/api/config" \
+          curl --retry 3 --retry-delay 5 --retry-all-errors -X PATCH "http://${{ steps.node_config.outputs.ssh_host }}:82/api/config" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
@@ -370,7 +370,7 @@ jobs:
 
       - name: Add Blocklists to Pihole via API
         run: |
-          curl -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/lists?type=block" \
+          curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/lists?type=block" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
@@ -388,7 +388,7 @@ jobs:
 
       - name: Update Gravity via API
         run: |
-          curl -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/action/gravity" \
+          curl --retry 3 --retry-delay 5 --retry-all-errors  -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/action/gravity" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: text/plain' \
@@ -396,7 +396,7 @@ jobs:
 
       - name: Create Bypass Group in Pihole
         run: |
-          curl -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+          curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
@@ -410,7 +410,7 @@ jobs:
       - name: Get Bypass Group ID
         id: bypass_group
         run: |
-          GROUP_ID=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+          GROUP_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
@@ -419,7 +419,7 @@ jobs:
 
       - name: Add Phone to Bypass Group
         run: |
-          curl -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/clients" \
+          curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/clients" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
@@ -432,7 +432,7 @@ jobs:
           
       - name: End Pihole API Session
         run: |
-          curl -X DELETE "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \
+          curl --retry 3 --retry-delay 5 --retry-all-errors -X DELETE "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
 
@@ -440,7 +440,7 @@ jobs:
         id: token
         run: |
           sleep 20
-          RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/tokens" \
+          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/tokens" \
             -H "Content-Type: application/json" \
             -d '{
                  "identity":"${{ vars.NGINX_EMAIL }}",
@@ -453,7 +453,7 @@ jobs:
       - name: Check for Existing SSL Certificate
         id: check_cert
         run: |
-          cert_id=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
+          cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
             jq -r --arg fulldomain "*.$domain" '.[] | select(.domain_names[] == $fulldomain) | .id' | head -n 1)
 
@@ -493,7 +493,7 @@ jobs:
           # Call API with strong error handling; captures HTTP status and body
           HTTP_STATUS=0
           RESPONSE=$(
-            curl -sS -X POST "http://${API_HOST}:81/api/nginx/certificates" \
+            curl --retry 3 --retry-delay 5 --retry-all-errors -sS -X POST "http://${API_HOST}:81/api/nginx/certificates" \
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
               -d "$PAYLOAD" \
@@ -632,7 +632,7 @@ jobs:
 
             echo "Attempting to create Proxy Host: $domain"
             
-            RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+            RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
               -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
               -H "Content-Type: application/json" \
               -d "$BODY")
@@ -649,7 +649,7 @@ jobs:
 
               if [ "$EXISTING_ID" != "null" ] && [ -n "$EXISTING_ID" ]; then
                 echo "Updating existing host ID: $EXISTING_ID"
-                curl -s -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$EXISTING_ID" \
+                curl --retry 3 --retry-delay 5 --retry-all-errors -s -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$EXISTING_ID" \
                   -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
                   -H "Content-Type: application/json" \
                   -d "$BODY" | jq

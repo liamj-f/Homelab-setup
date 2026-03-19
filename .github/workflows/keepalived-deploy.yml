@@ -493,7 +493,7 @@ jobs:
           # Call API with strong error handling; captures HTTP status and body
           HTTP_STATUS=0
           RESPONSE=$(
-            curl --retry 3 --retry-delay 5 --retry-all-errors -sS -X POST "http://${API_HOST}:81/api/nginx/certificates" \
+            curl --retry 3 --retry-delay 5 --retry-all-errors -sS -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
               -d "$PAYLOAD" \

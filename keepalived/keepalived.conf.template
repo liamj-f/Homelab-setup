@@ -1,6 +1,10 @@
+global_defs {
+    script_security on
+}
+
 vrrp_instance VI_1 {
   state ${MASTER_OR_BACKUP_STATE}
-  interface auto
+  interface ${KEEPALIVED_INTERFACE}
   virtual_router_id 51
   priority ${KEEPALIVED_PRIORITY}
   advert_int 1
@@ -14,5 +18,5 @@ vrrp_instance VI_1 {
     ${KEEPALIVED_VIRTUAL_IP}/24
   }
 
-  notify /etc/keepalived/notify.sh
+  notify /etc/keepalived/notify.sh root
 }

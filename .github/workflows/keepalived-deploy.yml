@@ -363,9 +363,9 @@ jobs:
                         "logging": false,
                         "ignoreUnknownClients": false,
                         "hosts": [
-                                "dc:a6:32:c8:bb:41,${{ vars.RPI4_IP }},"rpi4-server",infinite",
-                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},"rpi0-server",infinite",
-                                "3c:6a:a7:87:f4:0b,${{ vars.E7270_IP }},"e7270-server",infinite"
+                                "dc:a6:32:c8:bb:41,${{ vars.RPI4_IP }},rpi4-server,infinite",
+                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},rpi0-server,infinite",
+                                "3c:6a:a7:87:f4:0b,${{ vars.E7270_IP }},e7270-server,infinite"
                                  ]
                           },
                   "misc": {

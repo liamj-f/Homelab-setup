@@ -39,6 +39,7 @@ services:
       TZ: 'Europe/London'
       FTLCONF_webserver_api_password: ${PIHOLE_WEBPASSWORD}
       FTLCONF_webserver_port: 82
+      FTLCONF_dhcp_active: false  
 #      FTLCONF_misc_etc_dnsmasq_d: true
     cap_add:
       - NET_ADMIN
@@ -107,22 +108,21 @@ services:
       TZ: "Europe/London"
     restart: unless-stopped
 
-  rsync:
+rsync:
     image: instrumentisto/rsync-ssh
     container_name: rsync
     restart: unless-stopped
+    user: root
     volumes:
       - nginx_data:/data
       - nginx_letsencrypt:/etc/letsencrypt
       - ~/.ssh:/root/.ssh:ro
     environment:
-      - RSYNC_TARGET=${SSH_USER}@${SECONDARY_IP} 
-    command: >
+      - RSYNC_TARGET=${SSH_USER}@${SECONDARY_IP}
+    command: >-
       sh -c "while true; do
-        rsync -avz --delete
-          /data/ ${SSH_USER}@${SECONDARY_IP}:/data/ &&
-        rsync -avz --delete
-          /etc/letsencrypt/ ${SSH_USER}@${SECONDARY_IP}:/etc/letsencrypt/;
+        rsync -avz --delete /data/ ${SSH_USER}@${SECONDARY_IP}:/data/ &&
+        rsync -avz --delete /etc/letsencrypt/ ${SSH_USER}@${SECONDARY_IP}:/etc/letsencrypt/;
         sleep 300;
       done"
 

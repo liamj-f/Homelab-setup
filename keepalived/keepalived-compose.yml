@@ -24,7 +24,7 @@ services:
     container_name: pihole
     hostname: ${HOSTNAME}
     restart: unless-stopped
-    # network_mode: "host"
+    network_mode: "host"
     ports:
       # DNS Ports
       - "53:53/tcp"
@@ -112,20 +112,22 @@ rsync:
     image: instrumentisto/rsync-ssh
     container_name: rsync
     restart: unless-stopped
-    user: root
     volumes:
       - nginx_data:/data
       - nginx_letsencrypt:/etc/letsencrypt
       - ~/.ssh:/root/.ssh:ro
     environment:
-      - RSYNC_TARGET=${SSH_USER}@${SECONDARY_IP}
-    command: >-
-      sh -c "while true; do
-        rsync -avz --delete /data/ ${SSH_USER}@${SECONDARY_IP}:/data/ &&
-        rsync -avz --delete /etc/letsencrypt/ ${SSH_USER}@${SECONDARY_IP}:/etc/letsencrypt/;
-        sleep 300;
-      done"
-
+      - SSH_USER=${SSH_USER}
+      - SECONDARY_IP=${SECONDARY_IP}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          rsync -avz --delete /data/ $$SSH_USER@$$SECONDARY_IP:/data/
+          rsync -avz --delete /etc/letsencrypt/ $$SSH_USER@$$SECONDARY_IP:/etc/letsencrypt/
+          sleep 300
+        done
+        
 networks:
   nginx_network:
     external: true

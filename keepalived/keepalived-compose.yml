@@ -46,6 +46,9 @@ services:
       - pihole_data:/etc/pihole
       - dnsmasq_data:/etc/dnsmasq.d
 #      - /home/pi/stacks/pihole/99-pihole-custom.conf:/etc/dnsmasq.d/99-custom.conf
+    networks:
+      - nginx_network
+        
 
   nginx-proxy-manager:
     depends_on:

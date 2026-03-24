@@ -593,7 +593,26 @@ jobs:
 
             BODY=$(echo "$proxy" | jq \
               --argjson cert_id "$cert_id" \
-              '. + { certificate_id: $cert_id, ssl_forced: true }')
+              '{
+                domain_names: .domain_names,
+                forward_scheme: .forward_scheme,
+                forward_host: .forward_host,
+                forward_port: .forward_port,
+                access_list_id: .access_list_id,
+                certificate_id: $cert_id,
+                ssl_forced: true,
+                caching_enabled: .caching_enabled,
+                block_exploits: .block_exploits,
+                advanced_config: .advanced_config,
+                meta: .meta,
+                allow_websocket_upgrade: .allow_websocket_upgrade,
+                http2_support: .http2_support,
+                enabled: .enabled,
+                locations: (if .locations == null then [] else .locations end),
+                hsts_enabled: .hsts_enabled,
+                hsts_subdomains: .hsts_subdomains,
+                trust_forwarded_proto: .trust_forwarded_proto
+              }')
 
             echo "Applying cert to $fqdn (id: $id)"
             curl --retry 3 --retry-delay 5 --retry-all-errors -s \

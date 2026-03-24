@@ -341,13 +341,13 @@ jobs:
                       "listeningMode": "single",
                       "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
                       "hosts":[
-                              "192.168.0.1 tplink.$domain",
-                              "${{ vars.RPI4_IP }} pihole1.$domain",
-                              "${{ vars.E7270_IP }} pihole2.$domain",
+                              "${{ vars.KEEPALIVED_IP }} tplink.$domain",
+                              "${{ vars.KEEPALIVED_IP }} pihole1.$domain",
+                              "${{ vars.KEEPALIVED_IP }} pihole2.$domain",
                               "${{ vars.KEEPALIVED_IP }} nginx.$domain",
-                              "${{ vars.RPI4_IP }} portainer.$domain",
-                              "${{ vars.E7270_IP }} nextcloud.$domain",
-                              "${{ vars.RPI4_IP }} adminer.$domain"
+                              "${{ vars.KEEPALIVED_IP }} portainer.$domain",
+                              "${{ vars.KEEPALIVED_IP }} nextcloud.$domain",
+                              "${{ vars.KEEPALIVED_IP }} adminer.$domain"
                               ]
                            },                          
                   "dhcp": {
@@ -363,9 +363,9 @@ jobs:
                         "logging": false,
                         "ignoreUnknownClients": false,
                         "hosts": [
-                                "dc:a6:32:c8:bb:41,${{ vars.RPI4_IP }},,infinite",
-                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},,infinite",
-                                "3c:6a:a7:87:f4:0b,${{ vars.E7270_IP }},,infinite"
+                                "dc:a6:32:c8:bb:41,${{ vars.RPI4_IP }},"rpi4-server",infinite",
+                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},"rpi0-server",infinite",
+                                "3c:6a:a7:87:f4:0b,${{ vars.E7270_IP }},"e7270-server",infinite"
                                  ]
                           },
                   "misc": {

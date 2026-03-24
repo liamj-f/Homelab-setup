@@ -15,7 +15,7 @@ services:
     volumes:
       - /opt/stacks/keepalived/keepalived.conf:/etc/keepalived/keepalived.conf:ro
       - /opt/stacks/keepalived/notify.sh:/etc/keepalived/notify.sh:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
 
   pihole:
     depends_on:

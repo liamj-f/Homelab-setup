@@ -104,15 +104,22 @@ jobs:
 
       - name: Bring up VPN
         run: |
-          sudo wg-quick up ./wg0.conf
+          for i in $(seq 1 5); do
+            echo "Attempt $i/5: bringing up WireGuard..."
+            if sudo wg-quick up ./wg0.conf; then
+              echo "WireGuard up successfully"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "WireGuard failed after 5 attempts"
+              exit 1
+            fi
+            echo "Failed, waiting 10s before retry..."
+            sudo ip link delete dev wg0 2>/dev/null || true
+            sleep 10
+          done
           sudo wg show
-          sleep 5
-          # Check if handshake happened
-          sudo wg show wg0 latest-handshakes
-          # Try to reach the router itself
-          ping -c 3 -W 2 192.168.0.1 || true
-          ping -c 3 -W 2 ${{ steps.node_config.outputs.ssh_host }} || true
-
+          
       - name: Find optimal MTU
         run: |
           # Test progressively smaller sizes until ping succeeds

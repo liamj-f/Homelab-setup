@@ -109,7 +109,7 @@ services:
       TZ: "Europe/London"
     restart: unless-stopped
 
-rsync:
+  rsync:
     image: instrumentisto/rsync-ssh
     container_name: rsync
     restart: unless-stopped

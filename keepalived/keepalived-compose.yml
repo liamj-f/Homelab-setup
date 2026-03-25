@@ -39,7 +39,6 @@ services:
       TZ: 'Europe/London'
       FTLCONF_webserver_api_password: ${PIHOLE_WEBPASSWORD}
       FTLCONF_webserver_port: 82
-      FTLCONF_dhcp_active: false  
 #      FTLCONF_misc_etc_dnsmasq_d: true
     cap_add:
       - NET_ADMIN
@@ -110,16 +109,22 @@ services:
       TZ: "Europe/London"
     restart: unless-stopped
 
-  rsync:
+rsync:
     image: instrumentisto/rsync-ssh
     container_name: rsync
     restart: unless-stopped
+    mem_limit: 128m
+    memswap_limit: 128m
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         while true; do
-          rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" /data/ $SSH_USER@$SECONDARY_IP:/data/
-          rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" /etc/letsencrypt/ $SSH_USER@$SECONDARY_IP:/etc/letsencrypt/
+          rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" \
+            /data/ $SSH_USER@$SECONDARY_IP:/data/
+          rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" \
+            /etc/letsencrypt/ $SSH_USER@$SECONDARY_IP:/etc/letsencrypt/
           sleep 300
         done
     volumes:

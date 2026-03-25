@@ -120,14 +120,6 @@ jobs:
           done
           sudo wg show
 
-      - name: Find optimal MTU
-        run: |
-          # Test progressively smaller sizes until ping succeeds
-          for size in 1400 1350 1300 1250; do
-            echo -n "Testing MTU $size: "
-            ping -c 1 -M do -s $size 192.168.0.2 && echo "OK" && break || echo "too large"
-          done
-
       - name: Override system DNS resolver
         run: |
           sudo rm /etc/resolv.conf
@@ -148,6 +140,23 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key_path: /tmp/deploy_key
           script: chmod +x /opt/stacks/keepalived/notify.sh 
+
+      - name: Deploy rsync SSH key to each host
+        run: |
+          printf '%s' "${{ steps.node_config.outputs.rsync_target_key }}" > /tmp/rsync_key
+          chmod 600 /tmp/rsync_key
+          ssh -i /tmp/deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
+            "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
+          scp -i /tmp/deploy_key \
+            -o StrictHostKeyChecking=no \
+            /tmp/rsync_key \
+            ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:~/.ssh/rsync_id
+          ssh -i /tmp/deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
+            "chmod 600 ~/.ssh/rsync_id"          
 
       - name: Authenticate to Portainer
         id: auth
@@ -323,6 +332,7 @@ jobs:
           
       - name: Add DNS records to Pihole via API
         # should add wg0 back in as interface here "eth0,wg0
+        # removed "active": true, from the dhcp part as keepalived will handle on transistion to master
         run: |
           cat <<EOF > pihole_config.json
           {
@@ -351,7 +361,6 @@ jobs:
                               ]
                            },                          
                   "dhcp": {
-                        "active": true,
                         "start": "192.168.0.10",
                         "end": "192.168.0.254",
                         "router": "192.168.0.1",

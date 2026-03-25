@@ -130,7 +130,7 @@ services:
     volumes:
       - nginx_data:/data
       - nginx_letsencrypt:/etc/letsencrypt
-      - ~/.ssh:/root/.ssh:ro
+      - /home/${SSH_USER}/.ssh:/root/.ssh:ro
     environment:
       - SSH_USER=${SSH_USER}
       - SECONDARY_IP=${SECONDARY_IP}

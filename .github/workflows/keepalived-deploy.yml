@@ -136,13 +136,12 @@ jobs:
             keepalived/notify.sh \
             ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/keepalived/
 
-      - name: Set permissions            # this single ssh-action should be fine now
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key_path: /tmp/deploy_key
-          script: chmod +x /opt/stacks/keepalived/notify.sh 
+      - name: Write key files
+        run: |
+          printf '%s' "${{ steps.node_config.outputs.rsync_target_key }}" > /tmp/rsync_key
+          chmod 600 /tmp/rsync_key
+          printf '%s' "${{ steps.node_config.outputs.rsync_target_key }}" > /tmp/rsync_target_key
+          chmod 600 /tmp/rsync_target_key
 
       - name: Deploy rsync SSH key to host
         uses: appleboy/ssh-action@master
@@ -154,7 +153,7 @@ jobs:
             mkdir -p ~/.ssh
             chmod 700 ~/.ssh
             printf '%s' '${{ steps.node_config.outputs.rsync_target_key }}' > ~/.ssh/rsync_id
-            chmod 600 ~/.ssh/rsync_id      
+            chmod 600 ~/.ssh/rsync_id
 
       - name: Prepare rsync target directories
         uses: appleboy/ssh-action@master
@@ -167,7 +166,7 @@ jobs:
             sudo mkdir -p /var/lib/docker/volumes/nginx_letsencrypt/_data
             sudo chown -R ${{ steps.node_config.outputs.rsync_target_user }}:${{ steps.node_config.outputs.rsync_target_user }} /var/lib/docker/volumes/nginx_data/_data
             sudo chown -R ${{ steps.node_config.outputs.rsync_target_user }}:${{ steps.node_config.outputs.rsync_target_user }} /var/lib/docker/volumes/nginx_letsencrypt/_data
-
+            
       - name: Authenticate to Portainer
         id: auth
         run: |

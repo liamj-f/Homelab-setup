@@ -120,10 +120,10 @@ services:
       - |
         while true; do
           rsync -avz --delete \
-            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" \
+            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
             /data/ $SSH_USER@$SECONDARY_IP:/data/
           rsync -avz --delete \
-            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa" \
+            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
             /etc/letsencrypt/ $SSH_USER@$SECONDARY_IP:/etc/letsencrypt/
           sleep 300
         done

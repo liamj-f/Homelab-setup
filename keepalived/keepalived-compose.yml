@@ -121,10 +121,10 @@ services:
         while true; do
           rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
-            /data/ $SSH_USER@$SECONDARY_IP:/data/
+            /data/ $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_data/_data/
           rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
-            /etc/letsencrypt/ $SSH_USER@$SECONDARY_IP:/etc/letsencrypt/
+            /etc/letsencrypt/ $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_letsencrypt/_data/
           sleep 300
         done
     volumes:

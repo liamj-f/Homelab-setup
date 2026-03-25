@@ -10,9 +10,6 @@ on:
       - 'keepalived/**'
   workflow_dispatch:
     inputs:
-      host_machine:
-        required: true
-        type: string 
       domain:
         required: true
         type: string  

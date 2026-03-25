@@ -78,6 +78,12 @@ jobs:
           export KEEPALIVED_INTERFACE="${{ steps.node_config.outputs.keepalived_interface }}"
           envsubst < keepalived/keepalived.conf.template > keepalived/keepalived.conf
 
+      - name: Render notify.sh
+        run: |
+          export PRIMARY_IP="${{ steps.node_config.outputs.ssh_host }}"
+          export PIHOLE_WEBPASSWORD="${{ secrets.APP_PASSWORD }}"
+          envsubst '${PRIMARY_IP} ${PIHOLE_WEBPASSWORD}' < keepalived/notify.sh.template > keepalived/notify.sh
+
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
@@ -458,6 +464,7 @@ jobs:
 
       - name: Authenticate as nginx user
         id: token
+        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
         run: |
           RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/tokens" \
             -H "Content-Type: application/json" \
@@ -471,6 +478,7 @@ jobs:
 
       - name: Resolve SSL Certificate ID
         id: cert
+        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
         run: |
           cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s \
             -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
@@ -486,6 +494,7 @@ jobs:
           fi
 
       - name: Create or Update Proxy Hosts (without cert)
+        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
         run: |
           declare -A hosts
           hosts["tplink.$domain"]="192.168.0.1:80"
@@ -540,7 +549,7 @@ jobs:
 
       - name: Create Certificate
         id: create_cert
-        if: steps.cert.outputs.cert_id == ''
+        if: ${{ steps.cert.outputs.cert_id == '' && steps.node_config.outputs.keepalived_state == 'MASTER' }}
         continue-on-error: true
         run: |
           PAYLOAD=$(jq -n \
@@ -579,6 +588,7 @@ jobs:
           fi
 
       - name: Apply Certificate to Proxy Hosts
+        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
         run: |
           cert_id="${{ steps.cert.outputs.cert_id }}"
           [ -z "$cert_id" ] && cert_id="${{ steps.create_cert.outputs.cert_id }}"

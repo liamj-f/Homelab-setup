@@ -1,0 +1,64 @@
+#!/bin/bash
+
+TYPE=$1
+NAME=$2
+STATE=$3
+
+PIHOLE_URL="http://$PRIMARY_IP:82"
+
+pihole_set_dhcp() {
+  local active=$1  # "true" or "false"
+
+  local auth_response
+  auth_response=$(curl -s -X POST "$PIHOLE_URL/api/auth" \
+    -H "Content-Type: application/json" \
+    -d "{\"password\": \"$PIHOLE_WEBPASSWORD\"}")
+
+  local sid csrf
+  sid=$(echo "$auth_response" | sed -n 's/.*"sid"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+  csrf=$(echo "$auth_response" | sed -n 's/.*"csrf"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+
+  if [ -z "$sid" ]; then
+    logger "keepalived notify: failed to authenticate with Pi-hole at $PIHOLE_URL"
+    return 1
+  fi
+
+  curl -s -X PATCH "$PIHOLE_URL/api/config" \
+    -H "X-FTL-SID: $sid" \
+    -H "X-FTL-CSRF: $csrf" \
+    -H "Content-Type: application/json" \
+    -d "{\"config\":{\"dhcp\":{\"active\":$active}}}"
+
+  curl -s -X DELETE "$PIHOLE_URL/api/auth" \
+    -H "X-FTL-SID: $sid" \
+    -H "X-FTL-CSRF: $csrf"
+}
+
+case $STATE in
+  "MASTER")
+    docker start rsync
+    docker start nebula-sync
+    docker start nginx-proxy-manager
+    pihole_set_dhcp true
+    ;;
+  "BACKUP"|"FAULT")
+    sleep 5
+    # Re-check state before stopping - if we're now MASTER, abort
+    CURRENT_STATE=$(ip addr show | grep -q "192.168.0.5" && echo "MASTER" || echo "BACKUP")
+    if [ "$CURRENT_STATE" = "MASTER" ]; then
+      logger "keepalived notify: state changed to MASTER before stop completed, aborting"
+      exit 0
+    fi
+    docker stop rsync
+    docker stop nebula-sync
+    docker stop nginx-proxy-manager
+    pihole_set_dhcp false
+    ;;
+  *)
+    logger "keepalived notify: unknown state $STATE"
+    exit 1
+    ;;
+esac
+
+logger "keepalived notify: transitioned to $STATE"
+exit 0

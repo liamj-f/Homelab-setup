@@ -113,17 +113,17 @@ services:
     image: instrumentisto/rsync-ssh
     container_name: rsync
     restart: unless-stopped
-    mem_limit: 128m
-    memswap_limit: 128m
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         while true; do
           rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
+            --rsync-path="sudo rsync" \
             /data/ $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_data/_data/
           rsync -avz --delete \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
+            --rsync-path="sudo rsync" \
             /etc/letsencrypt/ $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_letsencrypt/_data/
           sleep 300
         done

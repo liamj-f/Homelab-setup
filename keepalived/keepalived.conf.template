@@ -1,5 +1,4 @@
 global_defs {
-    script_security on
 }
 
 vrrp_instance VI_1 {
@@ -18,6 +17,6 @@ vrrp_instance VI_1 {
     ${KEEPALIVED_VIRTUAL_IP}/24
   }
 
-  notify /etc/keepalived/notify.sh root
-  notify_stop "/etc/keepalived/notify.sh INSTANCE VI_1 FAULT" root
+  notify /etc/keepalived/notify.sh
+  notify_stop "/etc/keepalived/notify.sh INSTANCE VI_1 FAULT"
 }

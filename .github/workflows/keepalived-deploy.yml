@@ -143,7 +143,7 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key_path: /tmp/deploy_key
           script: |
-            chmod +x /opt/stacks/keepalived/notify.sh
+            chmod a+rx /opt/stacks/keepalived/notify.sh
             ls -la /opt/stacks/keepalived/
 
       - name: Write key files

@@ -128,6 +128,16 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
+      - name: Set permissions
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key_path: /tmp/deploy_key
+          script: |
+            chmod +x /opt/stacks/keepalived/notify.sh
+            ls -la /opt/stacks/keepalived/
+
       - name: Copy configs to host       # replace scp-action with this
         run: |
           rsync -avz \

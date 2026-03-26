@@ -155,18 +155,6 @@ jobs:
             printf '%s' '${{ steps.node_config.outputs.rsync_target_key }}' > ~/.ssh/rsync_id
             chmod 600 ~/.ssh/rsync_id
 
-      - name: Prepare rsync target directories
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ steps.node_config.outputs.rsync_target_host }}
-          username: ${{ steps.node_config.outputs.rsync_target_user }}
-          key_path: /tmp/rsync_target_key
-          script: |
-            sudo mkdir -p /var/lib/docker/volumes/nginx_data/_data
-            sudo mkdir -p /var/lib/docker/volumes/nginx_letsencrypt/_data
-            sudo chown -R ${{ steps.node_config.outputs.rsync_target_user }}:${{ steps.node_config.outputs.rsync_target_user }} /var/lib/docker/volumes/nginx_data/_data
-            sudo chown -R ${{ steps.node_config.outputs.rsync_target_user }}:${{ steps.node_config.outputs.rsync_target_user }} /var/lib/docker/volumes/nginx_letsencrypt/_data
-
       - name: Authenticate to Portainer
         id: auth
         run: |
@@ -643,16 +631,6 @@ jobs:
               -H "Content-Type: application/json" \
               -d "$BODY" | jq -r '.id // "error"'
           done
-
-      - name: Prepare rsync target directories
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ steps.node_config.outputs.rsync_target_host }}
-          username: ${{ steps.node_config.outputs.rsync_target_user }}
-          key_path: /tmp/rsync_target_key
-          script: |
-            sudo chown -R ${{ steps.node_config.outputs.rsync_target_user }}:${{ steps.node_config.outputs.rsync_target_user }} /var/lib/docker/volumes/nginx_data/_data
-            sudo chown -R ${{ steps.node_config.outputs.rsync_target_user }}:${{ steps.node_config.outputs.rsync_target_user }} /var/lib/docker/volumes/nginx_letsencrypt/_data
 
       - name: Bring down VPN
         if: always()

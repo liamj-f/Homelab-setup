@@ -128,6 +128,14 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
+      - name: Copy configs to host       # replace scp-action with this
+        run: |
+          rsync -avz \
+            -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" \
+            keepalived/keepalived.conf \
+            keepalived/notify.sh \
+            ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/keepalived/
+
       - name: Set permissions
         uses: appleboy/ssh-action@master
         with:
@@ -137,14 +145,6 @@ jobs:
           script: |
             chmod +x /opt/stacks/keepalived/notify.sh
             ls -la /opt/stacks/keepalived/
-
-      - name: Copy configs to host       # replace scp-action with this
-        run: |
-          rsync -avz \
-            -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" \
-            keepalived/keepalived.conf \
-            keepalived/notify.sh \
-            ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/keepalived/
 
       - name: Write key files
         run: |

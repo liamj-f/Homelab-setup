@@ -19,4 +19,5 @@ vrrp_instance VI_1 {
   }
 
   notify /etc/keepalived/notify.sh root
+  notify_stop "/etc/keepalived/notify.sh INSTANCE VI_1 FAULT" root
 }

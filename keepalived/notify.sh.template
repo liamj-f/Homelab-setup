@@ -36,10 +36,23 @@ pihole_set_dhcp() {
 
 case $STATE in
   "MASTER")
+    # Wait for pihole to be ready
+    for i in $(seq 1 12); do
+      if curl -s "http://localhost:82/api/auth" > /dev/null 2>&1; then
+        break
+      fi
+      sleep 5
+    done
+    pihole_set_dhcp true
+    docker start nginx-proxy-manager
     docker start rsync
     docker start nebula-sync
-    docker start nginx-proxy-manager
-    pihole_set_dhcp true
+    # Stop containers on the other node via SSH
+    ssh -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        -i /home/${SSH_USER}/.ssh/rsync_id \
+        ${SSH_USER}@${SECONDARY_IP} \
+        "docker stop rsync nebula-sync nginx-proxy-manager" || true
     ;;
   "BACKUP"|"FAULT")
     sleep 5

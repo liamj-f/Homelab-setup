@@ -118,10 +118,12 @@ services:
       - |
         while true; do
           rsync -avz --delete \
+            --chmod=F664,D775 \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
             --rsync-path="sudo rsync" \
             /data/ $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_data/_data/
           rsync -avz --delete \
+            --chmod=F664,D775 \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
             --rsync-path="sudo rsync" \
             /etc/letsencrypt/ $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_letsencrypt/_data/

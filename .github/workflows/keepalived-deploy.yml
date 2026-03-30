@@ -322,6 +322,16 @@ jobs:
 
             echo "Response: $RESPONSE"       
 
+      - name: Fix NPM database permissions
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key_path: /tmp/deploy_key
+          script: |
+            sudo chmod 664 /var/lib/docker/volumes/nginx_data/_data/database.sqlite
+            sudo chmod 775 /var/lib/docker/volumes/nginx_data/_data/
+
       - name: Pihole Api Auth
         id: pihole_auth
         run: |

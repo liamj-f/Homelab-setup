@@ -1,29 +1,24 @@
+name: Redeploy OCI Cert Updater via Portainer GitOps
 
-name: Redeploy OCI Dynamic IP Updater via Portainer GitOps 
 on:
   workflow_call:
     inputs:
       host_machine:
-        required: true
-        type: string 
-      domain:
         required: true
         type: string
   workflow_dispatch:
     inputs:
       host_machine:
         required: true
-        type: string 
-      domain:
-        required: true
-        type: string   
+        type: string
   push:
     branches:
       - main
       - '**'
     paths:
-      - '.github/workflows/OCI-dynamic-ip-updater-deploy.yml'  
-      - 'dynamic-ip-updater/**'  
+      - '.github/workflows/oci-cert-updater-deploy.yml'
+      - 'oci-cert-updater/**'
+
 jobs:
   build-image-and-push:
     name: Build and push image to ghcr.io
@@ -46,7 +41,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/liamj-f/oci-dynamic-ip-updater
+          images: ghcr.io/liamj-f/oci-cert-updater
           tags: |
             type=sha,prefix=sha-
             type=raw,value=latest
@@ -54,60 +49,37 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ./dynamic-ip-updater
+          context: ./oci-cert-updater
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  deploy_dynamic_ip_updater:
+  deploy:
     needs: build-image-and-push
     runs-on: ubuntu-latest
     env:
       host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
-      domain: ${{ inputs.domain || '14monarch.duckdns.org' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Install WireGuard
         run: |
-          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
-          
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)
+
       - name: Write WireGuard config
         run: |
           echo "${{ secrets.WG_CONFIG }}" > wg0.conf
-          
-      - name: Bring up VPN on runner
+
+      - name: Bring up VPN
         run: |
           sudo wg-quick up ./wg0.conf
-          sudo wg show  
+          sudo wg show
 
-#      - name: Add host key to known_hosts of runner
+#      - name: Override system DNS resolver
 #        run: |
-#          mkdir -p ~/.ssh
-#          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
-#
-#      - name: Build image on VPS (sparse checkout)
-#        uses: appleboy/ssh-action@v1.0.0
-#        with:
-#          host: ${{ vars.LJFCLOUD_IP }}
-#          username: ${{ vars.LJFCLOUD_USER }}
-#          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
-#          script: |
-#            cd /tmp
-#            rm -rf homelab-setup
-#
-#            # Sparse checkout - only get dynamic-ip-updater folder
-#            git clone --filter=blob:none --sparse https://github.com/liamj-f/homelab-setup.git
-#            cd homelab-setup
-#            git sparse-checkout set dynamic-ip-updater
-#            git checkout ${{ github.ref_name }}
-#
-#            # Build
-#            cd dynamic-ip-updater
-#            sudo docker build -t ip-security-list-updater:latest .
-#
-#            echo "✓ Image built successfully"
+#          sudo rm /etc/resolv.conf
+#          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
       - name: Authenticate to Portainer
         id: auth
@@ -127,7 +99,7 @@ jobs:
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')
-          echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT          
+          echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: Get Stack ID (if exists)
         id: get_stack_id
@@ -135,9 +107,8 @@ jobs:
           STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
-          # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="oci-dynamic-ip-updater" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
-          
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="oci-cert-updater" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
             echo "stack_id=0" >> $GITHUB_OUTPUT
@@ -150,22 +121,21 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         id: uuid
         run: |
-          echo "::set-output name=uuid::$(uuidgen)"
+          echo "uuid=$(uuidgen)" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
           OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
 
-          echo "Creating stack from GitHub..."
           RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "OCI-Dynamic-IP-Updater",
+               "Name": "oci-cert-updater",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "dynamic-ip-updater/dynamic-ip-updater-compose.yml",
+               "ComposeFile": "oci-cert-updater/oci-cert-updater-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,
@@ -173,79 +143,42 @@ jobs:
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
                "Env": [
-                      {"name":"Domain", "value":"${{ env.domain }}"},  
-                       {
-                       "name":"OCI_USER",
-                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
-                       },
-                       {
-                       "name":"OCI_FINGERPRINT",
-                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"
-                       },
-                       {
-                        "name":"OCI_TENANCY",
-                        "value":"${{ vars.OCID_TENANT }}"
-                        },
-                        {
-                        "name":"OCI_KEY_CONTENT_BASE64",
-                        "value":"'"$OCI_KEY_BASE64"'"
-                        },
-                        {
-                        "name":"SECURITY_LIST_ID",
-                        "value":"${{ vars.OCID_SECURITY_LIST }}"
-                        },
-                        {
-                        "name":"NSG_ID",
-                        "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
-                        }
+                       {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
+                       {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
+                       {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
+                       {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
+                       {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"}
                ],
                "Prune": true,
                "StackFileVersion": "3"
               }')
 
-            echo "API Response: $RESPONSE"
-            echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
+          echo "API Response: $RESPONSE"
 
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
           OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
-          
+
           curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Env": [
-                      {"name":"Domain", "value":"${{ env.domain }}"},  
-                       {
-                       "name":"OCI_USER",
-                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
-                       },
-                       {
-                       "name":"OCI_FINGERPRINT",
-                       "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"
-                       },
-                       {
-                        "name":"OCI_TENANCY",
-                        "value":"${{ vars.OCID_TENANT }}"
-                        },
-                        {
-                        "name":"OCI_KEY_CONTENT_BASE64",
-                        "value":"'"$OCI_KEY_BASE64"'"
-                        },
-                        {
-                        "name":"SECURITY_LIST_ID",
-                        "value":"${{ vars.OCID_SECURITY_LIST }}"
-                        }
-                ],
                "PullImage": true,
                "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
+               "Env": [
+                       {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
+                       {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
+                       {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
+                       {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
+                       {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"}
+               ],
                "Prune": true
               }'
-              
+
       - name: Bring down VPN
+        if: always()
         run: |
           sudo wg-quick down ./wg0.conf
-          sudo wg show   
-
+          sudo wg show

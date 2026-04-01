@@ -1,0 +1,6 @@
+services:
+  dovetrek:
+    image: ghcr.io/liamj-f/dovetrek-pwa:latest
+    ports:
+      - "86:80"
+    restart: unless-stopped

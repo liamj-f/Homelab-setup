@@ -14,7 +14,7 @@ services:
       - "81:81"     # Admin UI
     volumes:
       - nginx_data:/data
-      - ./letsencrypt:/etc/letsencrypt
+      - nginx_letsencrypt:/etc/letsencrypt
     networks:
       - nginx_network
     healthcheck:
@@ -24,6 +24,8 @@ services:
 volumes:
   nginx_data:
     name: nginx_data
+  nginx_letsencrypt:
+    name: nginx_letsencrypt
 networks:
   nginx_network:
     driver: bridge

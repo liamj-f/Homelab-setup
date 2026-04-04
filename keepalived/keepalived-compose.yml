@@ -136,6 +136,16 @@ services:
     environment:
       - SSH_USER=${SSH_USER}
       - SECONDARY_IP=${SECONDARY_IP}
+  
+  rathole:
+    image: rapiz1/rathole:latest
+    container_name: rathole-client
+    restart: unless-stopped
+    volumes:
+      - ./rathole-client.toml:/app/config.toml
+    command: --client /app/config.toml
+    extra_hosts: 
+      - "host.docker.internal:host-gateway"
 
 networks:
   nginx_network:

@@ -48,6 +48,7 @@ classDef lan fill:#ffd6d6,stroke:#c92a2a,stroke-width:2px,color:#000
                 neb_s1(Nebula-Sync)
                 nginx1(Nginx-Proxy-Manager)
                 rsync1(RSync)
+                rathole_c1(Rathole Client)
             end
 
             portainer_s(Portainer Server)
@@ -63,6 +64,7 @@ classDef lan fill:#ffd6d6,stroke:#c92a2a,stroke-width:2px,color:#000
                 neb_s2(Nebula-Sync)
                 nginx2(Nginx-Proxy-Manager)
                 rsync2(RSync)
+                rathole_c2(Rathole Client)
             end
             portainer_a2(Portainer Agent)
             NxtCld(NextCloud)

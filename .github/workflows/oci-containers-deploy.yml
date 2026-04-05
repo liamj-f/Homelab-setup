@@ -192,6 +192,7 @@ jobs:
                           }
               }'
               )
+              
       - name: Get Stack ID (if exists)
         id: get_stack_id
         run: |
@@ -199,8 +200,11 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="oci-containers" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
-          
+          STACK_ID=$(echo "$STACKS" | jq -r \
+            --arg name "oci-containers" \
+            --argjson endpoint_id "${{ steps.endpoint.outputs.endpoint_id }}" \
+            '.[] | select(.Name==$name and .EndpointId==$endpoint_id) | .Id')
+
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
             echo "stack_id=0" >> $GITHUB_OUTPUT

@@ -372,6 +372,7 @@ jobs:
           declare -A hosts
           hosts["dovetrek.$domain"]="${{ vars.LJFCLOUD_IP }}:86"
           hosts["nginx.$domain"]="${{ vars.LJFCLOUD_IP }}:81"
+          
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")

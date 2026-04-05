@@ -54,6 +54,24 @@ jobs:
           PersistentKeepalive = 25
           EOF
 
+      - name: Bring up VPN
+        run: |
+          for i in $(seq 1 5); do
+            echo "Attempt $i/5: bringing up WireGuard..."
+            if sudo wg-quick up ./wg0.conf; then
+              echo "WireGuard up successfully"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "WireGuard failed after 5 attempts"
+              exit 1
+            fi
+            echo "Failed, waiting 10s before retry..."
+            sudo ip link delete dev wg0 2>/dev/null || true
+            sleep 10
+          done
+          sudo wg show
+
       - name: Override system DNS resolver
         run: |
           sudo rm /etc/resolv.conf
@@ -69,6 +87,7 @@ jobs:
             for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
               sudo apt-get remove -y --allow-change-held-packages $pkg || true
             done
+
       - name: Add Docker repository
         uses: appleboy/ssh-action@master
         with:

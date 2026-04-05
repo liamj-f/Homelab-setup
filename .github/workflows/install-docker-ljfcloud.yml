@@ -283,13 +283,13 @@ jobs:
           sudo wg-quick down ./wg0.conf
           sudo wg show   
 
-  deploy-dynamic-ip-updater:
-    uses: ./.github/workflows/OCI-dynamic-ip-updater-deploy.yml
+  oci-containers-deploy:
+    uses: ./.github/workflows/oci-containers-deploy.yml
     needs: install_docker_and_add_to_portainer
     secrets: inherit
     with:
       host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
+      domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
       
   deploy_duckdns:
     uses: ./.github/workflows/duckdns-redeploy.yml
@@ -297,4 +297,4 @@ jobs:
     secrets: inherit
     with:
       host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
+      domain: ${{ inputs.domain || 'ljfcloud.james-fagg.uk' }}

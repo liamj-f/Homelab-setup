@@ -99,7 +99,6 @@ jobs:
             echo "ssh_key<<EOF" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_LJFCLOUD }}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
-          elif
           fi
 
       - name: Write SSH key to file

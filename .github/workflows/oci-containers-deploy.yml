@@ -1,5 +1,12 @@
-name: Redeploy Nginx via Portainer GitOps
+name: Redeploy OCI Containers via Portainer GitOps
 on:
+  push:
+    branches:
+      - main
+      - '**'
+    paths:
+      - 'oci-containers-compose.yml'
+      - '.github/workflows/oci-containers-deploy.yml'
   workflow_dispatch:
     inputs:
       host_machine:
@@ -17,6 +24,57 @@ on:
         required: true
         type: string
 jobs:
+  build-image-and-push:
+    name: Build and push images to ghcr.io
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata oci-cert-updater
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/liamj-f/oci-cert-updater
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push oci-cert-updater
+        uses: docker/build-push-action@v6
+        with:
+          context: ./oci-cert-updater
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Extract metadata dynamic-ip-updater
+        id: meta2
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/liamj-f/oci-dynamic-ip-updater
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push dynamic-ip-updater
+        uses: docker/build-push-action@v6
+        with:
+          context: ./dynamic-ip-updater
+          push: true
+          tags: ${{ steps.meta2.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
   deploy:
     runs-on: ubuntu-latest
     strategy:
@@ -44,6 +102,11 @@ jobs:
           elif
           fi
 
+      - name: Write SSH key to file
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
       - name: Write WireGuard config
         run: |
           cat > wg0.conf << EOF
@@ -55,6 +118,7 @@ jobs:
 
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
+          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
           AllowedIPs = 192.168.0.0/24, 145.241.244.229/32
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
@@ -127,7 +191,6 @@ jobs:
                           }
               }'
               )
-
       - name: Get Stack ID (if exists)
         id: get_stack_id
         run: |
@@ -135,7 +198,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="nginx" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="oci-containers" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
@@ -154,15 +217,17 @@ jobs:
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
+          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+
           echo "Creating stack from GitHub..."
           RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "nginx",
+               "Name": "oci-containers",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "nginx-compose.yml",
+               "ComposeFile": "oci-containers-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,
@@ -177,8 +242,30 @@ jobs:
                                     {
                                     "name":"INITIAL_ADMIN_PASSWORD",
                                     "value":"${{ secrets.APP_PASSWORD }}"
+                                    },
+                                    {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
+                                    {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
+                                    {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
+                                    {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
+                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
+                                    {
+                                    "name":"SECURITY_LIST_ID",
+                                    "value":"${{ vars.OCID_SECURITY_LIST }}"
+                                    },
+                                    {
+                                    "name":"NSG_ID",
+                                    "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+                                    },
+                                   {
+                                    "name":"DUCKDNS_TOKEN",
+                                    "value":"${{ secrets.DUCKDNS_TOKEN }}"
+                                    },
+                                    {
+                                    "name":"SUBDOMAIN",
+                                    "value":"ljfcloud"
                                     }
-                                   ],
+
+                                    ],
                "Prune": true,
                "StackFileVersion": "3"
               }'
@@ -197,37 +284,57 @@ jobs:
                "PullImage": true,
                "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
-               "Env": [
-                       {
-                       "name":"INITIAL_ADMIN_EMAIL",
-                       "value":"${{ vars.NGINX_EMAIL }}"
-                       },
-                       {
-                       "name":"INITIAL_ADMIN_PASSWORD",
-                       "value":"${{ secrets.APP_PASSWORD }}"
-                       }
-                       ],
+                              "Env": [
+                                    {
+                                    "name":"INITIAL_ADMIN_EMAIL",
+                                    "value":"${{ vars.NGINX_EMAIL }}"
+                                    },
+                                    {
+                                    "name":"INITIAL_ADMIN_PASSWORD",
+                                    "value":"${{ secrets.APP_PASSWORD }}"
+                                    },
+                                    {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
+                                    {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
+                                    {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
+                                    {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
+                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
+                                    {
+                                    "name":"SECURITY_LIST_ID",
+                                    "value":"${{ vars.OCID_SECURITY_LIST }}"
+                                    },
+                                    {
+                                    "name":"NSG_ID",
+                                    "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+                                    },
+                                   {
+                                    "name":"DUCKDNS_TOKEN",
+                                    "value":"${{ secrets.DUCKDNS_TOKEN }}"
+                                    },
+                                    {
+                                    "name":"SUBDOMAIN",
+                                    "value":"ljfcloud"
+                                    }
+                                    ],
                "Prune": true
-              }'               
-
-      - name: Write NPM custom XFF config
+              }'  
+              
+              
+      - name: Copy NGINX XFF config to host
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ steps.node_config.outputs.ssh_key }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh -o StrictHostKeyChecking=no \
+          rsync -az \
+            -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" \
+            nginx/http_top.conf \
+            ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/tmp/http_top.conf
+
+      - name: Copy NGINX XFF config into NPM container
+        run: |
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
               ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
-              "docker exec nginx-proxy-manager mkdir -p /data/nginx/custom && \
-               docker exec nginx-proxy-manager sh -c 'cat > /data/nginx/custom/http_top.conf << EOF
-          proxy_set_header X-Real-IP \$remote_addr;
-          proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-          proxy_set_header X-Forwarded-Proto \$scheme;
-          EOF' && \
+              "docker cp /tmp/http_top.conf nginx-proxy-manager:/data/nginx/custom/http_top.conf && \
                docker exec nginx-proxy-manager nginx -s reload"
 
       - name: Authenticate as nginx user
         id: token
-        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
         run: |
           RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/tokens" \
             -H "Content-Type: application/json" \
@@ -241,7 +348,6 @@ jobs:
 
       - name: Resolve SSL Certificate ID
         id: cert
-        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
         run: |
           cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s \
             -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
@@ -257,10 +363,10 @@ jobs:
           fi
 
       - name: Create or Update Proxy Hosts (without cert)
-        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
         run: |
           declare -A hosts
           hosts["dovetrek.$domain"]="${{ vars.LJFCLOUD_IP }}:86"
+          hosts["nginx.$domain"]="${{ vars.LJFCLOUD_IP }}:81"
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")

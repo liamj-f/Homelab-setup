@@ -84,6 +84,13 @@ jobs:
           export PIHOLE_WEBPASSWORD="${{ secrets.APP_PASSWORD }}"
           envsubst '${PRIMARY_IP} ${PIHOLE_WEBPASSWORD}' < keepalived/notify.sh.template > keepalived/notify.sh
 
+      - name: Render rathole client toml
+        run: |
+          export LJFCLOUD_IP="${{ vars.LJFCLOUD_IP }}"
+          export MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          export KEEPALIVED_VIRTUAL_IP="${{ vars.KEEPALIVED_IP }}"
+          envsubst < keepalived/rathole-client.toml.template > keepalived/rathole-client.toml
+
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
@@ -134,6 +141,8 @@ jobs:
             -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" \
             keepalived/keepalived.conf \
             keepalived/notify.sh \
+            keepalived/rathole-client.toml \
+            keepalived/http_top.conf \
             ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/keepalived/
 
       - name: Set permissions
@@ -331,6 +340,14 @@ jobs:
           script: |
             sudo chmod 664 /var/lib/docker/volumes/nginx_data/_data/database.sqlite
             sudo chmod 775 /var/lib/docker/volumes/nginx_data/_data/
+
+      - name: Copy NGINX XFF config into NPM container
+        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
+        run: |
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
+              ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
+              "docker cp /tmp/http_top.conf nginx-proxy-manager:/data/nginx/custom/http_top.conf && \
+               docker exec nginx-proxy-manager nginx -s reload"
 
       - name: Pihole Api Auth
         id: pihole_auth

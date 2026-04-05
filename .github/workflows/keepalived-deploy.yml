@@ -346,7 +346,7 @@ jobs:
         run: |
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
               ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
-              "docker cp /tmp/http_top.conf nginx-proxy-manager:/data/nginx/custom/http_top.conf && \
+              "docker cp /opt/stacks/keepalived/http_top.conf nginx-proxy-manager:/data/nginx/custom/http_top.conf && \
                docker exec nginx-proxy-manager nginx -s reload"
 
       - name: Pihole Api Auth

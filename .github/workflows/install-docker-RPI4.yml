@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
- #     - '**'
+      - '**'
     paths:
       - '.github/workflows/install-docker-RPI4.yml'
   workflow_dispatch:
@@ -31,7 +31,8 @@ jobs:
       domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@main 
+
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  

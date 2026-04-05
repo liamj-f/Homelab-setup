@@ -323,12 +323,10 @@ jobs:
                                     ],
                "Prune": true
               }'  
-              
-              
-      - name: Copy NGINX XFF config to host
+                          
+      - name: Copy XFF config to host
         run: |
-          rsync -az \
-            -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" \
+          scp -i /tmp/deploy_key -o StrictHostKeyChecking=no \
             keepalived/http_top.conf \
             ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/tmp/http_top.conf
 

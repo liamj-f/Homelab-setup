@@ -135,16 +135,15 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
-      - name: Copy configs to host       # replace scp-action with this
+      - name: Copy configs to host
         run: |
-          rsync -avz \
-            -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" \
+          scp -i /tmp/deploy_key -o StrictHostKeyChecking=no \
             keepalived/keepalived.conf \
             keepalived/notify.sh \
             keepalived/rathole-client.toml \
             keepalived/http_top.conf \
             ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/keepalived/
-
+            
       - name: Set permissions
         uses: appleboy/ssh-action@master
         with:

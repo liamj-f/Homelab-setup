@@ -21,18 +21,6 @@ services:
       test: ["CMD", "/usr/bin/check-health"]
       interval: 10s
       timeout: 3s
-  portainer_agent:
-    image: portainer/agent:latest
-    container_name: portainer_agent
-    restart: always
-    ports:
-      - "9001:9001"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/lib/docker/volumes:/var/lib/docker/volumes
-    environment:
-      - AGENT_SECRET=${PORTAINER_AGENT_SECRET}
-      - AGENT_PORT=9001
   oci-cert-updater:
     image: ghcr.io/liamj-f/oci-cert-updater:latest
     container_name: oci-cert-updater

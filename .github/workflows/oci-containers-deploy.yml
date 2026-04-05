@@ -330,6 +330,22 @@ jobs:
             keepalived/http_top.conf \
             ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/tmp/http_top.conf
 
+      - name: Wait for NPM to be healthy
+        run: |
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
+              ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
+              "for i in \$(seq 1 20); do
+                STATUS=\$(docker inspect --format='{{.State.Health.Status}}' nginx-proxy-manager 2>/dev/null)
+                echo \"Attempt \$i/20: NPM health = \$STATUS\"
+                if [ \"\$STATUS\" = \"healthy\" ]; then
+                  echo \"NPM is healthy\"
+                  exit 0
+                fi
+                sleep 5
+              done
+              echo \"NPM did not become healthy in time\"
+              exit 1"
+
       - name: Copy NGINX XFF config into NPM container
         run: |
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
@@ -372,7 +388,7 @@ jobs:
           declare -A hosts
           hosts["dovetrek.$domain"]="${{ vars.LJFCLOUD_IP }}:86"
           hosts["nginx.$domain"]="${{ vars.LJFCLOUD_IP }}:81"
-          
+
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")

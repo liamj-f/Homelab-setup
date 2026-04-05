@@ -286,6 +286,9 @@ jobs:
   oci-containers-deploy:
     uses: ./.github/workflows/oci-containers-deploy.yml
     needs: install_docker_and_add_to_portainer
+    permissions:
+      packages: write
+      contents: read
     secrets: inherit
     with:
       host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}

@@ -143,7 +143,7 @@ jobs:
             keepalived/rathole-client.toml \
             keepalived/http_top.conf \
             ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/keepalived/
-            
+
       - name: Set permissions
         uses: appleboy/ssh-action@master
         with:
@@ -345,7 +345,8 @@ jobs:
         run: |
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
               ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
-              "docker cp /opt/stacks/keepalived/http_top.conf nginx-proxy-manager:/data/nginx/custom/http_top.conf && \
+              "docker exec nginx-proxy-manager mkdir -p /data/nginx/custom && \
+               docker cp /opt/stacks/keepalived/http_top.conf nginx-proxy-manager:/data/nginx/custom/http_top.conf && \
                docker exec nginx-proxy-manager nginx -s reload"
 
       - name: Pihole Api Auth

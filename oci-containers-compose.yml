@@ -79,14 +79,14 @@ services:
     - /path/to/duckdns/config:/config # optional
     restart: unless-stopped
   rathole-server:
-    image: rapiz1/rathole:latest
+    image: ghcr.io/rathole-org/rathole:dev
     container_name: rathole-server
     restart: unless-stopped
     ports:
       - "2333:2333"
       - "3000:3000"
     volumes:
-      - /opt/rathole/server.toml:/app/config.toml
+      - /opt/stacks/rathole/rathole-server.toml:/app/config.toml
     command: --server /app/config.toml
     networks:
       - nginx_network

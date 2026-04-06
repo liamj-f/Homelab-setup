@@ -126,6 +126,10 @@ jobs:
           PersistentKeepalive = 25
           EOF
 
+      - name: Render Rathole config
+        run: |
+          envsubst < keepalived/rathole-server.toml.template > keepalived/rathole-server.toml 
+
       - name: Bring up VPN
         run: |
           for i in $(seq 1 5); do
@@ -143,6 +147,12 @@ jobs:
             sleep 10
           done
           sudo wg show
+
+      - name: Copy Rathole config to host
+        run: |
+          scp -i /tmp/deploy_key -o StrictHostKeyChecking=no \
+            keepalived/rathole-server.toml \
+            ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/rathole/rathole-server.toml
           
       - name: Authenticate to Portainer
         id: auth

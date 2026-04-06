@@ -142,7 +142,7 @@ services:
     container_name: rathole-client
     restart: unless-stopped
     volumes:
-      - /opt/keepalived/rathole-client.toml:/app/config.toml
+      - /opt/stacks/keepalived/rathole-client.toml:/app/config.toml
     command: --client /app/config.toml
     networks:
       - nginx_network

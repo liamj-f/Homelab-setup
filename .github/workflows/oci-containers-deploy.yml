@@ -128,6 +128,7 @@ jobs:
 
       - name: Render Rathole config
         run: |
+          export MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}"
           envsubst < keepalived/rathole-server.toml.template > keepalived/rathole-server.toml 
 
       - name: Bring up VPN
@@ -150,6 +151,9 @@ jobs:
 
       - name: Copy Rathole config to host
         run: |
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
+              ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
+              "mkdir -p /opt/stacks/rathole"
           scp -i /tmp/deploy_key -o StrictHostKeyChecking=no \
             keepalived/rathole-server.toml \
             ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/rathole/rathole-server.toml

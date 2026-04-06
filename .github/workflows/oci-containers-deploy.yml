@@ -337,6 +337,8 @@ jobs:
                                     ],
                "Prune": true
               }'  
+
+            echo "API Response: $RESPONSE"
                           
       - name: Copy XFF config to host
         run: |

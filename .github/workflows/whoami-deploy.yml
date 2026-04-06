@@ -1,4 +1,4 @@
-name: Redeploy Nextloud via Portainer GitOps
+name: Redeploy WhoAmI via Portainer GitOps
 #ToDo:
 # create the mount points and automount
 # then rescan files if the database isn't intact.
@@ -9,8 +9,8 @@ on:
       - main
       - '**'
     paths:
-      - 'nextcloud-compose.yml'
-      - '.github/workflows/nextcloud-redeploy.yml'
+      - 'whoami-compose.yml'
+      - '.github/workflows/whoami-deploy.yml'
   workflow_call:
     inputs:
       host_machine:
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
+      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -110,7 +110,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="nextcloud" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="whoami" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
@@ -134,7 +134,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "nextcloud",
+               "Name": "whoami",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "nextcloud/nextcloud-compose.yml",
@@ -144,32 +144,6 @@ jobs:
                               "forceUpdate": true,
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
-               "Env": [
-                       {
-                       "name":"POSTGRES_HOST",
-                       "value":"postgres"
-                       },
-                       {
-                       "name":"POSTGRES_DATABASE",
-                       "value":"nextcloud"
-                       },
-                       {
-                       "name":"POSTGRES_USER",
-                       "value":"nextcloud_app"
-                       },
-                       {
-                        "name":"POSTGRES_PASSWORD",
-                        "value":"${{ secrets.NEXTCLOUD_APP_PASSWORD }}"
-                        },
-                       {
-                        "name":"NEXTCLOUD_ADMIN_USER",
-                        "value":"${{ vars.APP_USER }}"
-                       },
-                       {
-                        "name":"NEXTCLOUD_ADMIN_PASSWORD",
-                        "value":"${{ secrets.APP_PASSWORD }}"
-                       }
-                       ],
                "Prune": true,
                "StackFileVersion": "3"
               }')
@@ -187,51 +161,11 @@ jobs:
                "PullImage": true,
                "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
-               "Env": [
-                       {
-                       "name":"POSTGRES_HOST",
-                       "value":"postgres"
-                       },
-                       {
-                       "name":"POSTGRES_DATABASE",
-                       "value":"nextcloud"
-                       },
-                       {
-                       "name":"POSTGRES_USER",
-                       "value":"nextcloud_app"
-                       },
-                       {
-                        "name":"POSTGRES_PASSWORD",
-                        "value":"${{ secrets.NEXTCLOUD_APP_PASSWORD }}"
-                        },
-                       {
-                        "name":"NEXTCLOUD_ADMIN_USER",
-                        "value":"${{ vars.APP_USER }}"
-                       },
-                       {
-                        "name":"NEXTCLOUD_ADMIN_PASSWORD",
-                        "value":"${{ secrets.APP_PASSWORD }}"
-                       }
-                       ],
                "Prune": true
               }'          
-    
-#      - name: Trigger stack redeploy via webhook
-#        run: |
-#          echo "Triggering stack redeploy via webhook..."
-#          RESPONSE=$(curl -s -w "HTTP %{http_code}" -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/e56041a2-75f6-4a10-85dc-c69424de631e")
-#          echo "$RESPONSE"
-
-      - name: Rescan files in external drive
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ vars.E7270_IP }}
-          username: ${{ vars.E7270_USER }}
-          password: ${{ secrets.E7270_PASSWORD }}
-          script: |
-            sudo docker exec -u www-data nextcloud php occ files:scan --all
 
       - name: Bring down VPN
+        if: always()
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show   

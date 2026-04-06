@@ -391,7 +391,8 @@ jobs:
                               "${{ vars.KEEPALIVED_IP }} nginx.$domain",
                               "${{ vars.KEEPALIVED_IP }} portainer.$domain",
                               "${{ vars.KEEPALIVED_IP }} nextcloud.$domain",
-                              "${{ vars.KEEPALIVED_IP }} adminer.$domain"
+                              "${{ vars.KEEPALIVED_IP }} adminer.$domain",
+                              "${{ vars.KEEPALIVED_IP }} whoami.$domain"
                               ]
                            },                          
                   "dhcp": {
@@ -535,6 +536,7 @@ jobs:
           hosts["portainer.$domain"]="${{ vars.RPI4_IP }}:83"
           hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:85"
           hosts["adminer.$domain"]="${{ vars.E7270_IP }}:86"
+          hosts["whoami.$domain"]="${{ vars.E7270_IP }}:87"
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")

@@ -350,9 +350,9 @@ jobs:
         run: |
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
               ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
-              "for i in \$(seq 1 20); do
+              "for i in \$(seq 1 25); do
                 STATUS=\$(docker inspect --format='{{.State.Health.Status}}' nginx-proxy-manager 2>/dev/null)
-                echo \"Attempt \$i/20: NPM health = \$STATUS\"
+                echo \"Attempt \$i/25: NPM health = \$STATUS\"
                 if [ \"\$STATUS\" = \"healthy\" ]; then
                   echo \"NPM is healthy\"
                   exit 0

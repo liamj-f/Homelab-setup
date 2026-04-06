@@ -153,7 +153,7 @@ jobs:
         run: |
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
               ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
-              "sudo mkdir -p /opt/stacks/rathole"
+              "sudo mkdir -p /opt/stacks/rathole && sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks""
           scp -i /tmp/deploy_key -o StrictHostKeyChecking=no \
             keepalived/rathole-server.toml \
             ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/rathole/rathole-server.toml

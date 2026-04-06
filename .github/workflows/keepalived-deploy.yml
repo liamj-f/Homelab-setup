@@ -139,7 +139,7 @@ jobs:
         run: |
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
               ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
-              "sudo mkdir -p /opt/stacks/keepalived && sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks""
+              "sudo mkdir -p /opt/stacks/keepalived && sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks"
           scp -i /tmp/deploy_key -o StrictHostKeyChecking=no \
             keepalived/keepalived.conf \
             keepalived/notify.sh \

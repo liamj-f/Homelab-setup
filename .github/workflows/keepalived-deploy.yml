@@ -333,6 +333,14 @@ jobs:
 
             echo "Response: $RESPONSE"       
 
+      - name: Trigger notify.sh to set correct state
+        run: |
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
+              ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
+              "CURRENT_STATE=\$(cat /tmp/keepalived_state 2>/dev/null || echo 'BACKUP') && \
+              echo \"Current state: \$CURRENT_STATE\" && \
+              sudo /opt/stacks/keepalived/notify.sh INSTANCE VI_1 \$CURRENT_STATE"
+
       - name: Fix NPM database permissions
         uses: appleboy/ssh-action@master
         with:

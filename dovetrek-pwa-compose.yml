@@ -1,6 +1,13 @@
 services:
   dovetrek:
     image: ghcr.io/liamj-f/dovetrek-pwa:latest
+    container name: dovetrek-pwa
+    networks:
+      - nginx_network
     ports:
       - "86:80"
     restart: unless-stopped
+
+networks:
+  nginx_network:
+    external: true

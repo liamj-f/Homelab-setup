@@ -402,8 +402,9 @@ jobs:
       - name: Create or Update Proxy Hosts (without cert)
         run: |
           declare -A hosts
-          hosts["dovetrek.$domain"]="${{ vars.LJFCLOUD_IP }}:86"
-          hosts["nginx.$domain"]="${{ vars.LJFCLOUD_IP }}:81"
+          hosts["dovetrek.$domain"]="dovetrek-pwa:86"
+          hosts["nginx.$domain"]="nginx-proxy-manager:81"
+          hosts["whoami.14monarch.james-fagg.uk"]="rathole-server:3000"
 
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \

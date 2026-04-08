@@ -227,12 +227,12 @@ jobs:
             echo "Stack found with ID: $STACK_ID"
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
-          
+
       - name: Debug stack response
         run: |
           curl -s \
             --max-time 10 \
-            -H "Authorization: ${{ secrets.PORTAINER_TOKEN }}" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             "http://192.168.0.2:83/api/stacks/75?endpointId=4" \
             | jq '.'
 
@@ -242,7 +242,7 @@ jobs:
         run: |
           WEBHOOK_TOKEN=$(curl -s \
             --max-time 10 \
-            -H "Authorization: ${{ secrets.PORTAINER_TOKEN }}" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             | jq -r '.AutoUpdate.Webhook')
 

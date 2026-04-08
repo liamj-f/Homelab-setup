@@ -297,6 +297,8 @@ jobs:
       - name: Update Stack
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
+          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+
           RESPONSE=$(curl -s -X --max-time 300 PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
@@ -402,7 +404,7 @@ jobs:
       - name: Create or Update Proxy Hosts (without cert)
         run: |
           declare -A hosts
-          hosts["dovetrek.$domain"]="dovetrek-pwa:86"
+          hosts["dovetrek.$domain"]="dovetrek-pwa:80"
           hosts["nginx.$domain"]="nginx-proxy-manager:81"
           hosts["whoami.14monarch.james-fagg.uk"]="rathole-server:3000"
 

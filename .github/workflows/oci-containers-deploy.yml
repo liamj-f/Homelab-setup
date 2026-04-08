@@ -213,7 +213,7 @@ jobs:
         run: |
           STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
-
+ 
           # Filter by both Name AND EndpointId
           STACK_ID=$(echo "$STACKS" | jq -r \
             --arg name "oci-containers" \
@@ -227,6 +227,19 @@ jobs:
             echo "Stack found with ID: $STACK_ID"
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
+
+      - name: Get stack webhook token
+        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+        id: get_webhook
+        run: |
+          WEBHOOK_TOKEN=$(curl -s \
+            --max-time 10 \
+            -H "Authorization: ${{ secrets.PORTAINER_TOKEN }}" \
+            "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            | jq -r '.AutoUpdate.Webhook')
+
+          echo "Webhook token: $WEBHOOK_TOKEN"
+          echo "webhook_token=$WEBHOOK_TOKEN" >> $GITHUB_OUTPUT
 
       - name: Generate UUID
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
@@ -294,7 +307,7 @@ jobs:
             echo "API Response: $RESPONSE"
             echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
 
-      - name: Update Stack
+      - name: Update Stack Environment Variables
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
           OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
@@ -303,7 +316,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "PullImage": true,
+               "PullImage": false,
                "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
                               "Env": [
@@ -337,10 +350,66 @@ jobs:
                                     "value":"ljfcloud"
                                     }
                                     ],
-               "Prune": true
+               "Prune": false
               }'  )
 
+            echo "API Response: $RESPONSE" 
+
+        - name: Redeploy Stack using webhook
+          if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+          run: |
+            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.webhook.outputs.webhook_token }}?pullimage=false" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
+
             echo "API Response: $RESPONSE"
+
+#      - name: Update Stack
+#        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+#        run: |
+#          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+#
+#          RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+#          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+#          -H "Content-Type: application/json" \
+#          -d '{
+#               "PullImage": true,
+#               "RepositoryReferenceName": "${{ github.ref }}",
+#               "repositoryAuthentication": false,
+#                              "Env": [
+#                                    {
+#                                    "name":"INITIAL_ADMIN_EMAIL",
+#                                    "value":"${{ vars.NGINX_EMAIL }}"
+#                                    },
+#                                    {
+#                                    "name":"INITIAL_ADMIN_PASSWORD",
+#                                    "value":"${{ secrets.APP_PASSWORD }}"
+#                                    },
+#                                    {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
+#                                    {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
+#                                    {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
+#                                    {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
+#                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
+#                                    {
+#                                    "name":"SECURITY_LIST_ID",
+#                                    "value":"${{ vars.OCID_SECURITY_LIST }}"
+#                                    },
+#                                    {
+#                                    "name":"NSG_ID",
+#                                    "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+#                                    },
+#                                   {
+#                                    "name":"DUCKDNS_TOKEN",
+#                                    "value":"${{ secrets.DUCKDNS_TOKEN }}"
+#                                    },
+#                                    {
+#                                    "name":"SUBDOMAIN",
+#                                    "value":"ljfcloud"
+#                                    }
+#                                    ],
+#               "Prune": true
+#              }'  )
+#
+#            echo "API Response: $RESPONSE"
                           
       - name: Copy XFF config to host
         run: |

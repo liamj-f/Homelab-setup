@@ -3,4 +3,4 @@ remote_addr = "${LJFCLOUD_IP}:2333"
 
 [client.services.onprem-npm]
 token = "${MYSQL_ROOT_PASSWORD}"
-local_addr = "${KEEPALIVED_VIRTUAL_IP}:3000"
+local_addr = "${KEEPALIVED_VIRTUAL_IP}:80"

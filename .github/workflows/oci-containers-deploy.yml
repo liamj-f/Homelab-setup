@@ -228,14 +228,6 @@ jobs:
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
 
-      - name: Debug stack response
-        run: |
-          curl -s \
-            --max-time 10 \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            "http://192.168.0.2:83/api/stacks/75?endpointId=4" \
-            | jq '.'
-
       - name: Get stack webhook token
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         id: get_webhook

@@ -112,7 +112,8 @@ jobs:
           
           echo "✓ Security list updated successfully"
           echo "✓ SSH (port 22) rule added for IP: ${{ steps.resolve_ip.outputs.ip_address }}"
-          echo "✓ Port 9001 rule added for IP: ${{ steps.resolve_ip.outputs.ip_address }}"          
+          echo "✓ Port 9001 rule added for IP: ${{ steps.resolve_ip.outputs.ip_address }}"       
+
   install_docker_and_add_to_portainer:
     runs-on: ubuntu-latest
     needs: Update_Security_Lists
@@ -121,7 +122,7 @@ jobs:
       domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@main
         
       - name: Install WireGuard
         run: |
@@ -209,6 +210,15 @@ jobs:
             sudo systemctl enable --now docker
             sudo systemctl status docker --no-pager
 
+      - name: add user to docker group on VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.LJFCLOUD_IP }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          script: |
+            sudo usermod -aG docker ${{ vars.LJFCLOUD_USER }}
+
       - name: Render Portainer agent compose
         run: |
           envsubst < portainer-agent-compose.yml > portainer-agent-compose-rendered.yml
@@ -273,18 +283,13 @@ jobs:
           sudo wg-quick down ./wg0.conf
           sudo wg show   
 
-  deploy-dynamic-ip-updater:
-    uses: ./.github/workflows/OCI-dynamic-ip-updater-deploy.yml
+  oci-containers-deploy:
+    uses: ./.github/workflows/oci-containers-deploy.yml
     needs: install_docker_and_add_to_portainer
+    permissions:
+      packages: write
+      contents: read
     secrets: inherit
     with:
       host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
-      
-  deploy_duckdns:
-    uses: ./.github/workflows/duckdns-redeploy.yml
-    needs: install_docker_and_add_to_portainer
-    secrets: inherit
-    with:
-      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
+      domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}

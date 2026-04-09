@@ -136,6 +136,16 @@ services:
     environment:
       - SSH_USER=${SSH_USER}
       - SECONDARY_IP=${SECONDARY_IP}
+  
+  rathole-client:
+    image: ghcr.io/rathole-org/rathole:dev
+    container_name: rathole-client
+    restart: unless-stopped
+    volumes:
+      - /opt/stacks/keepalived/rathole-client.toml:/app/config.toml
+    command: --client /app/config.toml
+    networks:
+      - nginx_network
 
 networks:
   nginx_network:

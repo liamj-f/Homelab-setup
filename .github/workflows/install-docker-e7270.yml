@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
+      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -135,6 +135,15 @@ jobs:
             sudo systemctl enable --now docker
             sudo systemctl status docker --no-pager
 
+      - name: add user to docker group
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.E7270_IP }}
+          username: ${{ vars.E7270_USER }}
+          password: ${{ secrets.E7270_PASSWORD }}
+          script: |
+            sudo usermod -aG docker ${{ vars.E7270_USER }}
+
       - name: Render Portainer agent compose
         run: |
           envsubst < portainer-agent-compose.yml > portainer-agent-compose-rendered.yml
@@ -206,4 +215,12 @@ jobs:
     secrets: inherit
     with:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
+      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
+
+  deploy_whoami:
+    uses: ./.github/workflows/whoami-deploy.yml
+    needs: install_docker_and_add_to_portainer
+    secrets: inherit
+    with:
+      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }} 

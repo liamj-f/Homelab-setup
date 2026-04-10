@@ -473,10 +473,10 @@ jobs:
       - name: Create or Update Proxy Hosts (without cert)
         run: |
           declare -A hosts
-          hosts["dovetrek.$domain"]="dovetrek-pwa:80"
-          hosts["nginx.$domain"]="nginx-proxy-manager:81"
+          hosts["dovetrek.james-fagg.uk"]="dovetrek-pwa:80"
+          hosts["nginx.oci.james-fagg.uk"]="nginx-proxy-manager:81"
           hosts["whoami.14monarch.james-fagg.uk"]="rathole-server:3000"
-
+          hosts["nginx.14monarch.james-fagg.uk"]="rathole-server:3000"
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")

@@ -19,8 +19,8 @@ on:
         type: string   
   push:
     branches:
-      - main
-      - '**'
+#      - main
+  #    - '**'
     paths:
       - '.github/workflows/OCI-dynamic-ip-updater-deploy.yml'  
       - 'dynamic-ip-updater/**'  

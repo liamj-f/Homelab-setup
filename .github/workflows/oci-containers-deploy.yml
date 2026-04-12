@@ -289,6 +289,10 @@ jobs:
                                     "name":"NSG_ID",
                                     "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
                                     },
+                                    {
+                                    "name":"WAF_ALLOWLIST_ID",
+                                    "value":"${{ vars.ocid_WAF_allowlist }}"
+                                    },
                                    {
                                     "name":"DUCKDNS_TOKEN",
                                     "value":"${{ secrets.DUCKDNS_TOKEN }}"
@@ -340,6 +344,10 @@ jobs:
                                       {
                                       "name":"NSG_ID",
                                       "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+                                      },
+                                      {
+                                      "name":"WAF_ALLOWLIST_ID",
+                                      "value":"${{ vars.ocid_WAF_allowlist }}"
                                       },
                                       {
                                       "name":"DUCKDNS_TOKEN",

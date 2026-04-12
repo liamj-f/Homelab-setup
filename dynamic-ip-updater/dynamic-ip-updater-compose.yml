@@ -13,6 +13,7 @@ services:
       # OCI Security List ID
       - SECURITY_LIST_ID=${SECURITY_LIST_ID}
       - NSG_ID=${OCID_HOME_TO_VM_NSG}
+      - WAF_ALLOWLIST_ID=${WAF_ALLOWLIST_ID}
       # OCI Credentials
       - OCI_USER=${OCI_USER}
       - OCI_FINGERPRINT=${OCI_FINGERPRINT}

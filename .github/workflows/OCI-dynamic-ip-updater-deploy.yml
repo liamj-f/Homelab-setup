@@ -5,18 +5,12 @@ on:
     inputs:
       host_machine:
         required: true
-        type: string 
-      domain:
-        required: true
         type: string
   workflow_dispatch:
     inputs:
       host_machine:
         required: true
-        type: string 
-      domain:
-        required: true
-        type: string   
+        type: string
   push:
     branches:
 #      - main
@@ -64,7 +58,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
-      domain: ${{ inputs.domain || '14monarch.duckdns.org' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -173,7 +166,7 @@ jobs:
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
                "Env": [
-                      {"name":"Domain", "value":"${{ env.domain }}"},  
+                      {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
                        {
                        "name":"OCI_USER",
                        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
@@ -197,6 +190,10 @@ jobs:
                         {
                         "name":"NSG_ID",
                         "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+                        },
+                        {
+                        "name":"WAF_ALLOWLIST_ID",
+                        "value":"${{ vars.OCID_WAF_ALLOWLIST }}"
                         }
                ],
                "Prune": true,
@@ -216,7 +213,7 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{
                "Env": [
-                      {"name":"Domain", "value":"${{ env.domain }}"},  
+                      {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
                        {
                        "name":"OCI_USER",
                        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
@@ -236,7 +233,14 @@ jobs:
                         {
                         "name":"SECURITY_LIST_ID",
                         "value":"${{ vars.OCID_SECURITY_LIST }}"
-                        }
+                        },
+                        {
+                        "name":"NSG_ID",
+                        "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+                        },
+                        {
+                        "name":"WAF_ALLOWLIST_ID",
+                        "value":"${{ vars.OCID_WAF_ALLOWLIST }}" }
                 ],
                "PullImage": true,
                "RepositoryReferenceName": "${{ github.ref }}",

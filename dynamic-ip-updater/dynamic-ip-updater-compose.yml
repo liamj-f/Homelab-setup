@@ -6,11 +6,14 @@ services:
     container_name: oci-dynamic-ip-updater
     restart: unless-stopped
     environment:
-      # Hostname to monitor
-      - TARGET_HOSTNAME=${DOMAIN}
+      # Comma-separated list of host:port or host:port_start-port_end entries.
+      # Use a hostname for dynamic IPs (resolved every CHECK_INTERVAL seconds)
+      # or a literal IP for static addresses.
+      # Example: "myhost.tplinkdns.com:22, myhost.tplinkdns.com:80-90, 1.2.3.4:443"
+      - LIST_ITEMS=${LIST_ITEMS}
       # Check interval in seconds (default: 300 = 5 minutes)
       - CHECK_INTERVAL=300
-      # OCI Security List ID
+      # OCI resource IDs (configure the ones you want updated)
       - SECURITY_LIST_ID=${SECURITY_LIST_ID}
       - NSG_ID=${OCID_HOME_TO_VM_NSG}
       - WAF_ALLOWLIST_ID=${WAF_ALLOWLIST_ID}

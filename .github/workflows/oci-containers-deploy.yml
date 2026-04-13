@@ -268,6 +268,7 @@ jobs:
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"                           
                              },
                               "Env": [
+                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
                                     {
                                     "name":"INITIAL_ADMIN_EMAIL",
                                     "value":"${{ vars.NGINX_EMAIL }}"
@@ -291,7 +292,7 @@ jobs:
                                     },
                                     {
                                     "name":"WAF_ALLOWLIST_ID",
-                                    "value":"${{ vars.ocid_WAF_allowlist }}"
+                                    "value":"${{ vars.OCID_WAF_ALLOWLIST }}"
                                     },
                                    {
                                     "name":"DUCKDNS_TOKEN",
@@ -327,45 +328,47 @@ jobs:
                   "PullImage": false,
                   "RepositoryReferenceName": "${{ github.ref }}",
                   "repositoryAuthentication": false,
-                                "Env": [
-                                      {
-                                      "name":"INITIAL_ADMIN_EMAIL",
-                                      "value":"${{ vars.NGINX_EMAIL }}"
-                                      },
-                                      {
-                                      "name":"INITIAL_ADMIN_PASSWORD",
-                                      "value":"${{ secrets.APP_PASSWORD }}"
-                                      },
-                                      {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
-                                      {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
-                                      {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
-                                      {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
-                                      {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
-                                      {
-                                      "name":"SECURITY_LIST_ID",
-                                      "value":"${{ vars.OCID_SECURITY_LIST }}"
-                                      },
-                                      {
-                                      "name":"NSG_ID",
-                                      "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
-                                      },
-                                      {
-                                      "name":"WAF_ALLOWLIST_ID",
-                                      "value":"${{ vars.ocid_WAF_allowlist }}"
-                                      },
-                                      {
-                                      "name":"DUCKDNS_TOKEN",
-                                      "value":"${{ secrets.DUCKDNS_TOKEN }}"
-                                      },
-                                      {
+                              "Env": [
+                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
+                                    {
+                                    "name":"INITIAL_ADMIN_EMAIL",
+                                    "value":"${{ vars.NGINX_EMAIL }}"
+                                    },
+                                    {
+                                    "name":"INITIAL_ADMIN_PASSWORD",
+                                    "value":"${{ secrets.APP_PASSWORD }}"
+                                    },
+                                    {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
+                                    {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
+                                    {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
+                                    {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
+                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
+                                    {
+                                    "name":"SECURITY_LIST_ID",
+                                    "value":"${{ vars.OCID_SECURITY_LIST }}"
+                                    },
+                                    {
+                                    "name":"NSG_ID",
+                                    "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+                                    },
+                                    {
+                                    "name":"WAF_ALLOWLIST_ID",
+                                    "value":"${{ vars.OCID_WAF_ALLOWLIST }}"
+                                    },
+                                   {
+                                    "name":"DUCKDNS_TOKEN",
+                                    "value":"${{ secrets.DUCKDNS_TOKEN }}"
+                                    },
+                                    {
                                       "name":"TARGET_HOSTNAME",
                                       "value":"14monarch.tplinkdns.com"
                                       },
-                                      {
-                                      "name":"SUBDOMAIN",
-                                      "value":"ljfcloud"
-                                      }
-                                      ],
+                                    {
+                                    "name":"SUBDOMAIN",
+                                    "value":"ljfcloud"
+                                    }
+
+                                    ],
                   "Prune": false
                 }'  )
 

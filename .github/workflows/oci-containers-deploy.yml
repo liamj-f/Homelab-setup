@@ -289,6 +289,10 @@ jobs:
                                     "name":"NSG_ID",
                                     "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
                                     },
+                                    {
+                                    "name":"WAF_ALLOWLIST_ID",
+                                    "value":"${{ vars.ocid_WAF_allowlist }}"
+                                    },
                                    {
                                     "name":"DUCKDNS_TOKEN",
                                     "value":"${{ secrets.DUCKDNS_TOKEN }}"
@@ -340,6 +344,10 @@ jobs:
                                       {
                                       "name":"NSG_ID",
                                       "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+                                      },
+                                      {
+                                      "name":"WAF_ALLOWLIST_ID",
+                                      "value":"${{ vars.ocid_WAF_allowlist }}"
                                       },
                                       {
                                       "name":"DUCKDNS_TOKEN",
@@ -410,7 +418,7 @@ jobs:
 #              }'  )
 #
 #            echo "API Response: $RESPONSE"
-                          
+
       - name: Copy XFF config to host
         run: |
           scp -i /tmp/deploy_key -o StrictHostKeyChecking=no \
@@ -473,10 +481,10 @@ jobs:
       - name: Create or Update Proxy Hosts (without cert)
         run: |
           declare -A hosts
-          hosts["dovetrek.james-fagg.uk"]="dovetrek-pwa:80"
-          hosts["nginx.oci.james-fagg.uk"]="nginx-proxy-manager:81"
+          hosts["dovetrek.$domain"]="dovetrek-pwa:80"
+          hosts["nginx.$domain"]="nginx-proxy-manager:81"
           hosts["whoami.14monarch.james-fagg.uk"]="rathole-server:3000"
-          hosts["nginx.14monarch.james-fagg.uk"]="rathole-server:3000"
+
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")

@@ -11,13 +11,13 @@ on:
       host_machine:
         required: true
         type: string
-  push:
-    branches:
+#  push:
+#    branches:
 #      - main
   #    - '**'
-    paths:
-      - '.github/workflows/OCI-dynamic-ip-updater-deploy.yml'  
-      - 'dynamic-ip-updater/**'  
+#    paths:
+#      - '.github/workflows/OCI-dynamic-ip-updater-deploy.yml'  
+#      - 'dynamic-ip-updater/**'  
 jobs:
   build-image-and-push:
     name: Build and push image to ghcr.io

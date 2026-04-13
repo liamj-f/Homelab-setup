@@ -299,10 +299,6 @@ jobs:
                                     "value":"${{ secrets.DUCKDNS_TOKEN }}"
                                     },
                                     {
-                                      "name":"TARGET_HOSTNAME",
-                                      "value":"14monarch.tplinkdns.com"
-                                      },
-                                    {
                                     "name":"SUBDOMAIN",
                                     "value":"ljfcloud"
                                     }
@@ -360,10 +356,6 @@ jobs:
                                     "value":"${{ secrets.DUCKDNS_TOKEN }}"
                                     },
                                     {
-                                      "name":"TARGET_HOSTNAME",
-                                      "value":"14monarch.tplinkdns.com"
-                                      },
-                                    {
                                     "name":"SUBDOMAIN",
                                     "value":"ljfcloud"
                                     }
@@ -377,7 +369,7 @@ jobs:
       - name: Redeploy Stack using webhook
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=false" \
+          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
 
           echo "API Response: $RESPONSE"

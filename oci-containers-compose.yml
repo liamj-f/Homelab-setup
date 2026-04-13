@@ -45,8 +45,9 @@ services:
     container_name: oci-dynamic-ip-updater
     restart: unless-stopped
     environment:
+      # Comma-separated host:port or host:port_start-port_end entries
+      - LIST_ITEMS=${LIST_ITEMS}
       # Hostname to monitor
-      - TARGET_HOSTNAME=${TARGET_HOSTNAME}
       # Check interval in seconds (default: 300 = 5 minutes)
       - CHECK_INTERVAL=300
       # OCI Security List ID

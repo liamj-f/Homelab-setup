@@ -298,6 +298,10 @@ jobs:
                                     "value":"${{ secrets.DUCKDNS_TOKEN }}"
                                     },
                                     {
+                                      "name":"TARGET_HOSTNAME",
+                                      "value":"14monarch.tplinkdns.com"
+                                      },
+                                    {
                                     "name":"SUBDOMAIN",
                                     "value":"ljfcloud"
                                     }
@@ -352,6 +356,10 @@ jobs:
                                       {
                                       "name":"DUCKDNS_TOKEN",
                                       "value":"${{ secrets.DUCKDNS_TOKEN }}"
+                                      },
+                                      {
+                                      "name":"TARGET_HOSTNAME",
+                                      "value":"14monarch.tplinkdns.com"
                                       },
                                       {
                                       "name":"SUBDOMAIN",

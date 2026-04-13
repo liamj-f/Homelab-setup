@@ -9,7 +9,7 @@ import oci
 from datetime import datetime
 
 # Configuration from environment variables
-HOSTNAME = os.getenv('HOSTNAME', '14monarch.tplinkdns.com')
+TARGET_HOSTNAME = os.getenv('TARGET_HOSTNAME', '14monarch.tplinkdns.com')
 SECURITY_LIST_ID = os.getenv('SECURITY_LIST_ID')
 NSG_ID = os.getenv('NSG_ID')
 WAF_ALLOWLIST_ID = os.getenv('WAF_ALLOWLIST_ID')
@@ -39,20 +39,20 @@ def log(message):
 def get_port_description(port):
     """Get description for a port"""
     if port == 22:
-        return f"{HOSTNAME} - SSH access"
+        return f"{TARGET_HOSTNAME} - SSH access"
     elif port == 9001:
-        return f"{HOSTNAME} - Port 9001"
+        return f"{TARGET_HOSTNAME} - Port 9001"
     else:
-        return f"{HOSTNAME} - Port {port}"
+        return f"{TARGET_HOSTNAME} - Port {port}"
 
-def resolve_ip(hostname):
-    """Resolve hostname to IP address"""
+def resolve_ip(TARGET_HOSTNAME):
+    """Resolve TARGET_HOSTNAME to IP address"""
     try:
-        ip = socket.gethostbyname(hostname)
-        log(f"Resolved {hostname} to {ip}")
+        ip = socket.gethostbyname(TARGET_HOSTNAME)
+        log(f"Resolved {TARGET_HOSTNAME} to {ip}")
         return ip
     except socket.gaierror as e:
-        log(f"ERROR: Failed to resolve {hostname}: {e}")
+        log(f"ERROR: Failed to resolve {TARGET_HOSTNAME}: {e}")
         return None
 
 def get_current_rules(virtual_network_client):
@@ -72,8 +72,8 @@ def update_security_list(virtual_network_client, new_ip):
         if current_rules is None:
             return False
 
-        # Filter out old rules for this hostname (all ports)
-        description_prefix = HOSTNAME
+        # Filter out old rules for this TARGET_HOSTNAME (all ports)
+        description_prefix = TARGET_HOSTNAME
         filtered_rules = [
             rule for rule in current_rules 
             if not (hasattr(rule, 'description') and rule.description and description_prefix in rule.description)
@@ -81,7 +81,7 @@ def update_security_list(virtual_network_client, new_ip):
 
         removed_count = len(current_rules) - len(filtered_rules)
         if removed_count > 0:
-            log(f"Removed {removed_count} old rule(s) for {HOSTNAME}")
+            log(f"Removed {removed_count} old rule(s) for {TARGET_HOSTNAME}")
 
         # Create new rules for each port
         new_rules = []
@@ -131,10 +131,10 @@ def update_nsg(virtual_network_client, new_ip):
         response = virtual_network_client.list_network_security_group_security_rules(NSG_ID)
         current_rules = response.data
 
-        # Find and remove old rules for this hostname
+        # Find and remove old rules for this TARGET_HOSTNAME
         old_rule_ids = [
             rule.id for rule in current_rules
-            if hasattr(rule, 'description') and rule.description and HOSTNAME in rule.description
+            if hasattr(rule, 'description') and rule.description and TARGET_HOSTNAME in rule.description
         ]
 
         if old_rule_ids:
@@ -144,7 +144,7 @@ def update_nsg(virtual_network_client, new_ip):
                     security_rule_ids=old_rule_ids
                 )
             )
-            log(f"Removed {len(old_rule_ids)} old NSG rule(s) for {HOSTNAME}")
+            log(f"Removed {len(old_rule_ids)} old NSG rule(s) for {TARGET_HOSTNAME}")
 
         # Add a single rule allowing all protocols/ports
         virtual_network_client.add_network_security_group_security_rules(
@@ -156,7 +156,7 @@ def update_nsg(virtual_network_client, new_ip):
                         protocol="all",
                         source=f"{new_ip}/32",
                         source_type="CIDR_BLOCK",
-                        description=f"{HOSTNAME} - all protocols"
+                        description=f"{TARGET_HOSTNAME} - all protocols"
                     )
                 ]
             )
@@ -209,7 +209,7 @@ def update_waf_allowlist(waf_client, old_ip, new_ip):
 def main():
     """Main loop"""
     log("=== IP Security List Updater Starting ===")
-    log(f"Hostname: {HOSTNAME}")
+    log(f"TARGET_HOSTNAME: {TARGET_HOSTNAME}")
     log(f"Ports: {', '.join(map(str, PORTS))}")
     log(f"Security List ID: {SECURITY_LIST_ID}")
     log(f"NSG ID: {NSG_ID or '(not configured)'}")
@@ -240,7 +240,7 @@ def main():
     while True:
         try:
             # Resolve current IP
-            new_ip = resolve_ip(HOSTNAME)
+            new_ip = resolve_ip(TARGET_HOSTNAME)
 
             if new_ip is None:
                 log(f"Skipping update due to DNS resolution failure")

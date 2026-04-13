@@ -52,7 +52,7 @@ services:
       - CHECK_INTERVAL=300
       # OCI Security List ID
       - SECURITY_LIST_ID=${SECURITY_LIST_ID}
-      - NSG_ID=${OCID_HOME_TO_VM_NSG}
+      - NSG_ID=${NSG_ID}
       # OCI Credentials
       - OCI_USER=${OCI_USER}
       - WAF_ALLOWLIST_ID=${WAF_ALLOWLIST_ID}

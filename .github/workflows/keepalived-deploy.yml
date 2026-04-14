@@ -9,15 +9,8 @@ on:
       - '.github/workflows/keepalived-deploy.yml'
       - 'keepalived/**'
   workflow_dispatch:
-    inputs:
-      domain:
-        required: true
-        type: string  
   workflow_call:
-    inputs:
-      domain:
-        required: true
-        type: string
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -25,8 +18,6 @@ jobs:
       matrix:
         host_machine: [rpi4-server, e7270-server]
       max-parallel: 1
-    env:
-      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v5
@@ -385,7 +376,7 @@ jobs:
                   "dns":{
                       "piholePTR":"Hostname",
                       "domain": {
-                                  "name": "$domain",
+                                  "name": "",
                                   "local": true
                                 },
                       "upstreams": [
@@ -396,14 +387,14 @@ jobs:
                       "listeningMode": "single",
                       "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
                       "hosts":[
-                              "${{ vars.KEEPALIVED_IP }} tplink.$domain",
-                              "${{ vars.KEEPALIVED_IP }} pihole1.$domain",
-                              "${{ vars.KEEPALIVED_IP }} pihole2.$domain",
-                              "${{ vars.KEEPALIVED_IP }} nginx.$domain",
-                              "${{ vars.KEEPALIVED_IP }} portainer.$domain",
-                              "${{ vars.KEEPALIVED_IP }} nextcloud.$domain",
-                              "${{ vars.KEEPALIVED_IP }} adminer.$domain",
-                              "${{ vars.KEEPALIVED_IP }} whoami.$domain"
+                              "${{ vars.KEEPALIVED_IP }} tplink.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} pihole1.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} pihole2.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} nginx.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} portainer.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} nextcloud.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} adminer.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} whoami.14monarch.james-fagg.uk"
                               ]
                            },                          
                   "dhcp": {
@@ -526,7 +517,7 @@ jobs:
           cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s \
             -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
-            jq -r --arg d "*.$domain" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
+            jq -r --arg d "*.14monarch.james-fagg.uk" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
 
           if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
             echo "Found existing cert: $cert_id"
@@ -540,14 +531,14 @@ jobs:
         if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
         run: |
           declare -A hosts
-          hosts["tplink.$domain"]="192.168.0.1:80"
-          hosts["nginx.$domain"]="${{ vars.KEEPALIVED_IP }}:81"
-          hosts["pihole1.$domain"]="${{ vars.RPI4_IP }}:82"
-          hosts["pihole2.$domain"]="${{ vars.E7270_IP }}:82"
-          hosts["portainer.$domain"]="${{ vars.RPI4_IP }}:83"
-          hosts["nextcloud.$domain"]="${{ vars.E7270_IP }}:85"
-          hosts["adminer.$domain"]="${{ vars.E7270_IP }}:86"
-          hosts["whoami.$domain"]="${{ vars.E7270_IP }}:87"
+          hosts["tplink.14monarch.james-fagg.uk"]="192.168.0.1:80"
+          hosts["nginx.14monarch.james-fagg.uk"]="${{ vars.KEEPALIVED_IP }}:81"
+          hosts["pihole1.14monarch.james-fagg.uk"]="${{ vars.RPI4_IP }}:82"
+          hosts["pihole2.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:82"
+          hosts["portainer.14monarch.james-fagg.uk"]="${{ vars.RPI4_IP }}:83"
+          hosts["nextcloud.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:85"
+          hosts["adminer.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:86"
+          hosts["whoami.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:87"
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")
@@ -597,12 +588,12 @@ jobs:
         continue-on-error: true
         run: |
           PAYLOAD=$(jq -n \
-            --arg domain "$domain" \
+            --arg domain "14monarch.james-fagg.uk" \
             --arg key "${{ secrets.PORKBUN_API_KEY }}" \
             --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
             '{
               provider: "letsencrypt",
-              domain_names: ["*." + $domain, $domain],
+              domain_names: ["*.14monarch.james-fagg.uk, *.james-fagg.uk"],
               meta: {
                 dns_challenge: true,
                 dns_provider: "porkbun",
@@ -660,7 +651,7 @@ jobs:
                 forward_port: .forward_port,
                 access_list_id: .access_list_id,
                 certificate_id: $cert_id,
-                ssl_forced: true,
+                ssl_forced: false,
                 caching_enabled: .caching_enabled,
                 block_exploits: .block_exploits,
                 advanced_config: .advanced_config,

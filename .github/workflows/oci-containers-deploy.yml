@@ -20,9 +20,7 @@ on:
       host_machine:
         required: true
         type: string 
-      domain:
-        required: true
-        type: string
+
 jobs:
   build-image-and-push:
     name: Build and push images to ghcr.io
@@ -484,8 +482,8 @@ jobs:
       - name: Create or Update Proxy Hosts (without cert)
         run: |
           declare -A hosts
-          hosts["dovetrek.$domain"]="dovetrek-pwa:80"
-          hosts["nginx.$domain"]="nginx-proxy-manager:81"
+          hosts["dovetrek.james-fagg.uk"]="dovetrek-pwa:80"
+          hosts["nginx.oci.james-fagg.uk"]="nginx-proxy-manager:81"
           hosts["whoami.14monarch.james-fagg.uk"]="rathole-server:3000"
 
 

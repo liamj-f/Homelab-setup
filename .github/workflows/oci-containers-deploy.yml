@@ -20,9 +20,7 @@ on:
       host_machine:
         required: true
         type: string 
-      domain:
-        required: true
-        type: string
+
 jobs:
   build-image-and-push:
     name: Build and push images to ghcr.io
@@ -268,6 +266,7 @@ jobs:
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"                           
                              },
                               "Env": [
+                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
                                     {
                                     "name":"INITIAL_ADMIN_EMAIL",
                                     "value":"${{ vars.NGINX_EMAIL }}"
@@ -288,6 +287,10 @@ jobs:
                                     {
                                     "name":"NSG_ID",
                                     "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+                                    },
+                                    {
+                                    "name":"WAF_ALLOWLIST_ID",
+                                    "value":"${{ vars.OCID_WAF_ALLOWLIST }}"
                                     },
                                    {
                                     "name":"DUCKDNS_TOKEN",
@@ -319,37 +322,43 @@ jobs:
                   "PullImage": false,
                   "RepositoryReferenceName": "${{ github.ref }}",
                   "repositoryAuthentication": false,
-                                "Env": [
-                                      {
-                                      "name":"INITIAL_ADMIN_EMAIL",
-                                      "value":"${{ vars.NGINX_EMAIL }}"
-                                      },
-                                      {
-                                      "name":"INITIAL_ADMIN_PASSWORD",
-                                      "value":"${{ secrets.APP_PASSWORD }}"
-                                      },
-                                      {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
-                                      {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
-                                      {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
-                                      {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
-                                      {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
-                                      {
-                                      "name":"SECURITY_LIST_ID",
-                                      "value":"${{ vars.OCID_SECURITY_LIST }}"
-                                      },
-                                      {
-                                      "name":"NSG_ID",
-                                      "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
-                                      },
-                                      {
-                                      "name":"DUCKDNS_TOKEN",
-                                      "value":"${{ secrets.DUCKDNS_TOKEN }}"
-                                      },
-                                      {
-                                      "name":"SUBDOMAIN",
-                                      "value":"ljfcloud"
-                                      }
-                                      ],
+                              "Env": [
+                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
+                                    {
+                                    "name":"INITIAL_ADMIN_EMAIL",
+                                    "value":"${{ vars.NGINX_EMAIL }}"
+                                    },
+                                    {
+                                    "name":"INITIAL_ADMIN_PASSWORD",
+                                    "value":"${{ secrets.APP_PASSWORD }}"
+                                    },
+                                    {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
+                                    {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
+                                    {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
+                                    {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
+                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
+                                    {
+                                    "name":"SECURITY_LIST_ID",
+                                    "value":"${{ vars.OCID_SECURITY_LIST }}"
+                                    },
+                                    {
+                                    "name":"NSG_ID",
+                                    "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+                                    },
+                                    {
+                                    "name":"WAF_ALLOWLIST_ID",
+                                    "value":"${{ vars.OCID_WAF_ALLOWLIST }}"
+                                    },
+                                   {
+                                    "name":"DUCKDNS_TOKEN",
+                                    "value":"${{ secrets.DUCKDNS_TOKEN }}"
+                                    },
+                                    {
+                                    "name":"SUBDOMAIN",
+                                    "value":"ljfcloud"
+                                    }
+
+                                    ],
                   "Prune": false
                 }'  )
 
@@ -358,7 +367,7 @@ jobs:
       - name: Redeploy Stack using webhook
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=false" \
+          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
 
           echo "API Response: $RESPONSE"
@@ -410,7 +419,7 @@ jobs:
 #              }'  )
 #
 #            echo "API Response: $RESPONSE"
-                          
+
       - name: Copy XFF config to host
         run: |
           scp -i /tmp/deploy_key -o StrictHostKeyChecking=no \
@@ -473,8 +482,8 @@ jobs:
       - name: Create or Update Proxy Hosts (without cert)
         run: |
           declare -A hosts
-          hosts["dovetrek.$domain"]="dovetrek-pwa:80"
-          hosts["nginx.$domain"]="nginx-proxy-manager:81"
+          hosts["dovetrek.james-fagg.uk"]="dovetrek-pwa:80"
+          hosts["nginx.oci.james-fagg.uk"]="nginx-proxy-manager:81"
           hosts["whoami.14monarch.james-fagg.uk"]="rathole-server:3000"
 
 

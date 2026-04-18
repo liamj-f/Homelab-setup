@@ -116,12 +116,20 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        apk add --no-cache sqlite
         while true; do
+          sqlite3 /data/database.sqlite ".backup '/tmp/database.sqlite.bak'"
           rsync -avz --delete \
             --chmod=F664,D775 \
+            --exclude='database.sqlite' \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
             --rsync-path="sudo rsync" \
             /data/ $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_data/_data/
+          rsync -avz \
+            --chmod=F664,D775 \
+            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev=null -i /root/.ssh/rsync_id" \
+            --rsync-path="sudo rsync" \
+            /tmp/database.sqlite.bak $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_data/_data/database.sqlite
           rsync -avz --delete \
             --chmod=F664,D775 \
             -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \

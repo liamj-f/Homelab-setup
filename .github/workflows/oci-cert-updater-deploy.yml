@@ -13,8 +13,8 @@ on:
         type: string
   push:
     branches:
-      - main
-      - '**'
+ #     - main
+ #     - '**'
     paths:
       - '.github/workflows/oci-cert-updater-deploy.yml'
       - 'oci-cert-updater/**'

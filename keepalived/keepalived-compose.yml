@@ -109,41 +109,41 @@ services:
       TZ: "Europe/London"
     restart: unless-stopped
 
-  rsync:
-    image: instrumentisto/rsync-ssh
-    container_name: rsync
-    restart: unless-stopped
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        apk add --no-cache sqlite
-        while true; do
-          sqlite3 /data/database.sqlite ".backup '/tmp/database.sqlite.bak'"
-          rsync -avz --delete \
-            --chmod=F664,D775 \
-            --exclude='database.sqlite' \
-            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
-            --rsync-path="sudo rsync" \
-            /data/ $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_data/_data/
-          rsync -avz \
-            --chmod=F664,D775 \
-            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev=null -i /root/.ssh/rsync_id" \
-            --rsync-path="sudo rsync" \
-            /tmp/database.sqlite.bak $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_data/_data/database.sqlite
-          rsync -avz --delete \
-            --chmod=F664,D775 \
-            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
-            --rsync-path="sudo rsync" \
-            /etc/letsencrypt/ $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_letsencrypt/_data/
-          sleep 300
-        done
-    volumes:
-      - nginx_data:/data
-      - nginx_letsencrypt:/etc/letsencrypt
-      - /home/${SSH_USER}/.ssh:/root/.ssh:ro
-    environment:
-      - SSH_USER=${SSH_USER}
-      - SECONDARY_IP=${SECONDARY_IP}
+#  rsync:
+#    image: instrumentisto/rsync-ssh
+#    container_name: rsync
+#    restart: unless-stopped
+#    entrypoint: ["/bin/sh", "-c"]
+#    command:
+#      - |
+#        apk add --no-cache sqlite
+#        while true; do
+#          sqlite3 /data/database.sqlite ".backup '/tmp/database.sqlite.bak'"
+#          rsync -avz --delete \
+#            --chmod=F664,D775 \
+#            --exclude='database.sqlite' \
+#            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
+#            --rsync-path="sudo rsync" \
+#            /data/ $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_data/_data/
+#          rsync -avz \
+#            --chmod=F664,D775 \
+#            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev=null -i /root/.ssh/rsync_id" \
+#            --rsync-path="sudo rsync" \
+#            /tmp/database.sqlite.bak $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_data/_data/database.sqlite
+#          rsync -avz --delete \
+#            --chmod=F664,D775 \
+#            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/rsync_id" \
+#            --rsync-path="sudo rsync" \
+#            /etc/letsencrypt/ $SSH_USER@$SECONDARY_IP:/var/lib/docker/volumes/nginx_letsencrypt/_data/
+#          sleep 300
+#        done
+#    volumes:
+#      - nginx_data:/data
+#      - nginx_letsencrypt:/etc/letsencrypt
+#      - /home/${SSH_USER}/.ssh:/root/.ssh:ro
+#    environment:
+#      - SSH_USER=${SSH_USER}
+#      - SECONDARY_IP=${SECONDARY_IP}
   
   rathole-client:
     image: ghcr.io/rathole-org/rathole:dev

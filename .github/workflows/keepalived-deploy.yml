@@ -312,7 +312,13 @@ jobs:
             --arg secondary_ip "${{ steps.node_config.outputs.rsync_target_host }}" \
             --arg hostname "${{ matrix.host_machine }}" \
             --arg nginx_email "${{ vars.NGINX_EMAIL }}" \
+            --arg webhook "${{ steps.get_webhook.outputs.webhook_token}}" \
             '{
+              AutoUpdate: {
+                    ForcePullImage: true,
+                    ForceUpdate: true,
+                    Webhook: $webhook
+                    }
               PullImage: true,
               RepositoryReferenceName: $ref,
               repositoryAuthentication: false,

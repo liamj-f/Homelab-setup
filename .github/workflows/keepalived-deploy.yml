@@ -318,7 +318,7 @@ jobs:
                     ForcePullImage: true,
                     ForceUpdate: true,
                     Webhook: $webhook
-                    }
+                    },
               PullImage: true,
               RepositoryReferenceName: $ref,
               repositoryAuthentication: false,

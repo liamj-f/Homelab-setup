@@ -44,7 +44,7 @@ case $STATE in
       sleep 5
     done
     pihole_set_dhcp true
-    docker start nginx-proxy-manager
+#    docker start nginx-proxy-manager
 #    docker start rsync
     docker start nebula-sync
     docker start rathole-client
@@ -53,7 +53,7 @@ case $STATE in
         -o UserKnownHostsFile=/dev/null \
         -i /home/${SSH_USER}/.ssh/rsync_id \
         ${SSH_USER}@${SECONDARY_IP} \
-        "docker stop nebula-sync nginx-proxy-manager rathole-client" || true
+        "docker stop nebula-sync rathole-client" || true
     ;;
   "BACKUP"|"FAULT")
     sleep 5
@@ -65,7 +65,7 @@ case $STATE in
     fi
 #    docker stop rsync
     docker stop nebula-sync
-    docker stop nginx-proxy-manager
+#    docker stop nginx-proxy-manager
     docker stop rathole-client
     pihole_set_dhcp false
     ;;

@@ -529,10 +529,10 @@ jobs:
           declare -A hosts
           hosts["dovetrek.james-fagg.uk"]="dovetrek-pwa:80"
           hosts["nginx.oci.james-fagg.uk"]="nginx-proxy-manager:81"
-          hosts["whoami.14monarch.james-fagg.uk"]="rathole-server:3000"
+          hosts["whoami.james-fagg.uk"]="rathole-server:3000"
           hosts["portainer.14monarch.james-fagg.uk"]="rathole-server:3000"
           hosts["nginx.14monarch.james-fagg.uk","nginx1.14monarch.james-fagg.uk","nginx2.14monarch.james-fagg.uk"]="rathole-server:3000"
-          hosts["familytee.james-fagg.uk"]="rathole-server:3000"
+          hosts["familytree.james-fagg.uk"]="rathole-server:3000"
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")

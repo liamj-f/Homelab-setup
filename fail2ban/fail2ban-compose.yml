@@ -1,0 +1,26 @@
+services:
+  fail2ban:
+    image: lscr.io/linuxserver/fail2ban:latest
+    container_name: fail2ban
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - OCID_WAF_BLOCKLIST=${OCID_WAF_BLOCKLIST}
+      - OCI_USER=${OCI_USER}
+      - OCI_FINGERPRINT=${OCI_FINGERPRINT}
+      - OCI_TENANCY=${OCI_TENANCY}
+      - OCI_REGION=uk-london-1
+      - OCI_KEY_CONTENT_BASE64=${OCI_KEY_CONTENT_BASE64}
+    volumes:
+      - ./data:/data
+      - ./custom-cont-init.d:/custom-cont-init.d:ro
+      - /var/log:/var/log:ro
+      - /opt/stacks/grampsweb/logs:/remotelogs/grampsweb:ro
+    networks:
+      - nginx_network
+
+networks:
+  nginx_network:
+    external: true

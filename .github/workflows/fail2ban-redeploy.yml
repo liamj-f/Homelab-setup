@@ -83,7 +83,8 @@ jobs:
                         /opt/stacks/fail2ban/data/filter.d \
                         /opt/stacks/fail2ban/data/jail.d \
                         /opt/stacks/fail2ban/data/scripts \
-                        /opt/stacks/fail2ban/custom-cont-init.d"
+                        /opt/stacks/fail2ban/custom-cont-init.d; \
+                sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/""
                         
       - name: Copy config files to host
         run: |

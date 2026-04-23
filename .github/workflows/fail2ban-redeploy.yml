@@ -157,7 +157,7 @@ jobs:
                                     {
                                     "name":"WAF_BLOCKLIST_ID",
                                     "value":"${{ vars.OCID_WAF_BLOCKLIST }}"
-                                    },
+                                    }
                        ],
                "Prune": true,
                "StackFileVersion": "3"

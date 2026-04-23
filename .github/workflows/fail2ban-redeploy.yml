@@ -29,7 +29,7 @@ jobs:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@latest
+        uses: actions/checkout@v6
 
       - name: Write SSH key to file
         run: |

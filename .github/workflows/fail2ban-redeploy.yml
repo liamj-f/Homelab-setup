@@ -75,6 +75,16 @@ jobs:
           done
           sudo wg show
 
+      - name: Create fail2ban directories on host
+        run: |
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
+              ${{ vars.E7270_USER }}@${{ vars.E7270_IP }} \
+              "mkdir -p /opt/stacks/fail2ban/data/action.d \
+                        /opt/stacks/fail2ban/data/filter.d \
+                        /opt/stacks/fail2ban/data/jail.d \
+                        /opt/stacks/fail2ban/data/scripts \
+                        /opt/stacks/fail2ban/custom-cont-init.d"
+
       - name: Copy config files to host
         run: |
           rsync -avz --checksum \

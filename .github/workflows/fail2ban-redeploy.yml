@@ -83,8 +83,7 @@ jobs:
                         /opt/stacks/fail2ban/data/filter.d \
                         /opt/stacks/fail2ban/data/jail.d \
                         /opt/stacks/fail2ban/data/scripts \
-                        /opt/stacks/fail2ban/custom-cont-init.d; \
-                sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/""
+                        /opt/stacks/fail2ban/custom-cont-init.d"
                         
       - name: Copy config files to host
         run: |
@@ -101,8 +100,10 @@ jobs:
         run: |
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
               ${{ vars.E7270_USER }}@${{ vars.E7270_IP }} \
-              "chmod -R +x /opt/stacks/fail2ban/custom-cont-init.d/; \
-              chmod -R +x /opt/stacks/fail2ban/data/scripts/"
+              "sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/; \
+                sudo chmod -R a+rX /opt/stacks/fail2ban/data/; \
+                chmod -R +x /opt/stacks/fail2ban/custom-cont-init.d/; \
+                chmod -R +x /opt/stacks/fail2ban/data/scripts/"
 
       - name: Authenticate to Portainer
         id: auth

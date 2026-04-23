@@ -14,7 +14,7 @@ services:
       - OCI_REGION=uk-london-1
       - OCI_KEY_CONTENT_BASE64=${OCI_KEY_CONTENT_BASE64}
     volumes:
-      - /opt/stacks/fail2ban/data:/data
+      - /opt/stacks/fail2ban/data:/config/fail2ban
       - /opt/stacks/fail2ban/custom-cont-init.d:/custom-cont-init.d:ro
       - /var/log:/var/log:ro
       - /opt/stacks/grampsweb/logs:/remotelogs/grampsweb:ro

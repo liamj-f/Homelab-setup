@@ -29,7 +29,13 @@ jobs:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@latest
+
+      - name: Write SSH key to file
+        run: |
+          echo "${{ secrets.SSH_KEY_E7270 }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
@@ -68,7 +74,18 @@ jobs:
             sleep 10
           done
           sudo wg show
-            
+
+      - name: Copy config files to host
+        run: |
+          rsync -avz --checksum \
+            -e "ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key" \
+            fail2ban/data/ \
+            ${{ vars.E7270_USER }}@${{ vars.E7270_IP }}:/opt/stacks/fail2ban/data/
+          rsync -avz --checksum \
+            -e "ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key" \
+            fail2ban/custom-cont-init.d/ \
+            ${{ vars.E7270_USER }}@${{ vars.E7270_IP }}:/opt/stacks/fail2ban/custom-cont-init.d/
+
       - name: Authenticate to Portainer
         id: auth
         run: |

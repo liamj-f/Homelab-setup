@@ -4,7 +4,6 @@ services:
     container_name: fail2ban
     restart: unless-stopped
     cap_add:
-      - NET_ADMIN
       - NET_RAW
     environment:
       - OCID_WAF_BLOCKLIST=${OCID_WAF_BLOCKLIST}

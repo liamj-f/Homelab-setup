@@ -1,6 +1,0 @@
-[Definition]
-actionban   = /data/scripts/oci-waf-ban.py ban   <ip>
-actionunban = /data/scripts/oci-waf-ban.py unban <ip>
-
-[Init]
-name = grampsweb

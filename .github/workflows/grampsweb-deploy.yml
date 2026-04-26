@@ -170,8 +170,12 @@ jobs:
           curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
-          -d '{
-               "PullImage": true,
+            -d '{
+                  "AutoUpdate": {
+                          "forcePullImage": true,
+                          "forceUpdate": true,
+                          "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
+                          },               "PullImage": true,
                "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
                "Prune": true

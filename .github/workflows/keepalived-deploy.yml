@@ -520,16 +520,24 @@ jobs:
 
       - name: Create Bypass Group in Pihole
         run: |
-          curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
-          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
-          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-          -H 'accept: application/json' \
-          -H 'content-type: application/json' \
-          -d '{
-              "name": "bypass",
-              "comment": "Bypass group - no blocklists",
-              "enabled": true
-              }'
+          for i in 1 2 3 4 5; do
+            RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+              -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+              -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+              -H 'accept: application/json' \
+              -H 'content-type: application/json' \
+              -d '{"name":"bypass","comment":"Bypass group - no blocklists","enabled":true}')
+            echo "Attempt $i: $RESPONSE"
+            # Success if no error key in response
+            if ! echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+              echo "Group created successfully"
+              exit 0
+            fi
+            echo "Pi-hole not ready, waiting 10s..."
+            sleep 10
+          done
+          echo "Failed to create bypass group after 5 attempts"
+          exit 1
 
       - name: Get Bypass Group ID
         id: bypass_group
@@ -741,6 +749,20 @@ jobs:
               -H "Content-Type: application/json" \
               -d "$BODY" | jq -r '.id // "error"'
           done
+
+      - name: Set NPM default site
+        run: |
+            $RESPONSE=$(curl -X PUT 'https://nginx.14monarch.james-fagg.uk/api/settings/default-site' \
+            -H 'Authorization: Bearer ${{ steps.token.outputs.token }}' \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "value": "html",
+              "meta": {
+                "html": "<body>\n<pre>{ \"code\":\"404\",\"message\":\"No route to host\",\"source\":\"$host_machine\" }\n</pre>\n</body>"
+              }
+              }')
+
+              echo $RESPONSE
 
       - name: Bring down VPN
         if: always()

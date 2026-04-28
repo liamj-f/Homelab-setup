@@ -553,6 +553,7 @@ jobs:
                 forward_port: $host_port,
                 forward_scheme: "http",
                 certificate_id: $cert_id,
+                allow_websocket_upgrade: 1,
                 ssl_forced: false,
                 enabled: true,
                 block_exploits: true,

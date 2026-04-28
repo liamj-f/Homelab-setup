@@ -579,7 +579,6 @@ jobs:
 
       - name: Authenticate as nginx user
         id: token
-        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
         run: |
           RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/tokens" \
             -H "Content-Type: application/json" \
@@ -593,7 +592,6 @@ jobs:
 
       - name: Resolve SSL Certificate ID
         id: cert
-        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
         run: |
           cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s \
             -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
@@ -608,78 +606,18 @@ jobs:
             echo "cert_id=" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create or Update Proxy Hosts (without cert)
-        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
-        run: |
-          declare -A hosts
-          hosts["tplink.14monarch.james-fagg.uk"]="192.168.0.1:80"
-          hosts["nginx.14monarch.james-fagg.uk"]="${{ vars.KEEPALIVED_IP }}:81"
-          hosts["nginx1.14monarch.james-fagg.uk"]="${{ vars.RPI4_IP }}:81"
-          hosts["nginx2.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:81"
-          hosts["pihole.14monarch.james-fagg.uk"]="${{ vars.KEEPALIVED_IP }}:82"
-          hosts["pihole1.14monarch.james-fagg.uk"]="${{ vars.RPI4_IP }}:82"
-          hosts["pihole2.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:82"
-          hosts["portainer.14monarch.james-fagg.uk"]="${{ vars.RPI4_IP }}:83"
-          hosts["nextcloud.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:85"
-          hosts["adminer.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:86"
-          hosts["whoami.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:87"
-          hosts["whoami.james-fagg.uk"]="${{ vars.E7270_IP }}:87"
-
-          ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}")
-
-          for fqdn in "${!hosts[@]}"; do
-            host="${hosts[$fqdn]}"
-            host_ip="${host%%:*}"
-            host_port="${host##*:}"
-
-            BODY=$(jq -n \
-              --arg fqdn "$fqdn" \
-              --arg host_ip "$host_ip" \
-              --argjson host_port "$host_port" \
-              '{
-                domain_names: [$fqdn],
-                forward_host: $host_ip,
-                forward_port: $host_port,
-                forward_scheme: "http",
-                ssl_forced: false,
-                enabled: true,
-                allow_websocket_upgrade: 1,
-                block_exploits: true,
-                meta: { letsencrypt_agree: false, dns_challenge: false }
-              }')
-
-            EXISTING_ID=$(echo "$ALL_HOSTS" | jq -r --arg d "$fqdn" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
-
-            if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ]; then
-              echo "Updating $fqdn (id: $EXISTING_ID)"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$EXISTING_ID" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            else
-              echo "Creating $fqdn"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            fi
-          done
-
       - name: Create Certificate
         id: create_cert
-        if: ${{ steps.cert.outputs.cert_id == '' && steps.node_config.outputs.keepalived_state == 'MASTER' }}
+        if: ${{ steps.cert.outputs.cert_id == ''}}
         continue-on-error: true
         run: |
           PAYLOAD=$(jq -n \
-            --arg domain "14monarch.james-fagg.uk" \
+            --arg domain "$domain" \
             --arg key "${{ secrets.PORKBUN_API_KEY }}" \
             --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
             '{
               provider: "letsencrypt",
-              domain_names: ["*.14monarch.james-fagg.uk, *.james-fagg.uk"],
+              domain_names: ["*." + $domain, $domain],
               meta: {
                 dns_challenge: true,
                 dns_provider: "porkbun",
@@ -708,55 +646,65 @@ jobs:
             echo "cert_id=$cert_id" >> $GITHUB_OUTPUT
           fi
 
-      - name: Apply Certificate to Proxy Hosts
-        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
+      - name: Create or Update Proxy Hosts 
         run: |
-          cert_id="${{ steps.cert.outputs.cert_id }}"
-          [ -z "$cert_id" ] && cert_id="${{ steps.create_cert.outputs.cert_id }}"
-
-          if [ -z "$cert_id" ] || [ "$cert_id" = "null" ]; then
-            echo "No certificate available — skipping SSL update."
-            exit 0
-          fi
-
-          echo "Applying cert $cert_id to all proxy hosts..."
+          declare -A hosts
+          hosts["tplink.14monarch.james-fagg.uk"]="192.168.0.1:80"
+          hosts["nginx.14monarch.james-fagg.uk"]="${{ vars.KEEPALIVED_IP }}:81"
+          hosts["nginx1.14monarch.james-fagg.uk"]="${{ vars.RPI4_IP }}:81"
+          hosts["nginx2.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:81"
+          hosts["pihole.14monarch.james-fagg.uk"]="${{ vars.KEEPALIVED_IP }}:82"
+          hosts["pihole1.14monarch.james-fagg.uk"]="${{ vars.RPI4_IP }}:82"
+          hosts["pihole2.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:82"
+          hosts["portainer.14monarch.james-fagg.uk"]="${{ vars.RPI4_IP }}:83"
+          hosts["nextcloud.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:85"
+          hosts["adminer.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:86"
+          hosts["whoami.14monarch.james-fagg.uk","whoami.james-fagg.uk"]="${{ vars.E7270_IP }}:87"
+          hosts["familytree.james-fagg.uk"]="${{ vars.E7270_IP }}:88"
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")
 
-          echo "$ALL_HOSTS" | jq -c '.[]' | while read -r proxy; do
-            id=$(echo "$proxy" | jq -r '.id')
-            fqdn=$(echo "$proxy" | jq -r '.domain_names[0]')
+          for fqdn in "${!hosts[@]}"; do
+            host="${hosts[$fqdn]}"
+            host_ip="${host%%:*}"
+            host_port="${host##*:}"
 
-            BODY=$(echo "$proxy" | jq \
-              --argjson cert_id "$cert_id" \
+            BODY=$(jq -n \
+              --arg fqdn "$fqdn" \
+              --arg host_ip "$host_ip" \
+              --argjson host_port "$host_port" \
+              --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: .domain_names,
-                forward_scheme: .forward_scheme,
-                forward_host: .forward_host,
-                forward_port: .forward_port,
-                access_list_id: .access_list_id,
+                domain_names: [$fqdn],
+                forward_host: $host_ip,
+                forward_port: $host_port,
+                forward_scheme: "http",
                 certificate_id: $cert_id,
+                allow_websocket_upgrade: 1,
                 ssl_forced: false,
-                caching_enabled: .caching_enabled,
-                block_exploits: .block_exploits,
-                advanced_config: .advanced_config,
-                meta: .meta,
-                allow_websocket_upgrade: .allow_websocket_upgrade,
-                http2_support: .http2_support,
-                enabled: .enabled,
-                locations: (if .locations == null then [] else .locations end),
-                hsts_enabled: .hsts_enabled,
-                hsts_subdomains: .hsts_subdomains,
-                trust_forwarded_proto: .trust_forwarded_proto
+                enabled: true,
+                block_exploits: true,
+                meta: { letsencrypt_agree: false, dns_challenge: false }
               }')
 
-            echo "Applying cert to $fqdn (id: $id)"
-            curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-              -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$id" \
-              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-              -H "Content-Type: application/json" \
-              -d "$BODY" | jq -r '.id // "error"'
+            EXISTING_ID=$(echo "$ALL_HOSTS" | jq -r --arg d "$fqdn" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
+
+            if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ]; then
+              echo "Updating $fqdn (id: $EXISTING_ID)"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$EXISTING_ID" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            else
+              echo "Creating $fqdn"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            fi
           done
 
       - name: Set NPM default site

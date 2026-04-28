@@ -579,7 +579,19 @@ jobs:
             fi
           done
 
+      - name: Set NPM default site
+        run: |
+            RESPONSE=$(curl -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/settings/default-site" \
+            -H 'Authorization: Bearer ${{ steps.token.outputs.token }}' \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "value": "html",
+              "meta": {
+                "html": "<body>\n<pre>{ \"code\":\"404\",\"message\":\"No route to host\",\"source\":\"${{ matrix.host_machine }}\" }\n</pre>\n</body>"
+              }
+              }')
 
+              echo $RESPONSE
 
 #      - name: Apply Certificate to Proxy Hosts
 #        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}

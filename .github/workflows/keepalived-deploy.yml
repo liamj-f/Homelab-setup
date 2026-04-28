@@ -627,6 +627,7 @@ jobs:
                 forward_scheme: "http",
                 ssl_forced: false,
                 enabled: true,
+                allow_websocket_upgrade: 1,
                 block_exploits: true,
                 meta: { letsencrypt_agree: false, dns_challenge: false }
               }')

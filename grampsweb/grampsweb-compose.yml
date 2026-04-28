@@ -9,7 +9,10 @@ services:
       GRAMPSWEB_CELERY_CONFIG__broker_url: "redis://grampsweb_redis:6379/0"
       GRAMPSWEB_CELERY_CONFIG__result_backend: "redis://grampsweb_redis:6379/0"
       GRAMPSWEB_RATELIMIT_STORAGE_URI: redis://grampsweb_redis:6379/1
-      GUNICORN_CMD_ARGS: "--access-logfile=/app/logs/access.log --access-logformat='%(h)s %({x-forwarded-for}i)s %(t)s %(r)s %(s)s' --forwarded-allow-ips=*"
+      GUNICORN_CMD_ARGS: >- 
+        --access-logfile=/app/logs/access.log 
+        --access-logformat='%(h)s %({x-forwarded-for}i)s %(t)s %(r)s %(s)s' 
+        --forwarded-allow-ips=192.168.0.2
     depends_on:
       - grampsweb_redis
     volumes:

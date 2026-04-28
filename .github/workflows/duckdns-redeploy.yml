@@ -40,7 +40,20 @@ jobs:
           
       - name: Write WireGuard config
         run: |
-          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+          cat > wg0.conf << EOF
+          [Interface]
+          PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
+          Address = 10.5.5.5/32
+          DNS = 10.5.5.1
+          MTU = 1250
+
+          [Peer]
+          PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
+          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
+          AllowedIPs = 192.168.0.0/24, 145.241.244.229/32
+          Endpoint = ${{ vars.WG_ENDPOINT }}:51820
+          PersistentKeepalive = 25
+          EOF
           
       - name: Bring up VPN on runner
         run: |
@@ -100,11 +113,24 @@ jobs:
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
 
+      - name: Get stack webhook token
+        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+        id: get_webhook
+        run: |
+          WEBHOOK_TOKEN=$(curl -s \
+            --max-time 10 \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            | jq -r '.AutoUpdate.Webhook')
+
+          echo "Webhook token: $WEBHOOK_TOKEN"
+          echo "webhook_token=$WEBHOOK_TOKEN" >> $GITHUB_OUTPUT    
+
       - name: Generate UUID
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         id: uuid
         run: |
-          echo "::set-output name=uuid::$(uuidgen)"
+          echo "uuid=$(uuidgen)" >> $GITHUB_OUTPUT
 
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
@@ -141,16 +167,21 @@ jobs:
             echo "API Response: $RESPONSE"
             echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
 
-      - name: Update Stack
+      - name: Update Stack Environment Variables
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |          
-          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
                "PullImage": true,
                "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
+               "AutoUpdate": {
+                              "forcePullImage": true,
+                              "forceUpdate": true,
+                              "Webhook": "{${{ steps.get_webhook.outputs.webhook_token }}}"
+                             },
                "Env": [
                        {
                        "name":"DUCKDNS_TOKEN",
@@ -164,7 +195,16 @@ jobs:
                "Prune": true
               }'
 
+      - name: Redeploy Stack using webhook
+        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+        run: |
+          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
+
+          echo "API Response: $RESPONSE"
+
       - name: Bring down VPN
+        if: always()
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show   

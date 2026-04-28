@@ -492,6 +492,23 @@ jobs:
           -H 'content-type: application/json' \
           -d "@pihole_config.json"
 
+      - name: Wait for Pi-hole DB ready
+        run: |
+          for i in $(seq 1 12); do
+            RESPONSE=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+              -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+              -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+              -H 'accept: application/json')
+            if echo "$RESPONSE" | jq -e '.groups' > /dev/null 2>&1; then
+              echo "Pi-hole gravity DB is ready"
+              exit 0
+            fi
+            echo "Attempt $i/12: DB not ready, waiting 10s..."
+            sleep 10
+          done
+          echo "Pi-hole gravity DB not ready after 2 minutes"
+          exit 1
+
       - name: Add Blocklists to Pihole via API
         run: |
           curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/lists?type=block" \
@@ -521,33 +538,25 @@ jobs:
       - name: Get Bypass Group ID
         id: bypass_group
         run: |
-          GROUP_ID=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+          RAW=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
             -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
             -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-            -H 'accept: application/json' \
-            | jq -r '.groups[] | select(.name == "bypass") | .id')
+            -H 'accept: application/json')
+          echo "Raw response: $RAW"
+          GROUP_ID=$(echo "$RAW" | jq -r '(.groups // [])[] | select(.name == "bypass") | .id')
           echo "group_id=$GROUP_ID" >> $GITHUB_OUTPUT
 
       - name: Create Bypass Group in Pihole
         if: steps.bypass_group.outputs.group_id == ''
         run: |
-          for i in 1 2 3 4 5; do
-            RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+            RESPONSE=$(curl -s --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
               -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
               -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
               -H 'accept: application/json' \
               -H 'content-type: application/json' \
               -d '{"name":"bypass","comment":"Bypass group - no blocklists","enabled":true}')
-            echo "Attempt $i: $RESPONSE"
-            if ! echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
-              echo "Group created successfully"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Failed to create bypass group after 5 attempts"
-          exit 1
-          
+            echo "Response: $RESPONSE"
+
       - name: Add Phone to Bypass Group
         run: |
           curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/clients" \

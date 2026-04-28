@@ -498,13 +498,13 @@ jobs:
             RESPONSE=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
               -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
               -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-              -H 'accept: application/json')
-              echo "API response: $RESPONSE"
+              -H 'accept: application/json' || true)
+            echo "Attempt $i/12: $RESPONSE"
             if echo "$RESPONSE" | jq -e '.groups' > /dev/null 2>&1; then
               echo "Pi-hole gravity DB is ready"
               exit 0
             fi
-            echo "Attempt $i/12: DB not ready, waiting 10s..."
+            echo "DB not ready, waiting 10s..."
             sleep 10
           done
           echo "Pi-hole gravity DB not ready after 2 minutes"

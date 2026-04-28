@@ -1,0 +1,5 @@
+[Definition]
+# Match: <proxy-ip> <client-ip>, <proxy-chain...> [date] POST /api/token/ HTTP/1.1 401/403
+failregex = ^(?:\d{1,3}\.){3}\d{1,3}\s+<HOST>(?:,\s*(?:\d{1,3}\.){3}\d{1,3})*\s+\[[^\]]+\]\s+POST\s+/api/token/\s+HTTP/1\.1\s+40[13]\b.*$
+
+ignoreregex =

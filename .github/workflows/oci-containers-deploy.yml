@@ -315,10 +315,15 @@ jobs:
         run: |
             OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
 
-            RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
+                  "AutoUpdate": {
+                          "forcePullImage": true,
+                          "forceUpdate": true,
+                          "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
+                          },
                   "PullImage": false,
                   "RepositoryReferenceName": "${{ github.ref }}",
                   "repositoryAuthentication": false,
@@ -479,59 +484,9 @@ jobs:
             echo "cert_id=" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create or Update Proxy Hosts (without cert)
-        run: |
-          declare -A hosts
-          hosts["dovetrek.james-fagg.uk"]="dovetrek-pwa:80"
-          hosts["nginx.oci.james-fagg.uk"]="nginx-proxy-manager:81"
-          hosts["whoami.14monarch.james-fagg.uk"]="rathole-server:3000"
-
-
-          ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}")
-
-          for fqdn in "${!hosts[@]}"; do
-            host="${hosts[$fqdn]}"
-            host_ip="${host%%:*}"
-            host_port="${host##*:}"
-
-            BODY=$(jq -n \
-              --arg fqdn "$fqdn" \
-              --arg host_ip "$host_ip" \
-              --argjson host_port "$host_port" \
-              '{
-                domain_names: [$fqdn],
-                forward_host: $host_ip,
-                forward_port: $host_port,
-                forward_scheme: "http",
-                ssl_forced: false,
-                enabled: true,
-                block_exploits: true,
-                meta: { letsencrypt_agree: false, dns_challenge: false }
-              }')
-
-            EXISTING_ID=$(echo "$ALL_HOSTS" | jq -r --arg d "$fqdn" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
-
-            if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ]; then
-              echo "Updating $fqdn (id: $EXISTING_ID)"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$EXISTING_ID" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            else
-              echo "Creating $fqdn"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            fi
-          done
-
       - name: Create Certificate
         id: create_cert
-        if: ${{ steps.cert.outputs.cert_id == '' && steps.node_config.outputs.keepalived_state == 'MASTER' }}
+        if: ${{ steps.cert.outputs.cert_id == ''}}
         continue-on-error: true
         run: |
           PAYLOAD=$(jq -n \
@@ -569,56 +524,125 @@ jobs:
             echo "cert_id=$cert_id" >> $GITHUB_OUTPUT
           fi
 
-      - name: Apply Certificate to Proxy Hosts
-        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
+      - name: Create or Update Proxy Hosts
         run: |
-          cert_id="${{ steps.cert.outputs.cert_id }}"
-          [ -z "$cert_id" ] && cert_id="${{ steps.create_cert.outputs.cert_id }}"
-
-          if [ -z "$cert_id" ] || [ "$cert_id" = "null" ]; then
-            echo "No certificate available — skipping SSL update."
-            exit 0
-          fi
-
-          echo "Applying cert $cert_id to all proxy hosts..."
+          declare -A hosts
+          hosts["dovetrek.james-fagg.uk"]="dovetrek-pwa:80"
+          hosts["nginx.oci.james-fagg.uk"]="nginx-proxy-manager:81"
+          hosts["whoami.james-fagg.uk"]="rathole-server:3000"
+          hosts["portainer.14monarch.james-fagg.uk"]="rathole-server:3000"
+          hosts["nginx.14monarch.james-fagg.uk","nginx1.14monarch.james-fagg.uk","nginx2.14monarch.james-fagg.uk"]="rathole-server:3000"
+          hosts["familytree.james-fagg.uk"]="rathole-server:3000"
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")
 
-          echo "$ALL_HOSTS" | jq -c '.[]' | while read -r proxy; do
-            id=$(echo "$proxy" | jq -r '.id')
-            fqdn=$(echo "$proxy" | jq -r '.domain_names[0]')
+          for fqdn in "${!hosts[@]}"; do
+            host="${hosts[$fqdn]}"
+            host_ip="${host%%:*}"
+            host_port="${host##*:}"
 
-            BODY=$(echo "$proxy" | jq \
-              --argjson cert_id "$cert_id" \
+            BODY=$(jq -n \
+              --arg fqdn "$fqdn" \
+              --arg host_ip "$host_ip" \
+              --argjson host_port "$host_port" \
+              --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: .domain_names,
-                forward_scheme: .forward_scheme,
-                forward_host: .forward_host,
-                forward_port: .forward_port,
-                access_list_id: .access_list_id,
+                domain_names: [$fqdn],
+                forward_host: $host_ip,
+                forward_port: $host_port,
+                forward_scheme: "http",
                 certificate_id: $cert_id,
-                ssl_forced: true,
-                caching_enabled: .caching_enabled,
-                block_exploits: .block_exploits,
-                advanced_config: .advanced_config,
-                meta: .meta,
-                allow_websocket_upgrade: .allow_websocket_upgrade,
-                http2_support: .http2_support,
-                enabled: .enabled,
-                locations: (if .locations == null then [] else .locations end),
-                hsts_enabled: .hsts_enabled,
-                hsts_subdomains: .hsts_subdomains,
-                trust_forwarded_proto: .trust_forwarded_proto
+                allow_websocket_upgrade: 1,
+                ssl_forced: false,
+                enabled: true,
+                block_exploits: true,
+                meta: { letsencrypt_agree: false, dns_challenge: false }
               }')
 
-            echo "Applying cert to $fqdn (id: $id)"
-            curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-              -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$id" \
-              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-              -H "Content-Type: application/json" \
-              -d "$BODY" | jq -r '.id // "error"'
+            EXISTING_ID=$(echo "$ALL_HOSTS" | jq -r --arg d "$fqdn" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
+
+            if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ]; then
+              echo "Updating $fqdn (id: $EXISTING_ID)"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$EXISTING_ID" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            else
+              echo "Creating $fqdn"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            fi
           done
+
+      - name: Set NPM default site
+        run: |
+            RESPONSE=$(curl -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/settings/default-site" \
+            -H 'Authorization: Bearer ${{ steps.token.outputs.token }}' \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "value": "html",
+              "meta": {
+                "html": "<body>\n<pre>{ \"code\":\"404\",\"message\":\"No route to host\",\"source\":\"${{ matrix.host_machine }}\" }\n</pre>\n</body>"
+              }
+              }')
+
+              echo $RESPONSE
+
+#      - name: Apply Certificate to Proxy Hosts
+#        if: ${{ steps.node_config.outputs.keepalived_state == 'MASTER' }}
+#        run: |
+#          cert_id="${{ steps.cert.outputs.cert_id }}"
+#          [ -z "$cert_id" ] && cert_id="${{ steps.create_cert.outputs.cert_id }}"
+#
+#          if [ -z "$cert_id" ] || [ "$cert_id" = "null" ]; then
+#            echo "No certificate available — skipping SSL update."
+#            exit 0
+#          fi
+#
+#          echo "Applying cert $cert_id to all proxy hosts..."
+#
+#          ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+#            -H "Authorization: Bearer ${{ steps.token.outputs.token }}")
+#
+#          echo "$ALL_HOSTS" | jq -c '.[]' | while read -r proxy; do
+#            id=$(echo "$proxy" | jq -r '.id')
+#            fqdn=$(echo "$proxy" | jq -r '.domain_names[0]')
+#
+#            BODY=$(echo "$proxy" | jq \
+#              --argjson cert_id "$cert_id" \
+#              '{
+#                domain_names: .domain_names,
+#                forward_scheme: .forward_scheme,
+#                forward_host: .forward_host,
+#                forward_port: .forward_port,
+#                access_list_id: .access_list_id,
+#                certificate_id: $cert_id,
+#                ssl_forced: true,
+#                caching_enabled: .caching_enabled,
+#                block_exploits: .block_exploits,
+#                advanced_config: .advanced_config,
+#                meta: .meta,
+#                allow_websocket_upgrade: .allow_websocket_upgrade,
+#                http2_support: .http2_support,
+#                enabled: .enabled,
+#                locations: (if .locations == null then [] else .locations end),
+#                hsts_enabled: .hsts_enabled,
+#                hsts_subdomains: .hsts_subdomains,
+#                trust_forwarded_proto: .trust_forwarded_proto
+#              }')
+#
+#            echo "Applying cert to $fqdn (id: $id)"
+#            curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+#              -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$id" \
+#              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+#              -H "Content-Type: application/json" \
+#              -d "$BODY" | jq -r '.id // "error"'
+#          done
 
       - name: Bring down VPN
         if: always()

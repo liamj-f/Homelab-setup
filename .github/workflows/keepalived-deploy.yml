@@ -752,13 +752,13 @@ jobs:
 
       - name: Set NPM default site
         run: |
-            $RESPONSE=$(curl -X PUT 'https://nginx.14monarch.james-fagg.uk/api/settings/default-site' \
+            RESPONSE=$(curl -X PUT 'https://nginx.14monarch.james-fagg.uk/api/settings/default-site' \
             -H 'Authorization: Bearer ${{ steps.token.outputs.token }}' \
             -H 'Content-Type: application/json' \
             -d '{
               "value": "html",
               "meta": {
-                "html": "<body>\n<pre>{ \"code\":\"404\",\"message\":\"No route to host\",\"source\":\"$host_machine\" }\n</pre>\n</body>"
+                "html": "<body>\n<pre>{ \"code\":\"404\",\"message\":\"No route to host\",\"source\":\"${{ matrix.host_machine }}\" }\n</pre>\n</body>"
               }
               }')
 

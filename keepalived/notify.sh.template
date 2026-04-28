@@ -44,8 +44,8 @@ case $STATE in
       sleep 5
     done
     pihole_set_dhcp true
-    docker start nginx-proxy-manager
-    docker start rsync
+#    docker start nginx-proxy-manager
+#    docker start rsync
     docker start nebula-sync
     docker start rathole-client
     # Stop containers on the other node via SSH
@@ -53,7 +53,7 @@ case $STATE in
         -o UserKnownHostsFile=/dev/null \
         -i /home/${SSH_USER}/.ssh/rsync_id \
         ${SSH_USER}@${SECONDARY_IP} \
-        "docker stop rsync nebula-sync nginx-proxy-manager rathole-client" || true
+        "docker stop nebula-sync rathole-client" || true
     ;;
   "BACKUP"|"FAULT")
     sleep 5
@@ -63,9 +63,9 @@ case $STATE in
       logger "keepalived notify: state changed to MASTER before stop completed, aborting"
       exit 0
     fi
-    docker stop rsync
+#    docker stop rsync
     docker stop nebula-sync
-    docker stop nginx-proxy-manager
+#    docker stop nginx-proxy-manager
     docker stop rathole-client
     pihole_set_dhcp false
     ;;

@@ -1,4 +1,4 @@
 [Definition]
-failregex = ^\S+\s+<HOST>,.*POST /api/token/ HTTP/1\.1 40[13]
+failregex = ^\S+\s+<HOST>,.*POST /api/token/ HTTP/1\.1 40[139]
 
 ignoreregex =

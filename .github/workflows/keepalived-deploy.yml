@@ -518,7 +518,18 @@ jobs:
           -H 'accept: text/plain' \
           -H 'content-type: application/json' \
 
+      - name: Get Bypass Group ID
+        id: bypass_group
+        run: |
+          GROUP_ID=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+            -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+            -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+            -H 'accept: application/json' \
+            | jq -r '.groups[] | select(.name == "bypass") | .id')
+          echo "group_id=$GROUP_ID" >> $GITHUB_OUTPUT
+
       - name: Create Bypass Group in Pihole
+        if: steps.bypass_group.outputs.group_id == ''
         run: |
           for i in 1 2 3 4 5; do
             RESPONSE=$(curl -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
@@ -528,27 +539,15 @@ jobs:
               -H 'content-type: application/json' \
               -d '{"name":"bypass","comment":"Bypass group - no blocklists","enabled":true}')
             echo "Attempt $i: $RESPONSE"
-            # Success if no error key in response
             if ! echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
               echo "Group created successfully"
               exit 0
             fi
-            echo "Pi-hole not ready, waiting 10s..."
             sleep 10
           done
           echo "Failed to create bypass group after 5 attempts"
           exit 1
-
-      - name: Get Bypass Group ID
-        id: bypass_group
-        run: |
-          GROUP_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
-          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
-          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-          -H 'accept: application/json' \
-          | jq '.groups[] | select(.name == "bypass") | .id')
-          echo "group_id=$GROUP_ID" >> $GITHUB_OUTPUT
-
+          
       - name: Add Phone to Bypass Group
         run: |
           curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/clients" \

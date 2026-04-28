@@ -709,7 +709,7 @@ jobs:
 
       - name: Set NPM default site
         run: |
-            RESPONSE=$(curl -X PUT 'https://nginx.14monarch.james-fagg.uk/api/settings/default-site' \
+            RESPONSE=$(curl -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/settings/default-site" \
             -H 'Authorization: Bearer ${{ steps.token.outputs.token }}' \
             -H 'Content-Type: application/json' \
             -d '{

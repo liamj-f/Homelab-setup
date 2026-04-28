@@ -499,6 +499,7 @@ jobs:
               -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
               -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
               -H 'accept: application/json')
+              echo "API response: $RESPONSE"
             if echo "$RESPONSE" | jq -e '.groups' > /dev/null 2>&1; then
               echo "Pi-hole gravity DB is ready"
               exit 0

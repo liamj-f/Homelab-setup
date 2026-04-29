@@ -75,6 +75,18 @@ jobs:
           done
           sudo wg show
 
+      - name: Render fail2ban action template
+        run: |
+          OCI_KEY_CONTENT_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+          export OCI_USER="${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
+          export OCI_FINGERPRINT="${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"
+          export OCI_TENANCY="${{ vars.OCID_TENANT }}"
+          export OCI_REGION="uk-london-1"
+          export OCI_KEY_CONTENT_BASE64
+          export OCID_WAF_BLOCKLIST="${{ vars.OCID_WAF_BLOCKLIST }}"
+          envsubst < fail2ban/data/action.d/oci-waf.local.template \
+                  > fail2ban/data/action.d/oci-waf.local
+
       - name: Create fail2ban directories on host
         run: |
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
@@ -85,6 +97,7 @@ jobs:
                         /opt/stacks/fail2ban/data/scripts \
                         /opt/stacks/fail2ban/custom-cont-init.d; \
                sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/"          
+
       - name: Copy config files to host
         run: |
           rsync -avz --checksum \
@@ -226,7 +239,7 @@ jobs:
                                     {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
                                     {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"}
                                       ],
-                  "Prune": false
+                  "Prune": true
                   }'  )
 
               echo "API Response: $RESPONSE" 

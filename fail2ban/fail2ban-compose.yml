@@ -5,6 +5,12 @@ services:
     restart: unless-stopped
     cap_add:
       - NET_RAW
+    healthcheck:
+      test: ["CMD", "fail2ban-client", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     environment:
       - OCID_WAF_BLOCKLIST=${OCID_WAF_BLOCKLIST}
       - OCI_USER=${OCI_USER}

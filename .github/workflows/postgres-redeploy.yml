@@ -23,6 +23,7 @@ on:
       - '**'
     paths:
       - '.github/workflows/postgres-redeploy.yml'    
+      - 'postgres-compose.yml'
     
 jobs:
   add_Postgres_stack:

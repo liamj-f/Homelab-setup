@@ -188,7 +188,7 @@ jobs:
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "{${{ steps.uuid.outputs.uuid }}}"
+                              "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
                "Env": [
                        {
@@ -197,7 +197,7 @@ jobs:
                         },
                        {
                        "name":"PGADMIN_EMAIL",
-                       "value":${{ vars.HOMELAB_EMAIL }}
+                       "value":"${{ vars.HOMELAB_EMAIL }}"
                         },
                        {
                        "name":"PGADMIN_PASSWORD",
@@ -224,7 +224,7 @@ jobs:
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "{${{ steps.get_webhook.outputs.webhook_token }}}"
+                              "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
                              },
                "Env": [
                        {
@@ -233,7 +233,7 @@ jobs:
                         },
                        {
                        "name":"PGADMIN_EMAIL",
-                       "value":${{ vars.HOMELAB_EMAIL }}
+                       "value":"${{ vars.HOMELAB_EMAIL }}"
                         },
                        {
                        "name":"PGADMIN_PASSWORD",

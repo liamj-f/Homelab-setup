@@ -14,7 +14,7 @@ services:
       POSTGRES_USER: svc_postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - /opt/stacks/postgres/data:/var/lib/postgresql/data
+      - /opt/stacks/postgres/data:/var/lib/postgresql
     networks:
       - db_network
 

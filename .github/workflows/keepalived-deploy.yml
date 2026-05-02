@@ -63,7 +63,7 @@ jobs:
       - name: Render keepalived config
         run: |
           export KEEPALIVED_VIRTUAL_IP="${{ vars.KEEPALIVED_IP }}"
-          export KEEPALIVED_AUTH_PASS="${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          export KEEPALIVED_AUTH_PASS="${{ secrets.KEEPALIVED_AUTH_SECRET }}"
           export KEEPALIVED_PRIORITY="${{ steps.node_config.outputs.keepalived_priority }}"
           export MASTER_OR_BACKUP_STATE="${{ steps.node_config.outputs.keepalived_state }}"
           export KEEPALIVED_INTERFACE="${{ steps.node_config.outputs.keepalived_interface }}"
@@ -78,7 +78,7 @@ jobs:
       - name: Render rathole client toml
         run: |
           export LJFCLOUD_IP="${{ vars.LJFCLOUD_IP }}"
-          export MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          export RATHOLE_AUTH_SECRET="${{ secrets.RATHOLE_AUTH_SECRET }}"
           export KEEPALIVED_VIRTUAL_IP="${{ vars.KEEPALIVED_IP }}"
           envsubst < keepalived/rathole-client.toml.template > keepalived/rathole-client.toml
 

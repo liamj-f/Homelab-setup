@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: ghcr.io/gramps-project/postgres:latest
+    container_name: postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: svc_postgres
+      POSTGRES_PASSWORD: ${SVC_POSTGRES_PASSWORD}
+    volumes:
+      - /opt/stacks/postgres/data:/var/lib/postgresql/data
+    networks:
+      - db-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+    volumes:
+      - /opt/stacks/pgadmin/data:/var/lib/pgadmin
+    networks:
+      - db-network
+
+networks:
+  db-network:
+    driver: bridge
+    external: true
+

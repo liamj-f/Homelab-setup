@@ -2,5 +2,5 @@
 bind_addr = "0.0.0.0:2333"
 
 [server.services.onprem-npm]
-token = "${MYSQL_ROOT_PASSWORD}"
+token = "${RATHOLE_AUTH_SECRET}"
 bind_addr = "0.0.0.0:3000"

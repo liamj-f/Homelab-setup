@@ -192,8 +192,16 @@ jobs:
                              },
                "Env": [
                        {
-                       "name":"POSTGRES_ADMIN_PASSWORD",
+                       "name":"POSTGRES_PASSWORD",
                        "value":"${{ secrets.SVC_POSTGRES_PASSWORD }}"
+                        },
+                       {
+                       "name":"PGADMIN_EMAIL",
+                       "value":${{ vars.HOMELAB_EMAIL }}
+                        },
+                       {
+                       "name":"PGADMIN_PASSWORD",
+                       "value":"${{ secrets.APP_PASSWORD }}"
                         }
                      ],
                "Prune": true,
@@ -220,7 +228,7 @@ jobs:
                              },
                "Env": [
                        {
-                       "name":"POSTGRES_ADMIN_PASSWORD",
+                       "name":"POSTGRES_PASSWORD",
                        "value":"${{ secrets.SVC_POSTGRES_PASSWORD }}"
                         }
                      ],

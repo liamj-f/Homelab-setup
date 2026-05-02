@@ -35,7 +35,7 @@ jobs:
       domain: ${{ inputs.domain || '14monarch.local' }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
@@ -238,7 +238,7 @@ jobs:
           echo "API Response: $RESPONSE"
 
       - name: Rescan files in external drive
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.E7270_IP }}
           username: ${{ vars.E7270_USER }}

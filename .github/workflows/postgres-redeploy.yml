@@ -30,7 +30,7 @@ jobs:
     strategy:
       matrix:
         host_machine: [e7270-server]
-        max-parallel: 1
+      max-parallel: 1
     env:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
       domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}

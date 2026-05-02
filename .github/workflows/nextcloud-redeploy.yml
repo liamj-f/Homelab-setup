@@ -200,6 +200,11 @@ jobs:
                "PullImage": true,
                "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
+               "AutoUpdate": {
+                              "forcePullImage": true,
+                              "forceUpdate": true,
+                              "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
+                             },
                "Env": [
                        {
                        "name":"POSTGRES_HOST",

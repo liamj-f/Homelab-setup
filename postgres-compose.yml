@@ -16,14 +16,14 @@ services:
     volumes:
       - /opt/stacks/postgres/data:/var/lib/postgresql/data
     networks:
-      - db-network
+      - db_network
 
   pgadmin:
     image: dpage/pgadmin4:9.14.0
     container_name: pgadmin
     restart: unless-stopped
     ports:
-      - "5050:80"
+      - "89:80"
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
@@ -31,10 +31,10 @@ services:
     volumes:
       - /opt/stacks/pgadmin/data:/var/lib/pgadmin
     networks:
-      - db-network
+      - db_network
 
 networks:
-  db-network:
+  db_network:
     driver: bridge
     external: true
 

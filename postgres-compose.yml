@@ -12,7 +12,7 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_USER: svc_postgres
-      POSTGRES_PASSWORD: ${SVC_POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - /opt/stacks/postgres/data:/var/lib/postgresql/data
     networks:

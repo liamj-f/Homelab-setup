@@ -233,12 +233,12 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
 
           echo "API Response: $RESPONSE"
-          
+
       - name: Create databases and users   
         uses: appleboy/ssh-action@master
         with: 
           host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ vars.APP_USER }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             docker exec postgres psql -U postgres <<'EOF'

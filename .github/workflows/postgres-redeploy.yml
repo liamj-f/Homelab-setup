@@ -258,8 +258,11 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-              docker exec postgres bash -c 'apt-get update && apt-get install -y --no-install-recommends locales && sed -i \"/en_GB.UTF-8/s/^# //\" /etc/locale.gen && locale-gen && rm -rf /var/lib/apt/lists/*'
-
+              docker exec postgres apt-get update
+              docker exec postgres apt-get install -y --no-install-recommends locales
+              docker exec postgres sed -i '/en_GB.UTF-8/s/^# //' /etc/locale.gen
+              docker exec postgres locale-gen
+              docker exec postgres bash -c 'rm -rf /var/lib/apt/lists/*'
       - name: Create databases and users   
         uses: appleboy/ssh-action@v1.2.5
         with: 

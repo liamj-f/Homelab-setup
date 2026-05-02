@@ -36,7 +36,7 @@ jobs:
       domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
 
       - name: Set node config
         id: node_config
@@ -234,8 +234,18 @@ jobs:
 
           echo "API Response: $RESPONSE"
 
+      - name: Install locales in Postgres container
+        uses: appleboy/ssh-action@v1.2.5
+        with: 
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            docker exec postgres bash -c 'apt-get update && apt-get install -y --no-install-recommends locales-all && rm -rf /var/lib/apt/lists/*'
+
+
       - name: Create databases and users   
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with: 
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
@@ -244,6 +254,9 @@ jobs:
             docker exec postgres psql -U postgres <<'EOF'
             DO $$
             BEGIN
+              IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${{ vars.APP_USER }}') THEN
+                CREATE USER ${{ vars.APP_USER }} WITH PASSWORD '${{ secrets.APP_PASSWORD }}' SUPERUSER CREATEDB CREATEROLE;
+              END IF;
               IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'grampsweb') THEN
                 CREATE USER grampsweb WITH PASSWORD '${{ secrets.SVC_GRAMPSWEB_PASSWORD }}';
               END IF;

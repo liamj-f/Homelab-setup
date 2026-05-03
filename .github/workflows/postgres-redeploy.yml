@@ -309,6 +309,7 @@ jobs:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
+          capture_stdout: true
           script: |
 
             docker exec postgres psql -U svc_postgres <<'EOF'

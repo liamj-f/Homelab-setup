@@ -1,0 +1,19 @@
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${APP_USER}') THEN
+    CREATE USER ${APP_USER} WITH PASSWORD '${APP_PASSWORD}' SUPERUSER CREATEDB CREATEROLE;
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'grampsweb') THEN
+    CREATE USER grampsweb WITH PASSWORD '${SVC_GRAMPSWEB_PASSWORD}';
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nextcloud') THEN
+    CREATE USER nextcloud WITH PASSWORD '${SVC_NEXTCLOUD_PASSWORD}';
+  END IF;
+END
+$$;
+
+SELECT 'CREATE DATABASE grampsweb OWNER grampsweb'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'grampsweb')\gexec
+
+SELECT 'CREATE DATABASE nextcloud OWNER nextcloud'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nextcloud')\gexec

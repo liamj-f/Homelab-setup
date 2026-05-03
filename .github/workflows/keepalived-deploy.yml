@@ -139,7 +139,7 @@ jobs:
             ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/keepalived/
 
       - name: Set permissions
-        uses: appleboy/ssh-action@1.2.5
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}

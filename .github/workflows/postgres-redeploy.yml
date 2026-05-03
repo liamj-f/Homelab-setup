@@ -134,7 +134,7 @@ jobs:
           export APP_PASSWORD="${{ secrets.APP_PASSWORD }}"
           export SVC_GRAMPSWEB_PASSWORD="${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"
           export SVC_NEXTCLOUD_PASSWORD="${{ secrets.SVC_NEXTCLOUD_PASSWORD }}"
-          envsubst < postgres/database_create.sql > postgres/database_create_rendered.sql
+          envsubst < postgres/database_create.sql.template > postgres/database_create.sql
 
       - name: Copy SQL files to host
         uses: appleboy/scp-action@v0.1.7
@@ -142,7 +142,7 @@ jobs:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}    
-          source: postgres/database_create_rendered.sql
+          source: postgres/database_create.sql
           target: /tmp/
 
       - name: Authenticate to Portainer
@@ -357,8 +357,8 @@ jobs:
           key: ${{ steps.node_config.outputs.ssh_key }}
           capture_stdout: true
           script: |
-            docker cp /tmp/postgres/database_create_rendered.sql postgres:/tmp/database_create_rendered.sql
-            docker exec postgres psql -U svc_postgres -e -f /tmp/database_create_rendered.sql
+            docker cp /tmp/postgres/database_create.sql postgres:/tmp/database_create.sql
+            docker exec postgres psql -U svc_postgres -e -f /tmp/database_create.sql
             rm -rf /tmp/postgres/
 
 

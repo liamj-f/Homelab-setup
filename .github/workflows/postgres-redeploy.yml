@@ -312,7 +312,7 @@ jobs:
           capture_stdout: true
           script: |
 
-            docker exec postgres psql -U svc_postgres <<'EOF'
+            docker exec postgres psql -U svc_postgres -e <<'EOF'
             DO $$
             BEGIN
               IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${{ vars.APP_USER }}') THEN

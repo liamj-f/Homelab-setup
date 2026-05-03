@@ -235,7 +235,7 @@ jobs:
                         },
                        {
                        "name":"PGADMIN_EMAIL",
-                       "value":"${{ vars.APP_USER }}"
+                       "value":"${{ vars.HOMELAB_EMAIL }}"
                         },
                        {
                        "name":"PGADMIN_PASSWORD",
@@ -274,7 +274,7 @@ jobs:
                         },
                        {
                        "name":"PGADMIN_EMAIL",
-                       "value":"${{ vars.APP_USER }}"
+                       "value":"${{ vars.HOMELAB_EMAIL }}"
                         },
                        {
                        "name":"PGADMIN_PASSWORD",

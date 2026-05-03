@@ -20,7 +20,7 @@ jobs:
       max-parallel: 1
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6.0.2
 
       - name: Set node config
         id: node_config
@@ -139,7 +139,7 @@ jobs:
             ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/keepalived/
 
       - name: Set permissions
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
@@ -661,6 +661,7 @@ jobs:
           hosts["adminer.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:86"
           hosts["whoami.14monarch.james-fagg.uk","whoami.james-fagg.uk"]="${{ vars.E7270_IP }}:87"
           hosts["familytree.james-fagg.uk"]="${{ vars.E7270_IP }}:88"
+          hosts["pgadmin.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:89"
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")

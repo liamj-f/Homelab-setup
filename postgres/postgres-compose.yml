@@ -29,8 +29,10 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: "True"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
     volumes:
       - /opt/stacks/pgadmin/data:/var/lib/pgadmin
+      - /opt/stacks/pgadmin/servers.json:/pgadmin4/servers.json
     networks:
       - db_network
 

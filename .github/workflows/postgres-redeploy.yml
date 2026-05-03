@@ -106,6 +106,27 @@ jobs:
             sudo mkdir -p /opt/stacks/pgadmin
             sudo chown -R 5050:5050 /opt/stacks/pgadmin
 
+      - name: Copy pgAdmin config to host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          source: postgres/servers.json
+          target: /tmp/
+
+      - name: Move pgAdmin config into place
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            sudo mkdir -p /opt/stacks/pgadmin
+            sudo mv /tmp/pgadmin/servers.json /opt/stacks/pgadmin/servers.json
+            sudo chown -R 5050:5050 /opt/stacks/pgadmin
+            rm -rf /tmp/postgres
+
       - name: Render SQL files
         run: |
           export APP_USER="${{ vars.APP_USER }}"

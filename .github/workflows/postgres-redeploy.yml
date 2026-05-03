@@ -221,7 +221,7 @@ jobs:
                "Name": "postgres",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "postgres-compose.yml",
+               "ComposeFile": "postgres/postgres-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,
@@ -256,8 +256,11 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
+               "Name": "postgres",
                "PullImage": true,
+               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
+               "ComposeFile": "postgres/postgres-compose.yml",
                "repositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,

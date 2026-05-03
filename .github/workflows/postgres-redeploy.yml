@@ -120,20 +120,8 @@ jobs:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}    
-          source: postgres/datbase_create_rendered.sql
+          source: postgres/database_create_rendered.sql
           target: /tmp/
-
-      - name: Create databases and users
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
-          capture_stdout: true
-          script: |
-            docker cp /tmp/database_create_rendered.sql postgres:/tmp/database_create_rendered.sql
-            docker exec postgres psql -U svc_postgres -e -f /tmp/database_create_rendered.sql
-            rm /tmp/database_create_rendered.sql
 
       - name: Authenticate to Portainer
         id: auth
@@ -332,36 +320,19 @@ jobs:
               docker exec postgres locale-gen
               docker exec postgres bash -c 'rm -rf /var/lib/apt/lists/*'
 
-      - name: Create databases and users   
+
+      - name: Create databases and users
         uses: appleboy/ssh-action@v1.2.5
-        with: 
+        with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           capture_stdout: true
           script: |
+            docker cp /tmp/postgres/database_create_rendered.sql postgres:/tmp/database_create_rendered.sql
+            docker exec postgres psql -U svc_postgres -e -f /tmp/database_create_rendered.sql
+            rm /tmp/database_create_rendered.sql
 
-            docker exec postgres psql -U svc_postgres -e <<'EOF'
-            DO $$
-            BEGIN
-              IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${{ vars.APP_USER }}') THEN
-                CREATE USER ${{ vars.APP_USER }} WITH PASSWORD '${{ secrets.APP_PASSWORD }}' SUPERUSER CREATEDB CREATEROLE;
-              END IF;
-              IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'grampsweb') THEN
-                CREATE USER grampsweb WITH PASSWORD '${{ secrets.SVC_GRAMPSWEB_PASSWORD }}';
-              END IF;
-              IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nextcloud') THEN
-                CREATE USER nextcloud WITH PASSWORD '${{ secrets.SVC_NEXTCLOUD_PASSWORD }}';
-              END IF;
-            END
-            $$;
-
-            SELECT 'CREATE DATABASE grampsweb OWNER grampsweb'
-            WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'grampsweb')\gexec
-
-            SELECT 'CREATE DATABASE nextcloud OWNER nextcloud'
-            WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nextcloud')\gexec
-            EOF
 
       - name: Bring down VPN
         if: always()

@@ -252,7 +252,7 @@ jobs:
       - name: Update Stack Environment Variables
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |          
-          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          $RESPONSE=$(curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -280,6 +280,9 @@ jobs:
                      ],
                "Prune": true
               }'
+              )
+
+            echo "API Response: $RESPONSE"
 
       - name: Redeploy Stack using webhook
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}

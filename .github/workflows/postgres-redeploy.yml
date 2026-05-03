@@ -86,6 +86,16 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
 
+      - name: Prepare pgAdmin data directory
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            sudo mkdir -p /opt/stacks/pgadmin
+            sudo chown -R 5050:5050 /opt/stacks/pgadmin
+      
       - name: Authenticate to Portainer
         id: auth
         run: |

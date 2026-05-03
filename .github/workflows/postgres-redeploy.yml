@@ -358,7 +358,7 @@ jobs:
           capture_stdout: true
           script: |
             docker cp /tmp/postgres/database_create.sql postgres:/tmp/database_create.sql
-            docker exec postgres psql -U svc_postgres -e -f /tmp/database_create.sql
+            docker exec postgres psql -U svc_postgres -d postgres_db -e -f /tmp/database_create.sql            
             rm -rf /tmp/postgres/
 
 

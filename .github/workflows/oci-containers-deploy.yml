@@ -30,7 +30,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -85,7 +85,7 @@ jobs:
     steps:
 
       - name: Checkout repo
-        uses: actions/checkout@main
+        uses: actions/checkout@v6.0.2
 
       - name: Install WireGuard
         run: |
@@ -533,6 +533,7 @@ jobs:
           hosts["portainer.14monarch.james-fagg.uk"]="rathole-server:3000"
           hosts["nginx.14monarch.james-fagg.uk","nginx1.14monarch.james-fagg.uk","nginx2.14monarch.james-fagg.uk"]="rathole-server:3000"
           hosts["familytree.james-fagg.uk"]="rathole-server:3000"
+          hosts["pgadmin.14monarch.james-fagg.uk"]="rathole-server:3000"
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")

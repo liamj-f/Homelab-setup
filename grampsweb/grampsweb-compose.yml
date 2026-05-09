@@ -5,7 +5,8 @@ services:
     ports:
       - "88:5000"  # host:docker
     environment:
-      GRAMPSWEB_TREE: "Gramps Web"
+      GRAMPSWEB_TREE: "James-Fagg_Family_Tree"
+      
       GRAMPSWEB_CELERY_CONFIG__broker_url: "redis://grampsweb_redis:6379/0"
       GRAMPSWEB_CELERY_CONFIG__result_backend: "redis://grampsweb_redis:6379/0"
       GRAMPSWEB_RATELIMIT_STORAGE_URI: redis://grampsweb_redis:6379/1
@@ -53,6 +54,5 @@ volumes:
   gramps_thumb_cache:
   gramps_cache:
   gramps_secret:
-  gramps_db:
   gramps_media:
   gramps_tmp:

@@ -34,9 +34,6 @@ networks:
     external: true    
 
 volumes:
-  nextcloud_db_data:
-    name: nextcloud_db_data
-    external: false
   nextcloud_app_data:
     name: nextcloud_app_data
     

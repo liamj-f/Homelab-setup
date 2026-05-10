@@ -14,6 +14,19 @@ services:
         --access-logfile=/app/logs/access.log 
         --access-logformat='%(h)s %({x-forwarded-for}i)s %(t)s %(r)s %(s)s' 
         --forwarded-allow-ips=192.168.0.2
+        
+      GRAMPSWEB_DATABASE_TYPE: "postgresql" 
+      GRAMPSWEB_POSTGRES_HOST: "postgres" 
+      GRAMPSWEB_POSTGRES_PORT: 5432 
+      GRAMPSWEB_POSTGRES_NAME: "grampsweb_trees" # The specific DB name 
+      GRAMPSWEB_POSTGRES_USER: "svc_grampsweb" 
+      GRAMPSWEB_POSTGRES_PASSWORD: $(svc_grampsweb_password)
+      
+      # 2. User/Auth Database (Metadata) # Format: postgresql://user:password@host:port/dbname 
+      GRAMPSWEB_USER_DB_URI: "postgresql://svc_grampsweb:$(svc_grampsweb_password)@0ostgres:5432/grampsweb_users" 
+      # 3. Search Index Database 
+      GRAMPSWEB_SEARCH_INDEX_DB_URI: "postgresql://your_user:your_password@your_postgres_ip:5432/grampsweb_search"    
+
     depends_on:
       - grampsweb_redis
     networks:

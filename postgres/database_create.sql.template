@@ -12,8 +12,14 @@ BEGIN
 END
 $$;
 
-SELECT 'CREATE DATABASE grampsweb OWNER svc_grampsweb'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'svc_grampsweb')\gexec
+SELECT 'CREATE DATABASE grampsweb_trees OWNER svc_grampsweb'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'grampsweb_trees')\gexec
+
+SELECT 'CREATE DATABASE grampsweb_users OWNER svc_grampsweb'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'grampsweb_users')\gexec
+
+SELECT 'CREATE DATABASE grampsweb_search OWNER svc_grampsweb'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'grampsweb_search')\gexec
 
 SELECT 'CREATE DATABASE nextcloud OWNER svc_nextcloud'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'svc_nextcloud')\gexec
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nextcloud')\gexec

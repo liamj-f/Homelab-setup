@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   keepalived:
-    image: shawly/keepalived:v2.3.4
+    image: osixia/keepalived:2.3.4
     container_name: keepalived
     network_mode: host
     restart: unless-stopped
@@ -11,7 +11,16 @@ services:
       - NET_BROADCAST
     environment:
       TZ: Europe/London
-      KEEPALIVED_CUSTOM_CONFIG: true
+    # KEEPALIVED_CUSTOM_CONFIG: true --used with shawly/keepalived:v2.3.4
+    # KEEPALIVED_CONF: /etc/keepalived/keepalived.conf
+      KEEPALIVED_VIRTUAL_IPS: ${KEEPALIVED_VIRTUAL_IPS}
+      KEEPALIVED_PRIORITY: ${KEEPALIVED_PRIORITY}
+      KEEPALIVED_INTERFACE: ${KEEPALIVED_INTERFACE}
+      KEEPALIVED_NOTIFY_SCRIPT: /etc/keepalived/notify.sh
+      KEEPALIVED_UNICAST_PEERS: ${SECONDARY_IP}
+      KEEPALIVED_STATE: ${KEEPALIVED_STATE}
+      KEEPALIVED_PASSWORD: ${KEEPALIVED_PASSWORD}
+      KEEPALIVED_VIRTUAL_ROUTER_ID: ${KEEPALIVED_VIRTUAL_ROUTER_ID}
     volumes:
       - /opt/stacks/keepalived/keepalived.conf:/etc/keepalived/keepalived.conf:ro
       - /opt/stacks/keepalived/notify.sh:/etc/keepalived/notify.sh:ro

@@ -282,6 +282,7 @@ jobs:
             RepositoryReferenceName: $ref,
             ComposeFile: "keepalived/keepalived-compose.yml",
             RepositoryAuthentication: false,
+            RepullImageAndRedeploy: true,
             AutoUpdate: {
                           "forcePullImage": true,
                           "forceUpdate": true,
@@ -337,7 +338,7 @@ jobs:
                     ForceUpdate: true,
                     Webhook: $webhook
                     },
-              PullImage: true,
+              RepullImageAndRedeploy: true,
               RepositoryReferenceName: $ref,
               repositoryAuthentication: false,
               Env: [
@@ -359,7 +360,7 @@ jobs:
               Prune: true
               }')
 
-            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d "$UPDATE_STACK_PAYLOAD")
@@ -370,7 +371,7 @@ jobs:
       - name: Redeploy Stack using webhook
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
+          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
 
           echo "API Response: $RESPONSE"

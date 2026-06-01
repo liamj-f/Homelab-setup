@@ -67,6 +67,8 @@ jobs:
           export KEEPALIVED_PRIORITY="${{ steps.node_config.outputs.keepalived_priority }}"
           export MASTER_OR_BACKUP_STATE="${{ steps.node_config.outputs.keepalived_state }}"
           export KEEPALIVED_INTERFACE="${{ steps.node_config.outputs.keepalived_interface }}"
+          export SECONDARY_IP="${{ steps.node_config.outputs.rsync_target_host }}"
+          export PRIMARY_IP="${{ steps.node_config.outputs.ssh_host }}"
           envsubst < keepalived/keepalived.conf.template > keepalived/keepalived.conf
 
       - name: Render notify.sh
@@ -291,14 +293,15 @@ jobs:
                 {name: "SECONDARY_IP",        value: $secondary_ip},
                 {name: "INITIAL_ADMIN_EMAIL", value: $nginx_email},
                 {name: "HOSTNAME",            value: $hostname},
-                {name: "KEEPALIVED_CONF", value: /etc/keepalived/keepalived.conf},
+                {name: "KEEPALIVED_CONF", value: /etc/keepalived/keepalived.conf}
                 {name: "KEEPALIVED_VIRTUAL_IPS", value: $keepalived_virtual_ip},
                 {name: "KEEPALIVED_PRIORITY", value: $keepalived_priority},
                 {name: "KEEPALIVED_INTERFACE", value: $keepalived_interface},
                 {name: "KEEPALIVED_NOTIFY_SCRIPT", value: /etc/keepalived/notify.sh},
                 {name: "KEEPALIVED_STATE", value: $keepalived_state},
                 {name: "KEEPALIVED_PASSWORD", value: $keepalived_password},
-                {name: "KEEPALIVED_VIRTUAL_ROUTER_ID", value:"51"}
+                {name: "KEEPALIVED_VIRTUAL_ROUTER_ID", value:"51"},
+                {name: "KEEPALIVED_UNICAST_PEERS", value: ("#PYTHON2BASH:['" + $secondary_ip + "']")}
               ],
             Prune: true,
             StackFileVersion: "3"
@@ -349,7 +352,9 @@ jobs:
                 {name: "KEEPALIVED_NOTIFY_SCRIPT", value: "/etc/keepalived/notify.sh"},
                 {name: "KEEPALIVED_STATE", value: $keepalived_state},
                 {name: "KEEPALIVED_PASSWORD", value: $keepalived_password},
-                {name: "KEEPALIVED_VIRTUAL_ROUTER_ID", value:"51"}
+                {name: "KEEPALIVED_VIRTUAL_ROUTER_ID", value:"51"},
+                {name: "KEEPALIVED_UNICAST_PEERS", value: ("#PYTHON2BASH:['" + $secondary_ip + "']")}
+                
               ],
               Prune: true
               }')

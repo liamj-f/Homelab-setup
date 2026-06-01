@@ -7,6 +7,9 @@ vrrp_instance VI_1 {
   virtual_router_id 51
   priority ${KEEPALIVED_PRIORITY}
   advert_int 3
+  unicast_src_ip ${PRIMARY_IP}
+  unicast_peer { ${SECONDARY_IP} }
+
 
   authentication {
     auth_type PASS

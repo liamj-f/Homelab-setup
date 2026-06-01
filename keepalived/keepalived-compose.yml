@@ -17,12 +17,12 @@ services:
       KEEPALIVED_PRIORITY: ${KEEPALIVED_PRIORITY}
       KEEPALIVED_INTERFACE: ${KEEPALIVED_INTERFACE}
       KEEPALIVED_NOTIFY_SCRIPT: /etc/keepalived/notify.sh
-      KEEPALIVED_UNICAST_PEERS: ${SECONDARY_IP}
+      KEEPALIVED_UNICAST_PEERS: ${KEEPALIVED_UNICAST_PEERS}
       KEEPALIVED_STATE: ${KEEPALIVED_STATE}
       KEEPALIVED_PASSWORD: ${KEEPALIVED_PASSWORD}
       KEEPALIVED_VIRTUAL_ROUTER_ID: ${KEEPALIVED_VIRTUAL_ROUTER_ID}
     volumes:
-      - /opt/stacks/keepalived/keepalived.conf:/etc/keepalived/keepalived.conf:ro
+     # - /opt/stacks/keepalived/keepalived.conf:/etc/keepalived/keepalived.conf:ro
       - /opt/stacks/keepalived/notify.sh:/etc/keepalived/notify.sh:ro
       - /var/run/docker.sock:/var/run/docker.sock
 

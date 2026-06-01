@@ -352,7 +352,7 @@ jobs:
                     ForcePullImage: true,
                     ForceUpdate: true,
                     Webhook: $webhook
-                    }
+                    },
               Prune: true
               }')
 

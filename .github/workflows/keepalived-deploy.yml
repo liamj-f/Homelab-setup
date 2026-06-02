@@ -348,26 +348,26 @@ jobs:
               Prune: true
               }')
 
-            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d "$UPDATE_STACK_PAYLOAD")
 
             echo "API Response: $RESPONSE" 
 
-      - name: Redeploy stack using redeploy endpoint
-        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-        run: |
-          RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-          -H "Content-Type: application/json" \
-          -d '{
-            "RepullImageAndRedeploy": true,
-            "RepositoryReferenceName": "${{ github.ref }}",
-            "repositoryAuthentication": false
-          }')
-
-          echo "API Response: $RESPONSE"
+      #- name: Redeploy stack using redeploy endpoint
+      #  if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+      #  run: |
+      #    RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+      #    -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+      #    -H "Content-Type: application/json" \
+      #    -d '{
+      #      "RepullImageAndRedeploy": true,
+      #      "RepositoryReferenceName": "${{ github.ref }}",
+      #      "repositoryAuthentication": false
+      #    }')
+      #
+      #    echo "API Response: $RESPONSE"
 
     #  - name: Redeploy Stack using webhook
     #    if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}

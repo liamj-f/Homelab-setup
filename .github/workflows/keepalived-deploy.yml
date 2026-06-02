@@ -347,11 +347,11 @@ jobs:
                 {name: "SECONDARY_IP",        value: $secondary_ip},
                 {name: "INITIAL_ADMIN_EMAIL", value: $nginx_email},
                 {name: "HOSTNAME",            value: $hostname},
-                {name: "KEEPALIVED_CONF", value: /etc/keepalived/keepalived.conf}
+                {name: "KEEPALIVED_CONF", value: "/etc/keepalived/keepalived.conf"},
                 {name: "KEEPALIVED_VIRTUAL_IPS", value: $keepalived_virtual_ip},
                 {name: "KEEPALIVED_PRIORITY", value: $keepalived_priority},
                 {name: "KEEPALIVED_INTERFACE", value: $keepalived_interface},
-                {name: "KEEPALIVED_NOTIFY_SCRIPT", value: /etc/keepalived/notify.sh},
+                {name: "KEEPALIVED_NOTIFY_SCRIPT", value: "/etc/keepalived/notify.sh"},
                 {name: "KEEPALIVED_STATE", value: $keepalived_state},
                 {name: "KEEPALIVED_PASSWORD", value: $keepalived_password},
                 {name: "KEEPALIVED_VIRTUAL_ROUTER_ID", value:"51"},

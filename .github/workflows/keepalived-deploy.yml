@@ -321,7 +321,7 @@ jobs:
         run: |
           CURRENT=$(curl -s "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-      
+          echo "Current stack: $CURRENT"
           PAYLOAD=$(echo "$CURRENT" | jq \
             --arg app_password "${{ secrets.APP_PASSWORD }}" \
             --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \

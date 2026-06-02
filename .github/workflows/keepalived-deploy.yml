@@ -321,13 +321,17 @@ jobs:
         run: |
             UPDATE_STACK_PAYLOAD=$(jq -n \
             --arg ref "${{ github.ref }}" \
-            --arg ssh_user "${{ steps.node_config.outputs.ssh_user }}" \
+            --arg webhook "${{ steps.uuid.outputs.uuid }}" \
             --arg app_password "${{ secrets.APP_PASSWORD }}" \
             --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
             --arg secondary_ip "${{ steps.node_config.outputs.rsync_target_host }}" \
-            --arg hostname "${{ matrix.host_machine }}" \
             --arg nginx_email "${{ vars.NGINX_EMAIL }}" \
-            --arg webhook "${{ steps.get_webhook.outputs.webhook_token}}" \
+            --arg hostname "${{ matrix.host_machine }}" \
+            --arg keepalived_virtual_ip "${{ vars.KEEPALIVED_IP }}" \
+            --arg keepalived_priority "${{ steps.node_config.outputs.keepalived_priority }}" \
+            --arg keepalived_interface "${{ steps.node_config.outputs.keepalived_interface }}" \
+            --arg keepalived_state "${{ steps.node_config.outputs.keepalived_state }}" \
+            --arg keepalived_password "${{ secrets.KEEPALIVED_AUTH_SECRET }}" \
             '{
               AutoUpdate: {
                     ForcePullImage: true,
@@ -338,12 +342,20 @@ jobs:
               RepositoryReferenceName: $ref,
               repositoryAuthentication: false,
               Env: [
-                {name: "SSH_USER",            value: $ssh_user},
                 {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
                 {name: "PRIMARY_IP",          value: $primary_ip},
                 {name: "SECONDARY_IP",        value: $secondary_ip},
                 {name: "INITIAL_ADMIN_EMAIL", value: $nginx_email},
-                {name: "HOSTNAME",            value: $hostname}
+                {name: "HOSTNAME",            value: $hostname},
+                {name: "KEEPALIVED_CONF", value: /etc/keepalived/keepalived.conf}
+                {name: "KEEPALIVED_VIRTUAL_IPS", value: $keepalived_virtual_ip},
+                {name: "KEEPALIVED_PRIORITY", value: $keepalived_priority},
+                {name: "KEEPALIVED_INTERFACE", value: $keepalived_interface},
+                {name: "KEEPALIVED_NOTIFY_SCRIPT", value: /etc/keepalived/notify.sh},
+                {name: "KEEPALIVED_STATE", value: $keepalived_state},
+                {name: "KEEPALIVED_PASSWORD", value: $keepalived_password},
+                {name: "KEEPALIVED_VIRTUAL_ROUTER_ID", value:"51"},
+                {name: "KEEPALIVED_UNICAST_PEERS", value: ("#PYTHON2BASH:['" + $secondary_ip + "']")}
               ],
               Prune: true
               }')

@@ -126,7 +126,7 @@ jobs:
 
       - name: Render Rathole config
         run: |
-          export MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          export RATHOLE_AUTH_SECRET="${{ secrets.RATHOLE_AUTH_SECRET }}"
           envsubst < keepalived/rathole-server.toml.template > keepalived/rathole-server.toml 
 
       - name: Bring up VPN

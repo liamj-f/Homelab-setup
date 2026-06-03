@@ -11,18 +11,18 @@ services:
       - NET_BROADCAST
     environment:
       TZ: Europe/London
-    # KEEPALIVED_CUSTOM_CONFIG: true --used with shawly/keepalived:v2.3.4
-    # KEEPALIVED_CONF: /etc/keepalived/keepalived.conf
-      KEEPALIVED_VIRTUAL_IPS: ${KEEPALIVED_VIRTUAL_IPS}
-      KEEPALIVED_PRIORITY: ${KEEPALIVED_PRIORITY}
-      KEEPALIVED_INTERFACE: ${KEEPALIVED_INTERFACE}
-      KEEPALIVED_NOTIFY_SCRIPT: /etc/keepalived/notify.sh
-      KEEPALIVED_UNICAST_PEERS: ${KEEPALIVED_UNICAST_PEERS}
-      KEEPALIVED_STATE: ${KEEPALIVED_STATE}
-      KEEPALIVED_PASSWORD: ${KEEPALIVED_PASSWORD}
-      KEEPALIVED_VIRTUAL_ROUTER_ID: ${KEEPALIVED_VIRTUAL_ROUTER_ID}
+      KEEPALIVED_CUSTOM_CONFIG: true # used with shawly/keepalived:v2.3.4
+      KEEPALIVED_CONF: /etc/keepalived/keepalived.conf
+    #  KEEPALIVED_VIRTUAL_IPS: ${KEEPALIVED_VIRTUAL_IPS}
+    #  KEEPALIVED_PRIORITY: ${KEEPALIVED_PRIORITY}
+    #  KEEPALIVED_INTERFACE: ${KEEPALIVED_INTERFACE}
+    #  KEEPALIVED_NOTIFY_SCRIPT: /etc/keepalived/notify.sh
+    #  KEEPALIVED_UNICAST_PEERS: ${KEEPALIVED_UNICAST_PEERS}
+    #  KEEPALIVED_STATE: ${KEEPALIVED_STATE}
+    #  KEEPALIVED_PASSWORD: ${KEEPALIVED_PASSWORD}
+    #  KEEPALIVED_VIRTUAL_ROUTER_ID: ${KEEPALIVED_VIRTUAL_ROUTER_ID}
     volumes:
-     # - /opt/stacks/keepalived/keepalived.conf:/etc/keepalived/keepalived.conf:ro
+      - /opt/stacks/keepalived/keepalived.conf:/etc/keepalived/keepalived.conf:ro
       - /opt/stacks/keepalived/notify.sh:/etc/keepalived/notify.sh:ro
       - /var/run/docker.sock:/var/run/docker.sock
 

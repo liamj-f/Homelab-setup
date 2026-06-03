@@ -8,8 +8,10 @@ vrrp_instance VI_1 {
   priority ${KEEPALIVED_PRIORITY}
   advert_int 3
   unicast_src_ip ${PRIMARY_IP}
-  unicast_peer { ${SECONDARY_IP} }
 
+  unicast_peer { 
+    ${SECONDARY_IP} 
+  }
 
   authentication {
     auth_type PASS
@@ -17,7 +19,7 @@ vrrp_instance VI_1 {
   }
 
   virtual_ipaddress {
-    ${KEEPALIVED_VIRTUAL_IP}/24
+    ${KEEPALIVED_VIRTUAL_IP}/32
   }
 
   notify /etc/keepalived/notify.sh

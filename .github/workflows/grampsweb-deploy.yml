@@ -158,9 +158,9 @@ jobs:
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
                "Prune": true,
-               "StackFileVersion": "3"
+               "StackFileVersion": "3",
                "Env": [
-                        {"name": "svc_Grampsweb_PASSWORD", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"},
+                        {"name": "svc_Grampsweb_PASSWORD", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"}
                       ]
 
               }')
@@ -182,9 +182,9 @@ jobs:
                "PullImage": true,
                "RepositoryReferenceName": "${{ github.ref }}",
                "RepositoryAuthentication": false,
-               "Prune": true
+               "Prune": true,
                "Env": [
-                        {"name": "svc_Grampsweb_PASSWORD", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"},
+                        {"name": "svc_Grampsweb_PASSWORD", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"}
                       ]
               }'          
 

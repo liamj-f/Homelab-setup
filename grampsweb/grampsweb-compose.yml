@@ -1,6 +1,7 @@
 services:
   grampsweb: &grampsweb
     image: ghcr.io/gramps-project/grampsweb:26.5.0
+    container_name: grampsweb
     restart: always
     ports:
       - "88:5000"  # host:docker
@@ -25,9 +26,9 @@ services:
         --forwarded-allow-ips=192.168.0.2
  
       # 2. User/Auth Database (Metadata) # Format: postgresql://user:password@host:port/dbname 
-      GRAMPSWEB_USER_DB_URI: "postgresql://svc_grampsweb:$(svc_grampsweb_password)@0ostgres:5432/grampsweb_users" 
+      # GRAMPSWEB_USER_DB_URI: "postgresql://svc_grampsweb:${svc_grampsweb_password}@postgres:5432/grampsweb_users" 
       # 3. Search Index Database 
-      GRAMPSWEB_SEARCH_INDEX_DB_URI: "postgresql://yosvc_grampsweb:$(svc_grampsweb_password)@0ostgres:5432/grampsweb_search"    
+      # GRAMPSWEB_SEARCH_INDEX_DB_URI: "postgresql://svc_grampsweb:${svc_grampsweb_password}@postgres:5432/grampsweb_search"    
 
     depends_on:
       - grampsweb_redis

@@ -109,7 +109,6 @@ jobs:
       - name: Render SQL files
         run: |
           export APP_USER="${{ vars.APP_USER }}"
-          export APP_USER="${APP_USER,,}"
           export APP_PASSWORD="${{ secrets.APP_PASSWORD }}"
           export SVC_GRAMPSWEB_PASSWORD="${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"
           export SVC_NEXTCLOUD_PASSWORD="${{ secrets.SVC_NEXTCLOUD_PASSWORD }}"
@@ -295,6 +294,15 @@ jobs:
 
           echo "API Response: $RESPONSE"
 
+      - name: Correct ownership of Postgres data directory
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            sudo chown -R 999:999 /opt/stacks/postgres/data
+
       - name: Wait for Postgres container
         uses: appleboy/ssh-action@v1.2.5
         with:
@@ -326,7 +334,6 @@ jobs:
               docker exec postgres sed -i '/en_GB.UTF-8/s/^# //' /etc/locale.gen
               docker exec postgres locale-gen
               docker exec postgres bash -c 'rm -rf /var/lib/apt/lists/*'
-
 
       - name: Create databases and users
         uses: appleboy/ssh-action@v1.2.5

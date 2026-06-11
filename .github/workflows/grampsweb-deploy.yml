@@ -219,7 +219,7 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key_path: /tmp/deploy_key
           script: |
-            docker exec -it grampsweb python3 -m gramps_webapi user add <your-username> --role 5 --password <your-password>
+            docker exec -it grampsweb python3 -m gramps_webapi user add ${{vars.app_user}} --role 5 --password ${{ secrets.app_password }}
 
       - name: Bring down VPN
         if: always()

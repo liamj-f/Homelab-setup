@@ -175,7 +175,8 @@ jobs:
                "Prune": true,
                "StackFileVersion": "3",
                "Env": [
-                        {"name": "svc_grampsweb_password", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"}
+                        {"name": "svc_grampsweb_password", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"},
+                        {"name": "grampsweb_secret_key", "value": "${{ secrets.GRAMPSWEB_SECRET_KEY }}"}
                       ]
 
               }')
@@ -199,7 +200,8 @@ jobs:
                "RepositoryAuthentication": false,
                "Prune": true,
                "Env": [
-                        {"name": "svc_grampsweb_password", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"}
+                        {"name": "svc_grampsweb_password", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"},
+                        {"name": "grampsweb_secret_key", "value": "${{ secrets.GRAMPSWEB_SECRET_KEY }}"}
                       ]
               }'          
 

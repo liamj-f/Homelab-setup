@@ -36,8 +36,8 @@ services:
     networks:
       - db_network
     volumes:
-      - gramps_users:/app/users  # persist user database
-      - gramps_index:/app/indexdir  # persist search index
+#      - gramps_users:/app/users  # persist user database
+#      - gramps_index:/app/indexdir  # persist search index
       - gramps_thumb_cache:/app/thumbnail_cache  # persist thumbnails
       - gramps_cache:/app/cache  # persist export and report caches
       - gramps_secret:/app/secret  # persist flask secret

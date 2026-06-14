@@ -213,8 +213,21 @@ jobs:
 #
 #          echo "API Response: $RESPONSE"
 
+#      - name : Find grampsweb tree id
+#        id: tree_id
+#        uses: appleboy/ssh-action@v1.2.5
+#        with:
+#          host: ${{ steps.node_config.outputs.ssh_host }}
+#          username: ${{ steps.node_config.outputs.ssh_user }}
+#          key_path: /tmp/deploy_key
+#          script: |
+#            docker exec grampsweb python3 -m gramps_webapi tree list 2>/dev/null | tail -n +2 | head -n1 | awk '{print $1}' >> /tmp/tree_id.txt
+#            TREE_ID=$(cat /tmp/tree_id.txt)
+#            echo "Tree ID: $TREE_ID"
+#            echo "tree_id=$TREE_ID" >> $GITHUB_OUTPUT
+
+
       - name: Create user in GrampsWeb
-        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}

@@ -6,14 +6,14 @@ services:
     ports:
       - "88:5000"  # host:docker
     environment:
-      GRAMPSWEB_TREE: "*"
+      GRAMPSWEB_TREE: "James-Fagg"
       GRAMPSWEB_SECRET_KEY: ${grampsweb_secret_key}
       GRAMPSWEB_POSTGRES_USER: svc_grampsweb
       GRAMPSWEB_POSTGRES_PASSWORD: ${svc_grampsweb_password}
       GRAMPSWEB_POSTGRES_HOST: postgres
       GRAMPSWEB_POSTGRES_PORT: 5432
       GRAMPSWEB_POSTGRES_DB: grampsweb
-      GRAMPSWEB_NEW_DB_BACKEND: sharedpostgresql
+      GRAMPSWEB_NEW_DB_BACKEND: postgresql
       GRAMPSWEB_DATABASE_TYPE: postgresql
       GRAMPSWEB_MEDIA_PREFIX_TREE: True
       GRAMPSWEB_USER_DB_URI: postgresql://svc_grampsweb:${svc_grampsweb_password}@postgres:5432/grampsweb_users

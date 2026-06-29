@@ -225,12 +225,13 @@ jobs:
 #            TREE_ID=$(cat /tmp/tree_id.txt)
 #            echo "Tree ID: $TREE_ID"
 #            echo "tree_id=$TREE_ID" >> $GITHUB_OUTPUT
+
       - name: Wait for GrampsWeb to be ready
         run: |
-          echo "Waiting for GrampsWeb to be ready..."
           for i in $(seq 1 24); do
-            if curl -sf http://${{ vars.E7270_IP }}:88/api/health/ > /dev/null 2>&1; then
-              echo "GrampsWeb is ready"
+            STATUS=$(curl -so /dev/null -w "%{http_code}" http://${{ vars.E7270_IP }}:88/api/metadata/)
+            if [ "$STATUS" != "000" ]; then
+              echo "GrampsWeb ready (HTTP $STATUS)"
               break
             fi
             echo "Attempt $i/24: not ready yet, waiting 5s..."

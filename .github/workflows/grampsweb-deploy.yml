@@ -249,7 +249,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.GW_TOKEN.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{
-              "FULL_NAME": "${{ vars.APP_USER }}",
+              "full_name": "${{ vars.APP_USER }}",
               "password": "${{ secrets.APP_PASSWORD }}",
               "email": "${{ vars.hOMELAB_EMAIL }}"
             }'

@@ -226,32 +226,27 @@ jobs:
 #            echo "Tree ID: $TREE_ID"
 #            echo "tree_id=$TREE_ID" >> $GITHUB_OUTPUT
 
-      - name: Wait for GrampsWeb to be ready
+      - name: Get owner token
+        id: GW_TOKEN
         run: |
           for i in $(seq 1 24); do
-            STATUS=$(curl -so /dev/null -w "%{http_code}" http://${{ vars.E7270_IP }}:88/api/metadata/)
-            if [ "$STATUS" != "000" ]; then
-              echo "GrampsWeb ready (HTTP $STATUS)"
+            RESPONSE=$(curl -Ss --max-time 5 -X POST http://${{ vars.E7270_IP }}:88/api/token/create_owner/ \
+              -H 'Content-Type: application/json' \
+              -d '{}' 2>/dev/null)
+            TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])" 2>/dev/null)
+            if [ -n "$TOKEN" ]; then
+              echo "GrampsWeb ready, got token"
+              echo "token=$TOKEN" >> $GITHUB_OUTPUT
               break
             fi
-            echo "Attempt $i/24: not ready yet, waiting 5s..."
+            echo "Attempt $i/24: not ready yet (response: $RESPONSE), waiting 5s..."
             sleep 5
           done
-
-      - name: Get owner token
-        id: gw_auth
-        run: |
-          RESPONSE=$(curl -Ss -X POST http://${{ vars.E7270_IP }}:88/api/token/create_owner/ \
-            -H 'Content-Type: application/json' \
-            -d '{}')
-          echo "Response: $RESPONSE"
-          TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Create owner user
         run: |
           curl -Ss -X POST http://${{ vars.E7270_IP }}:88/api/users/admin/create_owner/ \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Authorization: Bearer ${{ steps.GW_TOKEN.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{
               "username": "${{ vars.APP_USER }}",

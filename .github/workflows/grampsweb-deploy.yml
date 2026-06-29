@@ -228,12 +228,12 @@ jobs:
 
       - name: Create admin user in GrampsWeb
         run: |  
-            ADMIN_TOKEN=$(curl -X POST https://${{ steps.node_config.outputs.ssh_host }}:88/api/token/create_owner/ \
+            ADMIN_TOKEN=$(curl -X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/token/create_owner/ \
                 -H 'Content-Type: application/json' \
                 -d '{}' \
               | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
 
-            curl-X POST https://${{ steps.node_config.outputs.ssh_host }}/api/users/admin/create_owner/ \
+            curl-X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/users/admin/create_owner/ \
               -H "Authorization: Bearer $ADMIN_TOKEN" \
               -H 'Content-Type: application/json' \
               -d '{
@@ -254,7 +254,7 @@ jobs:
       - name: Login as Admin and get access token
         id: gw_auth
         run: |
-          TOKEN=$(curl -X POST https://${{ steps.node_config.outputs.ssh_host }}:88/api/token/ \
+          TOKEN=$(curl -X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/token/ \
             -H 'Content-Type: application/json' \
             -d '{"username":"admin","password":"${{ secrets.APP_PASSWORD }}"}' \
             | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
@@ -263,7 +263,7 @@ jobs:
       - name: Create a new tree
         id: create_tree
         run: |
-          TREE_ID=$(curl -X POST https://${{ steps.node_config.outputs.ssh_host }}:88/api/trees/ \
+          TREE_ID=$(curl -X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/trees/ \
             -H "Authorization: Bearer ${{ steps.gw_auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{"name":"James-Fagg"}' \
@@ -272,7 +272,7 @@ jobs:
 
       - name: Attach admin to tree
         run: |
-          curl -X PUT "https://${{ steps.node_config.outputs.ssh_host }}:88/api/users/admin/" \
+          curl -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:88/api/users/admin/" \
             -H "Authorization: Bearer ${{ steps.gw_auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{"tree":"${{ steps.create_tree.outputs.tree_id }}"}'

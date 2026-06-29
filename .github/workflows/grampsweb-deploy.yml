@@ -225,22 +225,38 @@ jobs:
 #            TREE_ID=$(cat /tmp/tree_id.txt)
 #            echo "Tree ID: $TREE_ID"
 #            echo "tree_id=$TREE_ID" >> $GITHUB_OUTPUT
+      - name: Wait for GrampsWeb to be ready
+        run: |
+          echo "Waiting for GrampsWeb to be ready..."
+          for i in $(seq 1 24); do
+            if curl -sf http://${{ vars.E7270_IP }}:88/api/health/ > /dev/null 2>&1; then
+              echo "GrampsWeb is ready"
+              break
+            fi
+            echo "Attempt $i/24: not ready yet, waiting 5s..."
+            sleep 5
+          done
 
-      - name: Create admin user in GrampsWeb
-        run: |  
-            ADMIN_TOKEN=$(curl -X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/token/create_owner/ \
-                -H 'Content-Type: application/json' \
-                -d '{}' \
-              | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+      - name: Get owner token
+        id: gw_auth
+        run: |
+          RESPONSE=$(curl -Ss -X POST http://${{ vars.E7270_IP }}:88/api/token/create_owner/ \
+            -H 'Content-Type: application/json' \
+            -d '{}')
+          echo "Response: $RESPONSE"
+          TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-            curl-X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/users/admin/create_owner/ \
-              -H "Authorization: Bearer $ADMIN_TOKEN" \
-              -H 'Content-Type: application/json' \
-              -d '{
-                "password":   "${{ secrets.APP_PASSWORD }}",
-                "email":      "${{ secrets.APP_EMAIL }}",
-                "username":   "${{ secrets.APP_USER }}"
-                  }'
+      - name: Create owner user
+        run: |
+          curl -Ss -X POST http://${{ vars.E7270_IP }}:88/api/users/admin/create_owner/ \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "username": "${{ vars.APP_USER }}",
+              "password": "${{ secrets.APP_PASSWORD }}",
+              "email": ""
+            }'
 
 #      - name: Create user in GrampsWeb
 #        uses: appleboy/ssh-action@v1.2.5
@@ -251,32 +267,32 @@ jobs:
 #          script: |
 #            docker exec grampsweb sh -c 'python3 -m gramps_webapi user add --role 5 ${{vars.app_user}} ${{ secrets.app_password }}'
 
-      - name: Login as Admin and get access token
-        id: gw_auth
-        run: |
-          TOKEN=$(curl -X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/token/ \
-            -H 'Content-Type: application/json' \
-            -d '{"username":"admin","password":"${{ secrets.APP_PASSWORD }}"}' \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+#      - name: Login as Admin and get access token
+#        id: gw_auth
+#        run: |
+#          TOKEN=$(curl -X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/token/ \
+#            -H 'Content-Type: application/json' \
+#            -d '{"username":"admin","password":"${{ secrets.APP_PASSWORD }}"}' \
+#            | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+#          echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Create a new tree
+      - name: Create tree
         id: create_tree
         run: |
-          TREE_ID=$(curl -X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/trees/ \
-            -H "Authorization: Bearer ${{ steps.gw_auth.outputs.token }}" \
+          RESPONSE=$(curl -Ss -X POST http://${{ vars.E7270_IP }}:88/api/trees/ \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
-            -d '{"name":"James-Fagg"}' \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+            -d '{"name":"James-Fagg"}')
+          echo "Response: $RESPONSE"
+          TREE_ID=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
           echo "tree_id=$TREE_ID" >> $GITHUB_OUTPUT
 
-      - name: Attach admin to tree
+      - name: Attach owner to tree
         run: |
-          curl -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:88/api/users/admin/" \
-            -H "Authorization: Bearer ${{ steps.gw_auth.outputs.token }}" \
+          curl -Ss -X PUT http://${{ vars.E7270_IP }}:88/api/users/${{ vars.APP_USER }}/ \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{"tree":"${{ steps.create_tree.outputs.tree_id }}"}'
-
 
       - name: Bring down VPN
         if: always()

@@ -278,7 +278,7 @@ jobs:
           RESPONSE=$(curl -Ss -X POST "http://${{ vars.E7270_IP }}:88/api/trees/" \
             -H "Authorization: Bearer ${{ steps.GW_TOKEN.outputs.token }}" \
             -H 'Content-Type: application/json' \
-            -d '{"name":"James-Fagg"}')
+            -d '{"name":"James-Fagg_Family"}')
           echo "Response: $RESPONSE"
           TREE_ID=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
           echo "tree_id=$TREE_ID" >> $GITHUB_OUTPUT

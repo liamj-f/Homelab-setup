@@ -228,12 +228,12 @@ jobs:
 
       - name: Create admin user in GrampsWeb
         run: |  
-            ADMIN_TOKEN=$(curl -Ss -X POST https://${{ steps.node_config.outputs.ssh_host }}/api/token/create_owner/ \
+            ADMIN_TOKEN=$(curl -X POST https://${{ steps.node_config.outputs.ssh_host }}:88/api/token/create_owner/ \
                 -H 'Content-Type: application/json' \
                 -d '{}' \
               | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
 
-            curl -Ss -X POST https://${{ steps.node_config.outputs.ssh_host }}/api/users/admin/create_owner/ \
+            curl-X POST https://${{ steps.node_config.outputs.ssh_host }}/api/users/admin/create_owner/ \
               -H "Authorization: Bearer $ADMIN_TOKEN" \
               -H 'Content-Type: application/json' \
               -d '{

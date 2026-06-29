@@ -230,7 +230,7 @@ jobs:
         id: GW_TOKEN
         run: |
           for i in $(seq 1 24); do
-            RESPONSE=$(curl -Ss --max-time 5 -X POST http://${{ vars.E7270_IP }}:88/api/token/create_owner/ \
+            RESPONSE=$(curl --max-time 5 http://${{ vars.E7270_IP }}:88/api/token/create_owner/ \
               -H 'Content-Type: application/json' \
               -d '{}' 2>/dev/null)
             TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])" 2>/dev/null)

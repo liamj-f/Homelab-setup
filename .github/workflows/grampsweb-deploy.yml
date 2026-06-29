@@ -231,8 +231,7 @@ jobs:
         run: |
           for i in $(seq 1 24); do
             RESPONSE=$(curl --max-time 5 http://${{ vars.E7270_IP }}:88/api/token/create_owner/ \
-              -H 'Content-Type: application/json' \
-              -d '{}' 2>/dev/null)
+              -H 'Content-Type: application/json'  2>/dev/null)
             TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])" 2>/dev/null)
             if [ -n "$TOKEN" ]; then
               echo "GrampsWeb ready, got token"

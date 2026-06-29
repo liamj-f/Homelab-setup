@@ -251,7 +251,7 @@ jobs:
             -d '{
               "FULL_NAME": "${{ vars.APP_USER }}",
               "password": "${{ secrets.APP_PASSWORD }}",
-              "email": "${{ vars.hOMELAB_EMAIL }}",
+              "email": "${{ vars.hOMELAB_EMAIL }}"
             }'
 
 #      - name: Create user in GrampsWeb

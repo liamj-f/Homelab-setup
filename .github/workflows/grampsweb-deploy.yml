@@ -226,10 +226,6 @@ jobs:
 #            echo "Tree ID: $TREE_ID"
 #            echo "tree_id=$TREE_ID" >> $GITHUB_OUTPUT
 
-      - name: Get owner token
-        run: |
-          echo "Connecting to: ${{ vars.E7270_IP }}:88"
-          curl -v --max-time 5 "http://${{ vars.E7270_IP }}:88/" 2>&1 || true
 
       - name: Get owner token
         id: GW_TOKEN
@@ -253,9 +249,9 @@ jobs:
             -H "Authorization: Bearer ${{ steps.GW_TOKEN.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{
-              "username": "${{ vars.APP_USER }}",
+              "FULL_NAME": "${{ vars.APP_USER }}",
               "password": "${{ secrets.APP_PASSWORD }}",
-              "email": ""
+              "email": "${{ vars.hOMELAB_EMAIL }}",
             }'
 
 #      - name: Create user in GrampsWeb

@@ -272,7 +272,7 @@ jobs:
         run: |
           TOKEN=$(curl -X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/token/ \
             -H 'Content-Type: application/json' \
-            -d '{"username":"admin","password":"${{ secrets.APP_PASSWORD }}"}' \
+            -d '{"username":"${{ vars.APP_USER }}","password":"${{ secrets.APP_PASSWORD }}"}' \
             | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 

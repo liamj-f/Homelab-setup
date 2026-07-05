@@ -245,7 +245,7 @@ jobs:
 
       - name: Create owner user
         run: |
-          curl -Ss -X POST "http://${{ vars.E7270_IP }}:88/api/users/admin/create_owner/" \
+          curl -Ss -v -X POST "http://${{ vars.E7270_IP }}:88/api/users/admin/create_owner/" \
             -H "Authorization: Bearer ${{ steps.GW_TOKEN.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{
@@ -275,7 +275,7 @@ jobs:
       - name: Create tree
         id: create_tree
         run: |
-          RESPONSE=$(curl -Ss -X POST "http://${{ vars.E7270_IP }}:88/api/trees/" \
+          RESPONSE=$(curl -Ss -v -X POST "http://${{ vars.E7270_IP }}:88/api/trees/" \
             -H "Authorization: Bearer ${{ steps.GW_TOKEN.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{"name":"James-Fagg_Family"}')
@@ -285,7 +285,7 @@ jobs:
 
       - name: Attach owner to tree
         run: |
-          curl -Ss -X PUT "http://${{ vars.E7270_IP }}:88/api/users/${{ vars.APP_USER }}/" \
+          curl -Ss -v -X PUT "http://${{ vars.E7270_IP }}:88/api/users/${{ vars.APP_USER }}/" \
             -H "Authorization: Bearer ${{ steps.GW_TOKEN.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{"tree":"${{ steps.create_tree.outputs.tree_id }}"}'

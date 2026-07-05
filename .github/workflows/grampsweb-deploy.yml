@@ -191,7 +191,7 @@ jobs:
           -H "Content-Type: application/json" \
             -d '{
                   "AutoUpdate": {
-                          "forcePullImage": true,
+                          "forcePullImage": false,
                           "forceUpdate": true,
                           "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
                           },               

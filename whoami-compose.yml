@@ -1,6 +1,6 @@
 services:
   whoami:
-    image: traefik/whoami
+    image: ghcr.io/traefik/whoami:v1.11.0
     container_name: whoami
     restart: unless-stopped
     ports:

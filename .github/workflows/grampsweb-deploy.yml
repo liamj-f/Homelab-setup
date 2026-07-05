@@ -228,25 +228,29 @@ jobs:
 
 
       - name: Get owner token
-        id: GW_TOKEN
+        id: gw_auth
         run: |
           for i in $(seq 1 24); do
-            RESPONSE=$(curl -Ss --max-time 5 --retry 0 \
-              "http://${{ vars.E7270_IP }}:88/api/token/create_owner/" 2>/dev/null || true)
+            RESPONSE=$(curl -Ss --max-time 5 \
+              http://${{ vars.E7270_IP }}:88/api/token/create_owner/ 2>/dev/null || true)
             TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])" 2>/dev/null || true)
             if [ -n "$TOKEN" ]; then
               echo "GrampsWeb ready, got token"
-              echo "token=$TOKEN" >> $GITHUB_OUTPUT
               break
             fi
-            echo "Attempt $i/24: not ready yet (response: $RESPONSE), waiting 5s..."
+            echo "Attempt $i/24: not ready yet, waiting 5s..."
             sleep 5
           done
+          if [ -z "$TOKEN" ]; then
+            echo "Failed to get token after 24 attempts"
+            exit 1
+          fi
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Create owner user
         run: |
           curl -Ss -v -X POST "http://${{ vars.E7270_IP }}:88/api/users/admin/create_owner/" \
-            -H "Authorization: Bearer ${{ steps.GW_TOKEN.outputs.token }}" \
+            -H "Authorization: Bearer ${{ steps.gw_auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{
               "full_name": "${{ vars.APP_USER }}",
@@ -276,7 +280,7 @@ jobs:
         id: create_tree
         run: |
           RESPONSE=$(curl -Ss -v -X POST "http://${{ vars.E7270_IP }}:88/api/trees/" \
-            -H "Authorization: Bearer ${{ steps.GW_TOKEN.outputs.token }}" \
+            -H "Authorization: Bearer ${{ steps.gw_auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{"name":"James-Fagg_Family"}')
           echo "Response: $RESPONSE"
@@ -286,7 +290,7 @@ jobs:
       - name: Attach owner to tree
         run: |
           curl -Ss -v -X PUT "http://${{ vars.E7270_IP }}:88/api/users/${{ vars.APP_USER }}/" \
-            -H "Authorization: Bearer ${{ steps.GW_TOKEN.outputs.token }}" \
+            -H "Authorization: Bearer ${{ steps.gw_auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{"tree":"${{ steps.create_tree.outputs.tree_id }}"}'
 

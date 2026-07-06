@@ -249,15 +249,13 @@ jobs:
 
       - name: Create owner user
         run: |
-          curl -Ss -v -X POST "http://${{ vars.E7270_IP }}:88/api/users/" \
+          curl -Ss -v -X POST "http://${{ vars.E7270_IP }}:88/api/users/admin/create_owner/" \
             -H "Authorization: Bearer ${{ steps.gw_auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{
-              "username": "${{ vars.APP_USER }}",
               "full_name": "${{ vars.APP_USER }}",
               "password": "${{ secrets.APP_PASSWORD }}",
               "email": "${{ vars.hOMELAB_EMAIL }}",
-              "role": 5
             }'
 
 #      - name: Create user in GrampsWeb
@@ -274,7 +272,7 @@ jobs:
         run: |
           TOKEN=$(curl -X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/token/ \
             -H 'Content-Type: application/json' \
-            -d '{"username":"${{ vars.APP_USER }}","password":"${{ secrets.APP_PASSWORD }}"}' \
+            -d '{"username":"admin","password":"${{ secrets.APP_PASSWORD }}"}' \
             | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 

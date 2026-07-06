@@ -255,7 +255,7 @@ jobs:
             -d '{
               "full_name": "${{ vars.APP_USER }}",
               "password": "${{ secrets.APP_PASSWORD }}",
-              "email": "${{ vars.hOMELAB_EMAIL }}"
+              "email": "${{ vars.HOMELAB_EMAIL }}"
             }'
 
 #      - name: Create user in GrampsWeb
@@ -270,12 +270,12 @@ jobs:
       - name: Login as Admin and get access token
         id: user_auth
         run: |
-          TOKEN=$(curl -X POST http://${{ steps.node_config.outputs.ssh_host }}:88/api/token/ \
+          RESPONSE=$(curl -Ss -X POST http://${{ vars.E7270_IP }}:88/api/token/ \
             -H 'Content-Type: application/json' \
-            -d '{"username":"admin","password":"${{ secrets.APP_PASSWORD }}"}' \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+            -d '{"username":"admin","password":"${{ secrets.APP_PASSWORD }}"}')
+          echo "Login response: $RESPONSE"
+          TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
-
 
       - name: Create tree
         id: create_tree

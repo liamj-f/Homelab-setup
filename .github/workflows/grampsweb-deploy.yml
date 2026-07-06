@@ -249,13 +249,15 @@ jobs:
 
       - name: Create owner user
         run: |
-          curl -Ss -v -X POST "http://${{ vars.E7270_IP }}:88/api/users/admin/create_owner/" \
+          curl -Ss -v -X POST "http://${{ vars.E7270_IP }}:88/api/users" \
             -H "Authorization: Bearer ${{ steps.gw_auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{
+              "username": "${{ vars.APP_USER }}",
               "full_name": "${{ vars.APP_USER }}",
               "password": "${{ secrets.APP_PASSWORD }}",
-              "email": "${{ vars.hOMELAB_EMAIL }}"
+              "email": "${{ vars.hOMELAB_EMAIL }}",
+              "role": 5
             }'
 
 #      - name: Create user in GrampsWeb

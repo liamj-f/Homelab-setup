@@ -213,113 +213,51 @@ jobs:
 #
 #          echo "API Response: $RESPONSE"
 
-#      - name : Find grampsweb tree id
-#        id: tree_id
-#        uses: appleboy/ssh-action@v1.2.5
-#        with:
-#          host: ${{ steps.node_config.outputs.ssh_host }}
-#          username: ${{ steps.node_config.outputs.ssh_user }}
-#          key_path: /tmp/deploy_key
-#          script: |
-#            docker exec grampsweb python3 -m gramps_webapi tree list 2>/dev/null | tail -n +2 | head -n1 | awk '{print $1}' >> /tmp/tree_id.txt
-#            TREE_ID=$(cat /tmp/tree_id.txt)
-#            echo "Tree ID: $TREE_ID"
-#            echo "tree_id=$TREE_ID" >> $GITHUB_OUTPUT
+      - name: Copy owner bootstrap script to host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          source: grampsweb/bootstrap_owner.py
+          target: /tmp/
+          strip_components: 1
 
-
-      - name: Get owner token
-        id: gw_auth
-        run: |
-          for i in $(seq 1 24); do
-            RESPONSE=$(curl -Ss --max-time 5 \
-              http://${{ vars.E7270_IP }}:88/api/token/create_owner/ 2>/dev/null || true)
-            TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])" 2>/dev/null || true)
-            if [ -n "$TOKEN" ]; then
-              echo "GrampsWeb ready, got token"
-              break
-            fi
-            echo "Attempt $i/24: not ready yet, waiting 5s..."
-            sleep 5
-          done
-          if [ -z "$TOKEN" ]; then
-            echo "Failed to get token after 24 attempts"
-            exit 1
-          fi
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-
-      - name: Create owner user
-        run: |
-          HTTP_CODE=$(curl -Ss -o /tmp/create_owner_response.json -w "%{http_code}" -X POST "http://${{ vars.E7270_IP }}:88/api/users/admin/create_owner/" \
-            -H "Authorization: Bearer ${{ steps.gw_auth.outputs.token }}" \
-            -H 'Content-Type: application/json' \
-            -d '{
-              "full_name": "${{ vars.APP_USER }}",
-              "password": "${{ secrets.APP_PASSWORD }}",
-              "email": "${{ vars.HOMELAB_EMAIL }}"
-            }')
-          echo "HTTP status: $HTTP_CODE"
-          echo "Response body:"
-          cat /tmp/create_owner_response.json
-          if [ "$HTTP_CODE" = "201" ]; then
-            echo "Owner user created."
-          elif [ "$HTTP_CODE" = "405" ]; then
-            echo "Owner user already exists (405) - treating as OK, continuing."
-          else
-            echo "Unexpected response ($HTTP_CODE) creating owner user."
-            exit 1
-          fi
-
-#      - name: Create user in GrampsWeb
-#        uses: appleboy/ssh-action@v1.2.5
-#        with:
-#          host: ${{ steps.node_config.outputs.ssh_host }}
-#          username: ${{ steps.node_config.outputs.ssh_user }}
-#          key_path: /tmp/deploy_key
-#          script: |
-#            docker exec grampsweb sh -c 'python3 -m gramps_webapi user add --role 5 ${{vars.app_user}} ${{ secrets.app_password }}'
-
-      - name: Login as Admin and get access token
-        id: user_auth
-        run: |
-          RESPONSE=$(curl -Ss -X POST http://${{ vars.E7270_IP }}:88/api/token/ \
-            -H 'Content-Type: application/json' \
-            -d '{"username":"admin","password":"${{ secrets.APP_PASSWORD }}"}')
-          echo "Login response: $RESPONSE"
-          TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || true)
-          if [ -z "$TOKEN" ]; then
-            echo "Login failed - no access_token in response (see 'Login response' above for the API error)."
-            exit 1
-          fi
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-
-      - name: Create tree
-        id: create_tree
-        run: |
-          RESPONSE=$(curl -Ss -X POST "http://${{ vars.E7270_IP }}:88/api/trees/" \
-            -H "Authorization: Bearer ${{ steps.user_auth.outputs.token }}" \
-            -H 'Content-Type: application/json' \
-            -d '{"name":"James-Fagg_Family"}')
-          echo "Response: $RESPONSE"
-          TREE_ID=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
-          if [ -z "$TREE_ID" ]; then
-            echo "Tree creation failed - no id in response (see 'Response' above for the API error)."
-            exit 1
-          fi
-          echo "tree_id=$TREE_ID" >> $GITHUB_OUTPUT
-
-      - name: Attach owner to tree
-        run: |
-          HTTP_CODE=$(curl -Ss -o /tmp/attach_response.json -w "%{http_code}" -X PUT "http://${{ vars.E7270_IP }}:88/api/users/admin/" \
-            -H "Authorization: Bearer ${{ steps.user_auth.outputs.token }}" \
-            -H 'Content-Type: application/json' \
-            -d '{"tree":"${{ steps.create_tree.outputs.tree_id }}"}')
-          echo "HTTP status: $HTTP_CODE"
-          echo "Response body:"
-          cat /tmp/attach_response.json
-          if [ "$HTTP_CODE" -ge 300 ]; then
-            echo "Failed to attach owner to tree."
-            exit 1
-          fi
+      # Bootstraps the tree + owner user directly inside the container via
+      # the internal gramps_webapi functions, instead of the create_owner/
+      # login REST API sequence. That API sequence deadlocks in multi-tree
+      # mode (GRAMPSWEB_TREE="*"): a user with no tree can't get a login
+      # token, but creating a tree requires a login token. Idempotent -
+      # safe to rerun every deploy, resyncs password/role/tree if the user
+      # already exists.
+      - name: Bootstrap tree and owner user
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          envs: APP_USER,APP_PASSWORD,HOMELAB_EMAIL
+          script: |
+            for i in $(seq 1 24); do
+              if docker exec grampsweb true 2>/dev/null; then
+                echo "grampsweb container is up"
+                break
+              fi
+              echo "Attempt $i/24: grampsweb not up yet, waiting 5s..."
+              sleep 5
+            done
+            docker cp /tmp/bootstrap_owner.py grampsweb:/tmp/bootstrap_owner.py
+            docker exec \
+              -e BOOTSTRAP_TREE_NAME="James-Fagg_Family" \
+              -e BOOTSTRAP_USERNAME="admin" \
+              -e BOOTSTRAP_FULLNAME="$APP_USER" \
+              -e BOOTSTRAP_PASSWORD="$APP_PASSWORD" \
+              -e BOOTSTRAP_EMAIL="$HOMELAB_EMAIL" \
+              grampsweb python3 /tmp/bootstrap_owner.py
+        env:
+          APP_USER: ${{ vars.APP_USER }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          HOMELAB_EMAIL: ${{ vars.HOMELAB_EMAIL }}
 
       - name: Bring down VPN
         if: always()

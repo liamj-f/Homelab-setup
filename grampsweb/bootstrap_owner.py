@@ -38,9 +38,11 @@ RETRY_DELAY_SECONDS = 3
 
 
 def find_tree(name):
-    for tree_name, path in list_trees():
-        if tree_name == name:
-            return os.path.basename(path)
+    # list_trees() entries are not reliably 2-tuples (matches the
+    # `tree list` CLI command, which also indexes rather than unpacks).
+    for details in list_trees():
+        if details[0] == name:
+            return os.path.basename(details[1])
     return None
 
 

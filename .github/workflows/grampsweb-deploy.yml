@@ -249,14 +249,25 @@ jobs:
 
       - name: Create owner user
         run: |
-          curl -Ss -v -X POST "http://${{ vars.E7270_IP }}:88/api/users/admin/create_owner/" \
+          HTTP_CODE=$(curl -Ss -o /tmp/create_owner_response.json -w "%{http_code}" -X POST "http://${{ vars.E7270_IP }}:88/api/users/admin/create_owner/" \
             -H "Authorization: Bearer ${{ steps.gw_auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{
               "full_name": "${{ vars.APP_USER }}",
               "password": "${{ secrets.APP_PASSWORD }}",
               "email": "${{ vars.HOMELAB_EMAIL }}"
-            }'
+            }')
+          echo "HTTP status: $HTTP_CODE"
+          echo "Response body:"
+          cat /tmp/create_owner_response.json
+          if [ "$HTTP_CODE" = "201" ]; then
+            echo "Owner user created."
+          elif [ "$HTTP_CODE" = "405" ]; then
+            echo "Owner user already exists (405) - treating as OK, continuing."
+          else
+            echo "Unexpected response ($HTTP_CODE) creating owner user."
+            exit 1
+          fi
 
 #      - name: Create user in GrampsWeb
 #        uses: appleboy/ssh-action@v1.2.5
@@ -274,26 +285,41 @@ jobs:
             -H 'Content-Type: application/json' \
             -d '{"username":"admin","password":"${{ secrets.APP_PASSWORD }}"}')
           echo "Login response: $RESPONSE"
-          TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+          TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || true)
+          if [ -z "$TOKEN" ]; then
+            echo "Login failed - no access_token in response (see 'Login response' above for the API error)."
+            exit 1
+          fi
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Create tree
         id: create_tree
         run: |
-          RESPONSE=$(curl -Ss -v -X POST "http://${{ vars.E7270_IP }}:88/api/trees/" \
+          RESPONSE=$(curl -Ss -X POST "http://${{ vars.E7270_IP }}:88/api/trees/" \
             -H "Authorization: Bearer ${{ steps.user_auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
             -d '{"name":"James-Fagg_Family"}')
           echo "Response: $RESPONSE"
-          TREE_ID=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+          TREE_ID=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
+          if [ -z "$TREE_ID" ]; then
+            echo "Tree creation failed - no id in response (see 'Response' above for the API error)."
+            exit 1
+          fi
           echo "tree_id=$TREE_ID" >> $GITHUB_OUTPUT
 
       - name: Attach owner to tree
         run: |
-          curl -Ss -v -X PUT "http://${{ vars.E7270_IP }}:88/api/users/${{ vars.APP_USER }}/" \
+          HTTP_CODE=$(curl -Ss -o /tmp/attach_response.json -w "%{http_code}" -X PUT "http://${{ vars.E7270_IP }}:88/api/users/admin/" \
             -H "Authorization: Bearer ${{ steps.user_auth.outputs.token }}" \
             -H 'Content-Type: application/json' \
-            -d '{"tree":"${{ steps.create_tree.outputs.tree_id }}"}'
+            -d '{"tree":"${{ steps.create_tree.outputs.tree_id }}"}')
+          echo "HTTP status: $HTTP_CODE"
+          echo "Response body:"
+          cat /tmp/attach_response.json
+          if [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Failed to attach owner to tree."
+            exit 1
+          fi
 
       - name: Bring down VPN
         if: always()

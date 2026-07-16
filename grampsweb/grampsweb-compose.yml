@@ -36,7 +36,7 @@ services:
       - gramps_thumb_cache:/app/thumbnail_cache  # persist thumbnails
       - gramps_cache:/app/cache  # persist export and report caches
       - gramps_secret:/app/secret  # persist flask secret
-#      - gramps_db:/root/.gramps/grampsdb  # persist Gramps database
+      - gramps_db:/root/.gramps/grampsdb  # persist tree registry (name/backend markers, not the data itself)
       - gramps_media:/app/media  # persist media files
       - gramps_tmp:/tmp
       - /opt/stacks/grampsweb/logs:/app/logs
@@ -75,3 +75,4 @@ volumes:
   gramps_secret:
   gramps_media:
   gramps_tmp:
+  gramps_db:

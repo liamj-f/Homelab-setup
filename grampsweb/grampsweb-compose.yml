@@ -1,3 +1,8 @@
+# NOTE: gramps_db (mounted below at /root/.gramps/grampsdb) must stay
+# persistent - it's the only local record of which family tree(s) exist
+# and which backend they use. Without it, every redeploy loses track of
+# the tree created by grampsweb/bootstrap_owner.py and creates a new one,
+# orphaning whatever was written to the previous tree id in Postgres.
 services:
   grampsweb: &grampsweb
     image: ghcr.io/gramps-project/grampsweb:26.5.0

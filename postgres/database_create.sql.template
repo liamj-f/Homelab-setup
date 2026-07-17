@@ -21,5 +21,12 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'grampsweb_search')\ge
 SELECT 'CREATE DATABASE grampsweb OWNER svc_grampsweb'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'grampsweb')\gexec
 
+-- Gramps' own SharedPostgreSQL addon hardcodes this literal database name
+-- (gramps60/plugins/SharedPostgreSQL/sharedpostgresql.py, _initialize()) the
+-- first time it writes a tree's settings.ini - it does not read
+-- GRAMPSWEB_POSTGRES_DB or any other env var. Required for tree data to load.
+SELECT 'CREATE DATABASE gramps OWNER svc_grampsweb'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'gramps')\gexec
+
 SELECT 'CREATE DATABASE nextcloud OWNER svc_nextcloud'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nextcloud')\gexec

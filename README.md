@@ -9,27 +9,30 @@ The project tasklist is here: https://github.com/users/liamj-f/projects/3
 
 ## List of Services
 Those in brackets are not yet fully deployed/Tested
-### RPI4 & E7270 via Keepalived
-- Pihole
-- Nginx Proxy Manager
-- Nebula-Sync
-- Rsync
-- Keepalived
-- (Rathole-Client)
 
 ### E7270
+- Keepalived
+  - Pihole
+  - Nginx Proxy Manager
+  - Nebula-Sync
+  - Rathole-Client
 - (Nextcloud)
-- (PostGres)
-- Adminer
+- Postgres
+- PgAdmin
 - Portainer-Agent
 - (GrampsWeb)
 - (Frigate)
 - Traefik/WHOAMI 
 
 ### RPI4
+- Keepalived
+  - Pihole
+  - Nginx Proxy Manager
+  - Nebula-Sync
+  - Rathole-Client
 - Portainer
 - DuckDNS
-- Homepage
+- (Homepage)
 
 ### LJFCloud 
 - Portainer-Agent

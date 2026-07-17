@@ -34,6 +34,21 @@ jobs:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
       domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
+      - name: Set node config
+        id: node_config
+        run: |
+            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+
+      - name: Write SSH key to file
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+
       - name: Checkout repo
         uses: actions/checkout@v4
       - name: Install WireGuard
@@ -98,7 +113,7 @@ jobs:
           HOST_MACHINE: ${{ inputs.host_machine || 'e7270-server' }}
         run: |
           echo "Looking for endpoint with name: $HOST_MACHINE"
-          RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+          RESPONSE=$(curl -Ss -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
@@ -106,7 +121,7 @@ jobs:
       - name: Get Stack ID (if exists)
         id: get_stack_id
         run: |
-          STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
+          STACKS=$(curl --fail -Ss -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
@@ -124,7 +139,7 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         id: get_webhook
         run: |
-          WEBHOOK_TOKEN=$(curl -s \
+          WEBHOOK_TOKEN=$(curl -Ss \
             --max-time 10 \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
@@ -143,7 +158,7 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
           echo "Creating stack from GitHub..."
-          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          RESPONSE=$(curl -v -Ss -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -158,36 +173,91 @@ jobs:
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
                "Prune": true,
-               "StackFileVersion": "3"
-              }')
+               "StackFileVersion": "3",
+               "Env": [
+                        {"name": "svc_grampsweb_password", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"},
+                        {"name": "grampsweb_secret_key", "value": "${{ secrets.GRAMPSWEB_SECRET_KEY }}"}
+                      ]
 
+              }')
             echo "API Response: $RESPONSE"
             echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
 
       - name: Update Environment Variables
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          curl -Ss -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
             -d '{
                   "AutoUpdate": {
-                          "forcePullImage": true,
+                          "forcePullImage": false,
                           "forceUpdate": true,
                           "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
-                          },               "PullImage": true,
+                          },               
+               "PullImage": true,
                "RepositoryReferenceName": "${{ github.ref }}",
-               "repositoryAuthentication": false,
-               "Prune": true
+               "RepositoryAuthentication": false,
+               "Prune": true,
+               "Env": [
+                        {"name": "svc_grampsweb_password", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"},
+                        {"name": "grampsweb_secret_key", "value": "${{ secrets.GRAMPSWEB_SECRET_KEY }}"}
+                      ]
               }'          
 
-      - name: Redeploy Stack using webhook
-        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-        run: |
-          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
+#      - name: Redeploy Stack using webhook
+#        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+#        run: |
+#          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
+#          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
+#
+#          echo "API Response: $RESPONSE"
 
-          echo "API Response: $RESPONSE"
+      - name: Copy owner bootstrap script to host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          source: grampsweb/bootstrap_owner.py
+          target: /tmp/
+          strip_components: 1
+
+      # Bootstraps the tree + owner user directly inside the container via
+      # the internal gramps_webapi functions, instead of the create_owner/
+      # login REST API sequence. That API sequence deadlocks in multi-tree
+      # mode (GRAMPSWEB_TREE="*"): a user with no tree can't get a login
+      # token, but creating a tree requires a login token. Idempotent -
+      # safe to rerun every deploy, resyncs password/role/tree if the user
+      # already exists.
+      - name: Bootstrap tree and owner user
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          envs: APP_USER,APP_PASSWORD,HOMELAB_EMAIL
+          script: |
+            for i in $(seq 1 24); do
+              if docker exec grampsweb true 2>/dev/null; then
+                echo "grampsweb container is up"
+                break
+              fi
+              echo "Attempt $i/24: grampsweb not up yet, waiting 5s..."
+              sleep 5
+            done
+            docker cp /tmp/bootstrap_owner.py grampsweb:/tmp/bootstrap_owner.py
+            docker exec \
+              -e BOOTSTRAP_TREE_NAME="James-Fagg_Family" \
+              -e BOOTSTRAP_USERNAME="admin" \
+              -e BOOTSTRAP_FULLNAME="$APP_USER" \
+              -e BOOTSTRAP_PASSWORD="$APP_PASSWORD" \
+              -e BOOTSTRAP_EMAIL="$HOMELAB_EMAIL" \
+              grampsweb python3 /tmp/bootstrap_owner.py
+        env:
+          APP_USER: ${{ vars.APP_USER }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          HOMELAB_EMAIL: ${{ vars.HOMELAB_EMAIL }}
 
       - name: Bring down VPN
         if: always()

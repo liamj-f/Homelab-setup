@@ -1,4 +1,6 @@
 global_defs {
+  script_user root
+  enable_script_security
 }
 
 vrrp_instance VI_1 {
@@ -6,7 +8,12 @@ vrrp_instance VI_1 {
   interface ${KEEPALIVED_INTERFACE}
   virtual_router_id 51
   priority ${KEEPALIVED_PRIORITY}
-  advert_int 1
+  advert_int 3
+  unicast_src_ip ${PRIMARY_IP}
+
+  unicast_peer { 
+    ${SECONDARY_IP} 
+  }
 
   authentication {
     auth_type PASS
@@ -14,7 +21,7 @@ vrrp_instance VI_1 {
   }
 
   virtual_ipaddress {
-    ${KEEPALIVED_VIRTUAL_IP}/24
+    ${KEEPALIVED_VIRTUAL_IP}/32
   }
 
   notify /etc/keepalived/notify.sh

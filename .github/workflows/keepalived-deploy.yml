@@ -20,7 +20,7 @@ jobs:
       max-parallel: 1
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6.0.2
 
       - name: Set node config
         id: node_config
@@ -28,31 +28,31 @@ jobs:
           if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
             echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_key<<EOF" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
             echo "keepalived_priority=110" >> $GITHUB_OUTPUT
             echo "keepalived_state=MASTER" >> $GITHUB_OUTPUT
             echo "keepalived_interface=eth0" >> $GITHUB_OUTPUT
-            echo "rsync_target_host=${{ vars.E7270_IP}}" >> $GITHUB_OUTPUT
+            echo "rsync_target_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "rsync_target_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "rsync_target_key<<EOF" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+            echo "rsync_target_key<<EOF_KEY2" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            echo "EOF_KEY2" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
-            echo "ssh_host=${{ vars.E7270_IP}}" >> $GITHUB_OUTPUT
+            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_key<<EOF" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
             echo "keepalived_priority=100" >> $GITHUB_OUTPUT
             echo "keepalived_state=BACKUP" >> $GITHUB_OUTPUT
             echo "keepalived_interface=wlp1s0" >> $GITHUB_OUTPUT
             echo "rsync_target_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "rsync_target_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "rsync_target_key<<EOF" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+            echo "rsync_target_key<<EOF_KEY2" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            echo "EOF_KEY2" >> $GITHUB_OUTPUT
           fi
 
       - name: Write SSH key to file
@@ -63,10 +63,12 @@ jobs:
       - name: Render keepalived config
         run: |
           export KEEPALIVED_VIRTUAL_IP="${{ vars.KEEPALIVED_IP }}"
-          export KEEPALIVED_AUTH_PASS="${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          export KEEPALIVED_AUTH_PASS="${{ secrets.KEEPALIVED_AUTH_SECRET }}"
           export KEEPALIVED_PRIORITY="${{ steps.node_config.outputs.keepalived_priority }}"
           export MASTER_OR_BACKUP_STATE="${{ steps.node_config.outputs.keepalived_state }}"
           export KEEPALIVED_INTERFACE="${{ steps.node_config.outputs.keepalived_interface }}"
+          export SECONDARY_IP="${{ steps.node_config.outputs.rsync_target_host }}"
+          export PRIMARY_IP="${{ steps.node_config.outputs.ssh_host }}"
           envsubst < keepalived/keepalived.conf.template > keepalived/keepalived.conf
 
       - name: Render notify.sh
@@ -78,7 +80,7 @@ jobs:
       - name: Render rathole client toml
         run: |
           export LJFCLOUD_IP="${{ vars.LJFCLOUD_IP }}"
-          export MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          export RATHOLE_AUTH_SECRET="${{ secrets.RATHOLE_AUTH_SECRET }}"
           export KEEPALIVED_VIRTUAL_IP="${{ vars.KEEPALIVED_IP }}"
           envsubst < keepalived/rathole-client.toml.template > keepalived/rathole-client.toml
 
@@ -139,7 +141,7 @@ jobs:
             ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/keepalived/
 
       - name: Set permissions
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
@@ -263,31 +265,45 @@ jobs:
           
           CREATE_STACK_PAYLOAD=$(jq -n \
             --arg ref "${{ github.ref }}" \
-            --arg ssh_user "${{ steps.node_config.outputs.ssh_user }}" \
+            --arg webhook "${{ steps.uuid.outputs.uuid }}" \
             --arg app_password "${{ secrets.APP_PASSWORD }}" \
             --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
             --arg secondary_ip "${{ steps.node_config.outputs.rsync_target_host }}" \
             --arg nginx_email "${{ vars.NGINX_EMAIL }}" \
             --arg hostname "${{ matrix.host_machine }}" \
-            --arg webhook "${{ steps.uuid.outputs.uuid }}" \
+            --arg keepalived_virtual_ip "${{ vars.KEEPALIVED_IP }}" \
+            --arg keepalived_priority "${{ steps.node_config.outputs.keepalived_priority }}" \
+            --arg keepalived_interface "${{ steps.node_config.outputs.keepalived_interface }}" \
+            --arg keepalived_state "${{ steps.node_config.outputs.keepalived_state }}" \
+            --arg keepalived_password "${{ secrets.KEEPALIVED_AUTH_SECRET }}" \
+            --arg keepalived_unicast_peers "#PYTHON2BASH:['${{ steps.node_config.outputs.rsync_target_host }}']" \
             '{
             Name: "keepalived",
             RepositoryURL: "https://github.com/liamj-f/homelab-setup",
             RepositoryReferenceName: $ref,
             ComposeFile: "keepalived/keepalived-compose.yml",
             RepositoryAuthentication: false,
+            RepullImageAndRedeploy: true,
             AutoUpdate: {
                           "forcePullImage": true,
                           "forceUpdate": true,
                           "Webhook": $webhook
                           },
               Env: [
-                {name: "SSH_USER",            value: $ssh_user},
                 {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
                 {name: "PRIMARY_IP",          value: $primary_ip},
                 {name: "SECONDARY_IP",        value: $secondary_ip},
                 {name: "INITIAL_ADMIN_EMAIL", value: $nginx_email},
-                {name: "HOSTNAME",            value: $hostname}
+                {name: "HOSTNAME",            value: $hostname},
+                {name: "KEEPALIVED_CONF", value: "/etc/keepalived/keepalived.conf"},
+                {name: "KEEPALIVED_VIRTUAL_IPS", value: $keepalived_virtual_ip},
+                {name: "KEEPALIVED_PRIORITY", value: $keepalived_priority},
+                {name: "KEEPALIVED_INTERFACE", value: $keepalived_interface},
+                {name: "KEEPALIVED_NOTIFY_SCRIPT", value: "/etc/keepalived/notify.sh"},
+                {name: "KEEPALIVED_STATE", value: $keepalived_state},
+                {name: "KEEPALIVED_PASSWORD", value: $keepalived_password},
+                {name: "KEEPALIVED_VIRTUAL_ROUTER_ID", value:"51"},
+                {name: "KEEPALIVED_UNICAST_PEERS", value: $keepalived_unicast_peers}
               ],
             Prune: true,
             StackFileVersion: "3"
@@ -306,13 +322,18 @@ jobs:
         run: |
             UPDATE_STACK_PAYLOAD=$(jq -n \
             --arg ref "${{ github.ref }}" \
-            --arg ssh_user "${{ steps.node_config.outputs.ssh_user }}" \
+            --arg webhook "${{ steps.uuid.outputs.uuid }}" \
             --arg app_password "${{ secrets.APP_PASSWORD }}" \
             --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
             --arg secondary_ip "${{ steps.node_config.outputs.rsync_target_host }}" \
-            --arg hostname "${{ matrix.host_machine }}" \
             --arg nginx_email "${{ vars.NGINX_EMAIL }}" \
-            --arg webhook "${{ steps.get_webhook.outputs.webhook_token}}" \
+            --arg hostname "${{ matrix.host_machine }}" \
+            --arg keepalived_virtual_ip "${{ vars.KEEPALIVED_IP }}" \
+            --arg keepalived_priority "${{ steps.node_config.outputs.keepalived_priority }}" \
+            --arg keepalived_interface "${{ steps.node_config.outputs.keepalived_interface }}" \
+            --arg keepalived_state "${{ steps.node_config.outputs.keepalived_state }}" \
+            --arg keepalived_password "${{ secrets.KEEPALIVED_AUTH_SECRET }}" \
+            --arg keepalived_unicast_peers "#PYTHON2BASH:['${{ steps.node_config.outputs.rsync_target_host }}']" \
             '{
               AutoUpdate: {
                     ForcePullImage: true,
@@ -323,67 +344,53 @@ jobs:
               RepositoryReferenceName: $ref,
               repositoryAuthentication: false,
               Env: [
-                {name: "SSH_USER",            value: $ssh_user},
                 {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
                 {name: "PRIMARY_IP",          value: $primary_ip},
                 {name: "SECONDARY_IP",        value: $secondary_ip},
                 {name: "INITIAL_ADMIN_EMAIL", value: $nginx_email},
-                {name: "HOSTNAME",            value: $hostname}
+                {name: "HOSTNAME",            value: $hostname},
+                {name: "KEEPALIVED_CONF", value: "/etc/keepalived/keepalived.conf"},
+                {name: "KEEPALIVED_VIRTUAL_IPS", value: $keepalived_virtual_ip},
+                {name: "KEEPALIVED_PRIORITY", value: $keepalived_priority},
+                {name: "KEEPALIVED_INTERFACE", value: $keepalived_interface},
+                {name: "KEEPALIVED_NOTIFY_SCRIPT", value: "/etc/keepalived/notify.sh"},
+                {name: "KEEPALIVED_STATE", value: $keepalived_state},
+                {name: "KEEPALIVED_PASSWORD", value: $keepalived_password},
+                {name: "KEEPALIVED_VIRTUAL_ROUTER_ID", value:"51"},
+                {name: "KEEPALIVED_UNICAST_PEERS", value: $keepalived_unicast_peers}
               ],
               Prune: true
               }')
 
-            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d "$UPDATE_STACK_PAYLOAD")
 
             echo "API Response: $RESPONSE" 
 
+      #- name: Redeploy stack using redeploy endpoint
+      #  if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+      #  run: |
+      #    RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+      #    -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+      #    -H "Content-Type: application/json" \
+      #    -d '{
+      #      "RepullImageAndRedeploy": true,
+      #      "RepositoryReferenceName": "${{ github.ref }}",
+      #      "repositoryAuthentication": false
+      #    }')
+      #
+      #    echo "API Response: $RESPONSE"
 
-      - name: Redeploy Stack using webhook
-        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-        run: |
-          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
+    #  - name: Redeploy Stack using webhook
+    #    if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+    #    run: |
+    #      RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}" \
+    #      -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
+    #      echo "API Response: $RESPONSE"
 
-          echo "API Response: $RESPONSE"
-
-#      - name: Update Stack
-#        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-#        run: |
-#            UPDATE_STACK_PAYLOAD=$(jq -n \
-#            --arg ref "${{ github.ref }}" \
-#            --arg ssh_user "${{ steps.node_config.outputs.ssh_user }}" \
-#            --arg app_password "${{ secrets.APP_PASSWORD }}" \
-#            --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
-#            --arg secondary_ip "${{ steps.node_config.outputs.rsync_target_host }}" \
-#            --arg hostname "${{ matrix.host_machine }}" \
-#            --arg nginx_email "${{ vars.NGINX_EMAIL }}" \
-#            '{
-#              PullImage: true,
-#              RepositoryReferenceName: $ref,
-#              repositoryAuthentication: false,
-#              Env: [
-#                {name: "SSH_USER",            value: $ssh_user},
-#                {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
-#                {name: "PRIMARY_IP",          value: $primary_ip},
-#                {name: "SECONDARY_IP",        value: $secondary_ip},
-#                {name: "INITIAL_ADMIN_EMAIL", value: $nginx_email},
-#                {name: "HOSTNAME",            value: $hostname}
-#              ],
-#              Prune: true
-#              }')
-#
-#            echo "Redeploying stack ${{ steps.get_stack_id.outputs.stack_id }} on endpoint ${{ steps.endpoint.outputs.endpoint_id }}"
-#
-#            RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X PUT \
-#              "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
-#              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-#              -H "Content-Type: application/json" \
-#              -d "$UPDATE_STACK_PAYLOAD")
-#
-#            echo "Response: $RESPONSE"       
+  
 
       - name: Trigger notify.sh to set correct state
         run: |
@@ -492,23 +499,23 @@ jobs:
           -H 'content-type: application/json' \
           -d "@pihole_config.json"
 
-      - name: Wait for Pi-hole DB ready
-        run: |
-          for i in $(seq 1 12); do
-            RESPONSE=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
-              -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
-              -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-              -H 'accept: application/json' || true)
-            echo "Attempt $i/12: $RESPONSE"
-            if echo "$RESPONSE" | jq -e '.groups' > /dev/null 2>&1; then
-              echo "Pi-hole gravity DB is ready"
-              exit 0
-            fi
-            echo "DB not ready, waiting 10s..."
-            sleep 10
-          done
-          echo "Pi-hole gravity DB not ready after 2 minutes"
-          exit 1
+    #  - name: Wait for Pi-hole DB ready
+    #    run: |
+    #      for i in $(seq 1 12); do
+    #        RESPONSE=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+    #          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+    #          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+    #          -H 'accept: application/json' || true)
+    #        echo "Attempt $i/12: $RESPONSE"
+    #        if echo "$RESPONSE" | jq -e '.groups' > /dev/null 2>&1; then
+    #          echo "Pi-hole gravity DB is ready"
+    #          exit 0
+    #        fi
+    #        echo "DB not ready, waiting 10s..."
+    #        sleep 10
+    #      done
+    #      echo "Pi-hole gravity DB not ready after 2 minutes"
+    #      exit 1
 
       - name: Add Blocklists to Pihole via API
         run: |
@@ -661,6 +668,7 @@ jobs:
           hosts["adminer.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:86"
           hosts["whoami.14monarch.james-fagg.uk","whoami.james-fagg.uk"]="${{ vars.E7270_IP }}:87"
           hosts["familytree.james-fagg.uk"]="${{ vars.E7270_IP }}:88"
+          hosts["pgadmin.14monarch.james-fagg.uk"]="${{ vars.E7270_IP }}:89"
 
           ALL_HOSTS=$(curl -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}")

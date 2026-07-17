@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:18.3-trixie
+    container_name: postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U svc_postgres -d postgres_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: svc_postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: "postgres_db"
+    volumes:
+      - /opt/stacks/postgres/data:/var/lib/postgresql
+    networks:
+      - db_network
+
+  pgadmin:
+    image: dpage/pgadmin4:9.14.0
+    container_name: pgadmin
+    restart: unless-stopped
+    ports:
+      - "89:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    healthcheck:
+      test: ["CMD", "wget", "-O", "-", "http://localhost:80/misc/ping"]
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - /opt/stacks/pgadmin/servers.json:/pgadmin4/servers.json
+    networks:
+      - db_network
+
+volumes:
+  pgadmin_data:
+
+networks:
+  db_network:
+    driver: bridge
+    external: true
+

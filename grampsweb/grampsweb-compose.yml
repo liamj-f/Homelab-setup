@@ -1,11 +1,27 @@
+# NOTE: gramps_db (mounted below at /root/.gramps/grampsdb) must stay
+# persistent - it's the only local record of which family tree(s) exist
+# and which backend they use. Without it, every redeploy loses track of
+# the tree created by grampsweb/bootstrap_owner.py and creates a new one,
+# orphaning whatever was written to the previous tree id in Postgres.
 services:
   grampsweb: &grampsweb
-    image: ghcr.io/gramps-project/grampsweb:latest
+    image: ghcr.io/gramps-project/grampsweb:26.5.0
+    container_name: grampsweb
     restart: always
     ports:
       - "88:5000"  # host:docker
     environment:
-      GRAMPSWEB_TREE: "Gramps Web"
+      GRAMPSWEB_TREE: "*"
+      GRAMPSWEB_SECRET_KEY: ${grampsweb_secret_key}
+      GRAMPSWEB_POSTGRES_USER: svc_grampsweb
+      GRAMPSWEB_POSTGRES_PASSWORD: ${svc_grampsweb_password}
+      GRAMPSWEB_POSTGRES_HOST: postgres
+      GRAMPSWEB_POSTGRES_PORT: 5432 
+      GRAMPSWEB_NEW_DB_BACKEND: sharedpostgresql
+      GRAMPSWEB_MEDIA_PREFIX_TREE: True
+      GRAMPSWEB_USER_DB_URI: postgresql://svc_grampsweb:${svc_grampsweb_password}@postgres:5432/grampsweb_users
+      GRAMPSWEB_SEARCH_INDEX_DB_URI: postgresql://svc_grampsweb:${svc_grampsweb_password}@postgres:5432/grampsweb_search
+      GRAMPSWEB_BASE_URL: "https://familytree.james-fagg.uk"
       GRAMPSWEB_CELERY_CONFIG__broker_url: "redis://grampsweb_redis:6379/0"
       GRAMPSWEB_CELERY_CONFIG__result_backend: "redis://grampsweb_redis:6379/0"
       GRAMPSWEB_RATELIMIT_STORAGE_URI: redis://grampsweb_redis:6379/1
@@ -13,15 +29,16 @@ services:
         --access-logfile=/app/logs/access.log 
         --access-logformat='%(h)s %({x-forwarded-for}i)s %(t)s %(r)s %(s)s' 
         --forwarded-allow-ips=192.168.0.2
+ 
     depends_on:
       - grampsweb_redis
+    networks:
+      - db_network
     volumes:
-      - gramps_users:/app/users  # persist user database
-      - gramps_index:/app/indexdir  # persist search index
       - gramps_thumb_cache:/app/thumbnail_cache  # persist thumbnails
       - gramps_cache:/app/cache  # persist export and report caches
       - gramps_secret:/app/secret  # persist flask secret
-      - gramps_db:/root/.gramps/grampsdb  # persist Gramps database
+      - gramps_db:/root/.gramps/grampsdb  # persist tree registry (name/backend markers, not the data itself)
       - gramps_media:/app/media  # persist media files
       - gramps_tmp:/tmp
       - /opt/stacks/grampsweb/logs:/app/logs
@@ -36,16 +53,26 @@ services:
     command: celery -A gramps_webapi.celery worker --loglevel=INFO --concurrency=2
 
   grampsweb_redis:
-    image: docker.io/valkey/valkey:8-alpine
+    image: ghcr.io/valkey-io/valkey:9.1.0-alpine
     container_name: grampsweb_redis
     restart: always
+    networks:
+      - db_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  db_network:
+    external: true
+    driver: bridge
 
 volumes:
-  gramps_users:
-  gramps_index:
   gramps_thumb_cache:
   gramps_cache:
   gramps_secret:
-  gramps_db:
   gramps_media:
   gramps_tmp:
+  gramps_db:

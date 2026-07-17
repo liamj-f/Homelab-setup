@@ -16,8 +16,7 @@ services:
       GRAMPSWEB_POSTGRES_USER: svc_grampsweb
       GRAMPSWEB_POSTGRES_PASSWORD: ${svc_grampsweb_password}
       GRAMPSWEB_POSTGRES_HOST: postgres
-      GRAMPSWEB_POSTGRES_PORT: 5432
-      GRAMPSWEB_POSTGRES_DB: grampsweb 
+      GRAMPSWEB_POSTGRES_PORT: 5432 
       GRAMPSWEB_NEW_DB_BACKEND: sharedpostgresql
       GRAMPSWEB_MEDIA_PREFIX_TREE: True
       GRAMPSWEB_USER_DB_URI: postgresql://svc_grampsweb:${svc_grampsweb_password}@postgres:5432/grampsweb_users
@@ -36,8 +35,6 @@ services:
     networks:
       - db_network
     volumes:
-#      - gramps_users:/app/users  # persist user database
-#      - gramps_index:/app/indexdir  # persist search index
       - gramps_thumb_cache:/app/thumbnail_cache  # persist thumbnails
       - gramps_cache:/app/cache  # persist export and report caches
       - gramps_secret:/app/secret  # persist flask secret
@@ -73,8 +70,6 @@ networks:
     driver: bridge
 
 volumes:
-  gramps_users:
-  gramps_index:
   gramps_thumb_cache:
   gramps_cache:
   gramps_secret:

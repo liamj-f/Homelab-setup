@@ -51,6 +51,6 @@ export const experience: ExperienceEntry[] = [
   {
     org: 'The Scout Association',
     role: 'Assistant Explorer Scout Leader (Volunteer)',
-    dates: 'Aug 2016 – Current',
+    dates: 'Aug 2016 – Present',
   },
 ];

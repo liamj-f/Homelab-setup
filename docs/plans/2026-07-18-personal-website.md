@@ -25,7 +25,7 @@
 6. The Zinc Group — Customer Account Manager (Aug 2016–Jan 2017)
 7. British Army — Officer Cadet, Wales Universities OTC (Sep 2014–Sep 2015)
 8. St John Ambulance — Emergency Medical Technician & District Training Officer (Aug 2016–Jan 2022)
-9. The Scout Association — Assistant Explorer Scout Leader, volunteer (Aug 2016–Current)
+9. The Scout Association — Assistant Explorer Scout Leader, volunteer (Aug 2016–Present)
 
 **Stack (professional):** Data Warehousing & Modelling (Kimball & Inmon), Data Architecture, Power BI & Power Query, Tableau, Crystal Reports, SSRS/SSIS, Power Automate & Logic Apps, Azure Data Factory, Databricks, NoSQL (CosmosDB), Machine Learning & AI, CI/CD pipelines, ELT, Agile/Scrum, T-SQL/MySQL/SparkSQL, Python, R, KQL, M Formula, VBA.
 
@@ -346,7 +346,7 @@ export const experience: ExperienceEntry[] = [
   {
     org: 'The Scout Association',
     role: 'Assistant Explorer Scout Leader (Volunteer)',
-    dates: 'Aug 2016 – Current',
+    dates: 'Aug 2016 – Present',
   },
 ];
 ```

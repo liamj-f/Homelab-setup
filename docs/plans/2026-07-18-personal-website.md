@@ -124,6 +124,7 @@ git commit -m "Scaffold Astro project for personal website"
   --color-ink: #1a1a1a;
   --color-line: #1a1a1a33;
   --color-accent: #2f5d50; /* distinct from georgedenton.co.uk's accent */
+  --color-muted: #5c5850; /* AA-contrast (6.3:1) against --color-bg, unlike an opacity trick */
   --font-mono: "JetBrains Mono", "Consolas", "SFMono-Regular", monospace;
   --content-width: 760px;
 }
@@ -134,6 +135,7 @@ git commit -m "Scaffold Astro project for personal website"
     --color-ink: #e8e6df;
     --color-line: #e8e6df33;
     --color-accent: #6fbf9a;
+    --color-muted: #a8a49a; /* AA-contrast (7.2:1) against dark --color-bg */
   }
 }
 
@@ -158,7 +160,7 @@ a { color: var(--color-accent); }
 .fig-label {
   font-size: 0.75rem;
   letter-spacing: 0.05em;
-  opacity: 0.6;
+  color: var(--color-muted);
 }
 
 .section-heading::before {

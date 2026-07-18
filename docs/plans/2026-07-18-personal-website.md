@@ -172,6 +172,18 @@ section {
   border-top: 1px solid var(--color-line);
   padding: 2.5rem 0;
 }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 ```
 
 **Step 2: Write the base layout**
@@ -243,6 +255,7 @@ const navItems = [
 ];
 ---
 <header>
+  <h1 class="sr-only">Liam James-Fagg</h1>
   <p class="fig-label">FIG. 00 LJF — REV 2026</p>
   <nav>
     <ul style="display:flex; gap:1.25rem; list-style:none; padding:0; margin:0.5rem 0 0;">

@@ -1,0 +1,13 @@
+services:
+  website:
+    image: ghcr.io/liamj-f/website:latest
+    container_name: website
+    networks:
+      - nginx_network
+    ports:
+      - "90:80"
+    restart: unless-stopped
+
+networks:
+  nginx_network:
+    external: true

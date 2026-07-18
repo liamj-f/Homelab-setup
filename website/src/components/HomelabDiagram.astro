@@ -1,0 +1,21 @@
+---
+// website/src/components/HomelabDiagram.astro
+const diagram = `flowchart TB
+    internet((Public Internet)) --> ns((Porkbun / DuckDNS Nameservers))
+    ns --> lb([OCI Load Balancer])
+    lb --> waf([Web Application Firewall])
+    waf --> npm_oci(Nginx Proxy Manager - OCI VM)
+    npm_oci -->|Rathole tunnel| npm_home(Nginx Proxy Manager - Home)
+    subgraph home[Home Network - Keepalived Failover Pair]
+        npm_home --> nextcloud(Nextcloud)
+        npm_home --> gramps(GrampsWeb)
+        npm_home --> portainer(Portainer)
+        npm_home --> pihole(Pi-hole)
+    end
+`;
+---
+<div class="mermaid">{diagram}</div>
+<script>
+  import mermaid from 'mermaid';
+  mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'strict' });
+</script>

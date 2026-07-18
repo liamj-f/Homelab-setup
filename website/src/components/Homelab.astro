@@ -1,0 +1,14 @@
+---
+import HomelabDiagram from './HomelabDiagram.astro';
+---
+<section id="homelab">
+  <h2 class="section-heading">Homelab</h2>
+  <p>
+    Self-hosted services run across a Keepalived failover pair on-prem (a
+    Dell E7270 and a Raspberry Pi 4) with an Oracle Cloud VM acting as the
+    public tunnel and WAF front door. Everything is deployed and redeployed
+    through GitHub Actions talking to Portainer's API — pushing to this repo
+    is enough to roll out a change.
+  </p>
+  <HomelabDiagram />
+</section>

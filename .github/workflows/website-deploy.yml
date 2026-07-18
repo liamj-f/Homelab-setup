@@ -155,7 +155,7 @@ jobs:
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
-          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          RESPONSE=$(curl -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -200,7 +200,7 @@ jobs:
       - name: Redeploy Stack using webhook
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
+          RESPONSE=$(curl -s -i --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
 
           echo "API Response: $RESPONSE"

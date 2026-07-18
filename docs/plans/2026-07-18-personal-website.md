@@ -263,9 +263,9 @@ const year = new Date().getFullYear();
 <footer style="border-top:1px solid var(--color-line); margin-top:2rem; padding-top:1.5rem; display:flex; justify-content:space-between; font-size:0.85rem;">
   <span>&copy; {year} Liam James-Fagg</span>
   <span>
-    <a href="https://github.com/liamj-f" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/liamj-f" target="_blank" rel="noopener" aria-label="GitHub (opens in new tab)">GitHub</a>
     &nbsp;·&nbsp;
-    <a href="https://www.linkedin.com/in/liam-james-fagg/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://www.linkedin.com/in/liam-james-fagg/" target="_blank" rel="noopener" aria-label="LinkedIn (opens in new tab)">LinkedIn</a>
   </span>
 </footer>
 ```

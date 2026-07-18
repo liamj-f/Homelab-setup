@@ -666,11 +666,13 @@ git commit -m "Add Stack section and clean up placeholder page content"
 
 **Step 1: Write the Dockerfile**
 
+Uses `npm install` rather than `npm ci`: no `package-lock.json` has been committed, since Task 1's local `npm install` was skipped (no Node.js on the dev machine) and CI is the first place dependencies actually get resolved. `npm ci` requires a pre-existing lockfile and would fail here.
+
 ```dockerfile
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json ./
+RUN npm install
 COPY . .
 RUN npm run build
 

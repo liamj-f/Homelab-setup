@@ -1,0 +1,19 @@
+---
+const navItems = [
+  { href: '#about', label: 'About' },
+  { href: '#experience', label: 'Experience' },
+  { href: '#projects', label: 'Projects' },
+  { href: '#homelab', label: 'Homelab' },
+  { href: '#stack', label: 'Stack' },
+];
+---
+<header>
+  <p class="fig-label">FIG. 00 LJF — REV 2026</p>
+  <nav>
+    <ul style="display:flex; gap:1.25rem; list-style:none; padding:0; margin:0.5rem 0 0;">
+      {navItems.map((item) => (
+        <li><a href={item.href}>{item.label}</a></li>
+      ))}
+    </ul>
+  </nav>
+</header>

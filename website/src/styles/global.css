@@ -1,0 +1,52 @@
+/* website/src/styles/global.css */
+:root {
+  --color-bg: #f4f2ec;
+  --color-ink: #1a1a1a;
+  --color-line: #1a1a1a33;
+  --color-accent: #2f5d50; /* distinct from georgedenton.co.uk's accent */
+  --font-mono: "JetBrains Mono", "Consolas", "SFMono-Regular", monospace;
+  --content-width: 760px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #14171a;
+    --color-ink: #e8e6df;
+    --color-line: #e8e6df33;
+    --color-accent: #6fbf9a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  line-height: 1.5;
+}
+
+main {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 2rem 1.25rem 6rem;
+}
+
+a { color: var(--color-accent); }
+
+.fig-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+
+.section-heading::before {
+  content: "//\2014 ";
+  color: var(--color-accent);
+}
+
+section {
+  border-top: 1px solid var(--color-line);
+  padding: 2.5rem 0;
+}

@@ -530,7 +530,7 @@ import { projects } from '../data/projects';
   {projects.map((project) => (
     <article style="margin-bottom:1.5rem;">
       <p style="margin-bottom:0.15rem;">
-        <strong>{project.link ? <a href={project.link} target="_blank" rel="noopener">{project.name}</a> : project.name}</strong>
+        <strong>{project.link ? <a href={project.link} target="_blank" rel="noopener" aria-label={`${project.name} (opens in new tab)`}>{project.name}</a> : project.name}</strong>
       </p>
       <p style="margin:0.25rem 0;">{project.description}</p>
       <p class="fig-label">{project.tags.join(' · ')}</p>

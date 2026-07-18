@@ -38,6 +38,7 @@ Those in brackets are not yet fully deployed/Tested
 - Portainer-Agent
 - Nginx Proxy Manager
 - Dovetrek-PWA
+- (Website)
 - DuckDNS
 
 ## Final Architecture

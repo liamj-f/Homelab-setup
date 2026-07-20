@@ -350,14 +350,20 @@ def main():
                 for host in changed_hosts:
                     log(f"IP change: {host}  {host_ip_map[host]} -> {newly_resolved[host]}")
 
-                update_security_list(vcn_client, parsed_items, changed_hosts, newly_resolved)
-                update_nsg(vcn_client, parsed_items, changed_hosts, newly_resolved)
+                security_list_ok = update_security_list(vcn_client, parsed_items, changed_hosts, newly_resolved)
+                nsg_ok = update_nsg(vcn_client, parsed_items, changed_hosts, newly_resolved)
                 # Pass the full old and new maps so WAF can manage the complete IP set
-                update_waf_allowlist(waf_client, host_ip_map, newly_resolved)
+                waf_ok = update_waf_allowlist(waf_client, host_ip_map, newly_resolved)
 
-                # Persist new IPs (only for hosts that resolved successfully)
-                for host in changed_hosts:
-                    host_ip_map[host] = newly_resolved[host]
+                # Only persist new IPs if every configured target was updated
+                # successfully. Otherwise leave host_ip_map as-is so the failed
+                # target(s) are retried (all update functions are idempotent) on
+                # the next loop iteration instead of being silently skipped forever.
+                if security_list_ok and nsg_ok and waf_ok:
+                    for host in changed_hosts:
+                        host_ip_map[host] = newly_resolved[host]
+                else:
+                    log("WARNING: One or more updates failed; will retry affected hosts next cycle")
 
             else:
                 status = ', '.join(

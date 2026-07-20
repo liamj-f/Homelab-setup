@@ -7,6 +7,7 @@ on:
     paths:
       - 'oci-containers-compose.yml'
       - '.github/workflows/oci-containers-deploy.yml'
+      - 'dynamic-ip-updater/**'
   workflow_dispatch:
     inputs:
       host_machine:
@@ -266,7 +267,7 @@ jobs:
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"                           
                              },
                               "Env": [
-                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
+                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001,14monarch.tplinkdns.com:2333, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
                                     {
                                     "name":"INITIAL_ADMIN_EMAIL",
                                     "value":"${{ vars.NGINX_EMAIL }}"
@@ -315,7 +316,7 @@ jobs:
         run: |
             OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
 
-            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
@@ -328,7 +329,7 @@ jobs:
                   "RepositoryReferenceName": "${{ github.ref }}",
                   "repositoryAuthentication": false,
                               "Env": [
-                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
+                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001, 14monarch.tplinkdns.com:2333, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
                                     {
                                     "name":"INITIAL_ADMIN_EMAIL",
                                     "value":"${{ vars.NGINX_EMAIL }}"
@@ -369,61 +370,14 @@ jobs:
 
               echo "API Response: $RESPONSE" 
 
-      - name: Redeploy Stack using webhook
-        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-        run: |
-          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
-
-          echo "API Response: $RESPONSE"
-
-#      - name: Update Stack
+#      - name: Redeploy Stack using webhook
 #        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
 #        run: |
-#          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+#          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
+#          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
 #
-#          RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
-#          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-#          -H "Content-Type: application/json" \
-#          -d '{
-#               "PullImage": true,
-#               "RepositoryReferenceName": "${{ github.ref }}",
-#               "repositoryAuthentication": false,
-#                              "Env": [
-#                                    {
-#                                    "name":"INITIAL_ADMIN_EMAIL",
-#                                    "value":"${{ vars.NGINX_EMAIL }}"
-#                                    },
-#                                    {
-#                                    "name":"INITIAL_ADMIN_PASSWORD",
-#                                    "value":"${{ secrets.APP_PASSWORD }}"
-#                                    },
-#                                    {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
-#                                    {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
-#                                    {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
-#                                    {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
-#                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
-#                                    {
-#                                    "name":"SECURITY_LIST_ID",
-#                                    "value":"${{ vars.OCID_SECURITY_LIST }}"
-#                                    },
-#                                    {
-#                                    "name":"NSG_ID",
-#                                    "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
-#                                    },
-#                                   {
-#                                    "name":"DUCKDNS_TOKEN",
-#                                    "value":"${{ secrets.DUCKDNS_TOKEN }}"
-#                                    },
-#                                    {
-#                                    "name":"SUBDOMAIN",
-#                                    "value":"ljfcloud"
-#                                    }
-#                                    ],
-#               "Prune": true
-#              }'  )
-#
-#            echo "API Response: $RESPONSE"
+#          echo "API Response: $RESPONSE"
+
 
       - name: Copy XFF config to host
         run: |

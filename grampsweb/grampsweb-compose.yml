@@ -23,7 +23,7 @@ services:
       GRAMPSWEB_OIDC_GOOGLE_CLIENT_ID: "${gcp_oauth_client_id}"
       GRAMPSWEB_OIDC_GOOGLE_CLIENT_SECRET: "${gcp_oauth_client_secret}"
       GRAMPSWEB_OIDC_NAME: "Sign in with Google"        # cosmetic label
-      GRAMPSWEB_OIDC_AUTO_REDIRECT: True                 # skip the login page if Google is the only method
+      GRAMPSWEB_OIDC_AUTO_REDIRECT: False                 # skip the login page if Google is the only method
       GRAMPSWEB_OIDC_DISABLE_LOCAL_AUTH: False             # force everyone through Google, no local passwords
       GRAMPSWEB_POSTGRES_USER: svc_grampsweb
       GRAMPSWEB_POSTGRES_PASSWORD: ${svc_grampsweb_password}

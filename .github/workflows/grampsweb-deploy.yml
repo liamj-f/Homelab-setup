@@ -179,7 +179,7 @@ jobs:
                         {"name": "grampsweb_secret_key", "value": "${{ secrets.GRAMPSWEB_SECRET_KEY }}"},
                         {"name": "grampsweb_email_address", "value": "${{ vars.GRAMPSWEB_EMAIL_ADDRESS }}"},
                         {"name": "gmail_address", "value": "${{ vars.GMAIL_ADDRESS }}"},
-                        {"name": "gmail_app_password", "value": "${{ secrets.GMAIL_APP_PASSWORD }}"},
+                        {"name": "gmail_app_password", "value": "${{ secrets.GRAMPSWEB_GMAIL_APP_PASSWORD }}"},
                         {"name": "gcp_oauth_client_id", "value": "${{ secrets.GCP_OAUTH_CLIENT_ID }}"},
                         {"name": "gcp_oauth_client_secret", "value": "${{ secrets.GCP_OAUTH_CLIENT_SECRET }}"}
                       ]
@@ -209,7 +209,7 @@ jobs:
                         {"name": "grampsweb_secret_key", "value": "${{ secrets.GRAMPSWEB_SECRET_KEY }}"},
                         {"name": "grampsweb_email_address", "value": "${{ vars.GRAMPSWEB_EMAIL_ADDRESS }}"},
                         {"name": "gmail_address", "value": "${{ vars.GMAIL_ADDRESS }}"},
-                        {"name": "gmail_app_password", "value": "${{ secrets.GMAIL_APP_PASSWORD }}"},
+                        {"name": "gmail_app_password", "value": "${{ secrets.GRAMPSWEB_GMAIL_APP_PASSWORD }}"},
                         {"name": "gcp_oauth_client_id", "value": "${{ secrets.GCP_OAUTH_CLIENT_ID }}"},
                         {"name": "gcp_oauth_client_secret", "value": "${{ secrets.GCP_OAUTH_CLIENT_SECRET }}"}
                       ]

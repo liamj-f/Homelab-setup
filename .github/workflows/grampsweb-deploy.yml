@@ -176,7 +176,7 @@ jobs:
                "StackFileVersion": "3",
                "Env": [
                         {"name": "svc_grampsweb_password", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"},
-                        {"name": "grampsweb_secret_key", "value": "${{ secrets.GRAMPSWEB_SECRET_KEY }}"}
+                        {"name": "grampsweb_secret_key", "value": "${{ secrets.GRAMPSWEB_SECRET_KEY }}"},
                         {"name": "grampsweb_email_address", "value": "${{ vars.GRAMPSWEB_EMAIL_ADDRESS }}"},
                         {"name": "gmail_address", "value": "${{ vars.GMAIL_ADDRESS }}"},
                         {"name": "gmail_app_password", "value": "${{ secrets.GMAIL_APP_PASSWORD }}"},
@@ -206,7 +206,7 @@ jobs:
                "Prune": true,
                "Env": [
                         {"name": "svc_grampsweb_password", "value": "${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"},
-                        {"name": "grampsweb_secret_key", "value": "${{ secrets.GRAMPSWEB_SECRET_KEY }}"}
+                        {"name": "grampsweb_secret_key", "value": "${{ secrets.GRAMPSWEB_SECRET_KEY }}"},
                         {"name": "grampsweb_email_address", "value": "${{ vars.GRAMPSWEB_EMAIL_ADDRESS }}"},
                         {"name": "gmail_address", "value": "${{ vars.GMAIL_ADDRESS }}"},
                         {"name": "gmail_app_password", "value": "${{ secrets.GMAIL_APP_PASSWORD }}"},

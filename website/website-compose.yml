@@ -12,7 +12,7 @@ services:
       PROJECTS_TS_FILEPATH: "./website/projects.ts"
       SKILLS_TS_FILEPATH: "./website/skills.ts"
       HOMELAB_TS_FILEPATH: "./website/homelab.ts"
-      WEBSITE_URL: "liam.james-fagg.uk"
+      WEBSITE_URL: "https://liam.james-fagg.uk"
     volumes:
       # Your content files, read-only. The names must match.
       - ./website:/website_files:ro

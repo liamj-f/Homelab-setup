@@ -18,45 +18,10 @@ on:
         type: string
 
 jobs:
-  build-image-and-push:
-    name: Build and push website image to ghcr.io
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6.0.2
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/liamj-f/website
-          tags: |
-            type=sha,prefix=sha-
-            type=raw,value=latest
-
-      - name: Build and push website image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./website
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
   deploy:
-    needs: build-image-and-push
     runs-on: ubuntu-latest
     env:
-      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
+      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
       domain: ${{ inputs.domain || 'liam.james-fagg.uk' }}
     steps:
       - name: Checkout repo
@@ -180,7 +145,7 @@ jobs:
       - name: Update Stack Environment Variables
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -196,14 +161,6 @@ jobs:
                      ],
                "Prune": true
               }'
-
-      - name: Redeploy Stack using webhook
-        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-        run: |
-          RESPONSE=$(curl -s -i --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
-
-          echo "API Response: $RESPONSE"
 
       - name: Bring down VPN
         if: always()

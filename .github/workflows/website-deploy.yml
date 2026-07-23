@@ -21,7 +21,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
       domain: ${{ inputs.domain || 'liam.james-fagg.uk' }}
     steps:
       - name: Checkout repo

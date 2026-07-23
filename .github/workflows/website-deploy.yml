@@ -129,6 +129,7 @@ jobs:
                "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "website/website-compose.yml",
                "RepositoryAuthentication": false,
+               "Registries": [1],
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
@@ -157,6 +158,7 @@ jobs:
                "PullImage": true,
                "RepositoryReferenceName": "${{ github.ref }}",
                "repositoryAuthentication": false,
+               "Registries": [1],
                "Env": [
                      ],
                "Prune": true

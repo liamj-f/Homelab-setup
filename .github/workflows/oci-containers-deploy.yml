@@ -21,6 +21,9 @@ on:
       host_machine:
         required: true
         type: string 
+      domain:
+        required: true
+        type: string
 
 jobs:
   build-image-and-push:

@@ -80,12 +80,9 @@ jobs:
   deploy:
     needs: build-image-and-push
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        host_machine: [ljfcloud-server]
-      max-parallel: 1
     env:
       domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
     steps:
 
       - name: Checkout repo
@@ -98,13 +95,20 @@ jobs:
       - name: Set node config
         id: node_config
         run: |
-          if [ "${{ matrix.host_machine }}" = "ljfcloud-server" ]; then
+          if [ "${{ env.host_machine }}" = "ljfcloud-server" ]; then
             echo "ssh_host=${{ vars.LJFCLOUD_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_key<<EOF" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_LJFCLOUD }}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ env.host_machine }}" = "ljfcloud-arm" ]; then
+            echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
           fi
+        
 
       - name: Write SSH key to file
         run: |
@@ -123,7 +127,7 @@ jobs:
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
           PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, 145.241.244.229/32
+          AllowedIPs = 192.168.0.0/24, ${{ steps.node_config.outputs.ssh_host }}/32
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF

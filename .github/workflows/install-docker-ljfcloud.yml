@@ -122,18 +122,18 @@ jobs:
       domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@main
+        uses: actions/checkout@v7.0.1
 
       - name: Set node config
         id: node_config
         run: |
-          if [ "${{ matrix.host_machine }}" = "ljfcloud-server" ]; then
+          if [ "${{ env.host_machine }}" = "ljfcloud-server" ]; then
             echo "ssh_host=${{ vars.LJFCLOUD_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_LJFCLOUD }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
+          elif [ "${{ env.host_machine }}" = "ljfcloud-arm" ]; then
             echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
@@ -183,7 +183,7 @@ jobs:
           ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
      
       - name: Uninstall old Docker from VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
@@ -194,7 +194,7 @@ jobs:
             done 
             
       - name: Add Docker repository to VPS
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
@@ -210,7 +210,7 @@ jobs:
             sudo apt update
 
       - name: Install Docker packages on VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
@@ -219,7 +219,7 @@ jobs:
             sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
       - name: Configure Docker DNS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
@@ -236,7 +236,7 @@ jobs:
             sudo systemctl restart docker
 
       - name: Ensure Docker is running on VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
@@ -246,7 +246,7 @@ jobs:
             sudo systemctl status docker --no-pager
 
       - name: add user to docker group on VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
@@ -269,7 +269,7 @@ jobs:
           overwrite: true
 
       - name: Deploy Portainer agent on VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}

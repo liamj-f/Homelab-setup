@@ -178,10 +178,13 @@ jobs:
 
       - name: Get Portainer EndpointId
         id: endpoint
+        env:
+          host_machine: ${{ env.host_machine || 'ljfcloud-arm' }}
         run: |
+          echo "Looking for endpoint with name: $host_machine"
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
-          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine ${{ matrix.host_machine }} '.[] | select(.Name==$host_machine) | .Id')
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')
           echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
 
       - name: See if Nginx network exists
@@ -549,7 +552,7 @@ jobs:
             -d '{
               "value": "html",
               "meta": {
-                "html": "<body>\n<pre>{ \"code\":\"404\",\"message\":\"No route to host\",\"source\":\"${{ matrix.host_machine }}\" }\n</pre>\n</body>"
+                "html": "<body>\n<pre>{ \"code\":\"404\",\"message\":\"No route to host\",\"source\":\"${{ env.HOST_MACHINE }}\" }\n</pre>\n</body>"
               }
               }')
 

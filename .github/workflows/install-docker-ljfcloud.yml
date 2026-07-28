@@ -326,5 +326,5 @@ jobs:
       contents: read
     secrets: inherit
     with:
-      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
       domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}

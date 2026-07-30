@@ -118,20 +118,55 @@ jobs:
     runs-on: ubuntu-latest
     needs: Update_Security_Lists
     env:
-      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
-      domain: ${{ inputs.domain || '14monarch.local' }}
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
+      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@main
+        uses: actions/checkout@v7.0.1
+
+      - name: Set node config
+        id: node_config
+        run: |
+          if [ "${{ env.host_machine }}" = "ljfcloud-server" ]; then
+            echo "ssh_host=${{ vars.LJFCLOUD_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_LJFCLOUD }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ env.host_machine }}" = "ljfcloud-arm" ]; then
+            echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          fi
         
+      - name: Write SSH key to file
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
 
       - name: Write WireGuard config
         run: |
-          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
-          
+          cat > wg0.conf << EOF
+          [Interface]
+          PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
+          Address = 10.5.5.5/32
+          DNS = 10.5.5.1
+          MTU = 1250
+
+          [Peer]
+          PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
+          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
+          AllowedIPs = 192.168.0.0/24, ${{ steps.node_config.outputs.ssh_host }}/32
+          Endpoint = ${{ vars.WG_ENDPOINT }}:51820
+          PersistentKeepalive = 25
+          EOF
+
       - name: Bring up VPN on runner
         run: |
           sudo wg-quick up ./wg0.conf
@@ -145,25 +180,25 @@ jobs:
       - name: Add host key to known_hosts of runner
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ steps.node_config.outputs.ssh_host }} >> ~/.ssh/known_hosts
      
       - name: Uninstall old Docker from VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
-          host: ${{ vars.LJFCLOUD_IP }}
+          host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
-          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
               sudo apt remove -y --allow-change-held-packages $pkg || true
             done 
             
       - name: Add Docker repository to VPS
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
-          host: ${{ vars.LJFCLOUD_IP }}
+          host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
-          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             sudo apt update
             sudo apt install -y ca-certificates curl
@@ -175,20 +210,20 @@ jobs:
             sudo apt update
 
       - name: Install Docker packages on VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
-          host: ${{ vars.LJFCLOUD_IP }}
+          host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
-          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
       - name: Configure Docker DNS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
-          host: ${{ vars.E7270_IP }}
-          username: ${{ vars.E7270_USER }}
-          password: ${{ secrets.E7270_PASSWORD }}
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ vars.LJFCLOUD_USER }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             sudo mkdir -p /etc/docker
             cat <<EOF | sudo tee /etc/docker/daemon.json
@@ -201,21 +236,21 @@ jobs:
             sudo systemctl restart docker
 
       - name: Ensure Docker is running on VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
-          host: ${{ vars.LJFCLOUD_IP }}
+          host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
-          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             sudo systemctl enable --now docker
             sudo systemctl status docker --no-pager
 
       - name: add user to docker group on VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
-          host: ${{ vars.LJFCLOUD_IP }}
+          host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
-          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             sudo usermod -aG docker ${{ vars.LJFCLOUD_USER }}
 
@@ -226,19 +261,19 @@ jobs:
       - name: Copy rendered compose file from runner to VPS
         uses: appleboy/scp-action@v1.0.0
         with:
-          host: ${{ vars.LJFCLOUD_IP }}
+          host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
-          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
           source: portainer-agent-compose-rendered.yml
           target: /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer/
           overwrite: true
 
       - name: Deploy Portainer agent on VPS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
-          host: ${{ vars.LJFCLOUD_IP }}
+          host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ vars.LJFCLOUD_USER }}
-          key: ${{ secrets.LJFCLOUD_SSH_KEY }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             set -e
             cd /home/${{ vars.LJFCLOUD_USER }}/stacks/portainer
@@ -272,7 +307,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -F "Name=$host_machine" \
             -F "EndpointCreationType=2" \
-            -F "URL=tcp://${{ vars.LJFCLOUD_IP }}:9001" \
+            -F "URL=tcp://${{ steps.node_config.outputs.ssh_host }}:9001" \
             -F "TLS=true" \
             -F "TLSSkipVerify=true" \
             -F "TLSSkipClientVerify=true"
@@ -291,5 +326,5 @@ jobs:
       contents: read
     secrets: inherit
     with:
-      host_machine: ${{ inputs.host_machine || 'ljfcloud-server' }}
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
       domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}

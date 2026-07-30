@@ -81,11 +81,6 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
           
-      - name: Add host key to known_hosts of runner
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
-
       - name: Prepare Postgres data directory
         uses: appleboy/ssh-action@v1.2.5
         with:

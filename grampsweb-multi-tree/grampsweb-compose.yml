@@ -1,8 +1,8 @@
 # NOTE: gramps_db (mounted below at /root/.gramps/grampsdb) must stay
 # persistent - it's the only local record of which family tree(s) exist
 # and which backend they use. Without it, every redeploy loses track of
-# the tree and creates a new one, orphaning whatever was written to the
-# previous tree id in Postgres.
+# the tree created by grampsweb/bootstrap_owner.py and creates a new one,
+# orphaning whatever was written to the previous tree id in Postgres.
 services:
   grampsweb: &grampsweb
     image: ghcr.io/gramps-project/grampsweb:26.5.0
@@ -11,7 +11,7 @@ services:
     ports:
       - "88:5000"  # host:docker
     environment:
-      GRAMPSWEB_TREE: "James-Fagg_Family"
+      GRAMPSWEB_TREE: "*"
       GRAMPSWEB_SECRET_KEY: ${grampsweb_secret_key}
       GRAMPSWEB_EMAIL_HOST: "smtp.gmail.com"
       GRAMPSWEB_EMAIL_PORT: "587"
@@ -30,7 +30,8 @@ services:
       GRAMPSWEB_POSTGRES_PASSWORD: ${svc_grampsweb_password}
       GRAMPSWEB_POSTGRES_HOST: postgres
       GRAMPSWEB_POSTGRES_PORT: 5432 
-      GRAMPSWEB_NEW_DB_BACKEND: postgresql
+      GRAMPSWEB_NEW_DB_BACKEND: sharedpostgresql
+      GRAMPSWEB_MEDIA_PREFIX_TREE: True
       GRAMPSWEB_USER_DB_URI: postgresql://svc_grampsweb:${svc_grampsweb_password}@postgres:5432/grampsweb_users
       GRAMPSWEB_SEARCH_INDEX_DB_URI: postgresql://svc_grampsweb:${svc_grampsweb_password}@postgres:5432/grampsweb_search
       GRAMPSWEB_BASE_URL: "https://familytree.james-fagg.uk"

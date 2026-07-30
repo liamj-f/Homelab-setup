@@ -223,45 +223,51 @@ jobs:
 #
 #          echo "API Response: $RESPONSE"
 
-      - name: Wait for GrampsWeb to be ready
-        run: |
-          for i in $(seq 1 24); do
-            if curl -sf "http://${{ vars.E7270_IP }}:88/api/metadata/" > /dev/null; then
-              echo "GrampsWeb is up"
-              break
-            fi
-            echo "Attempt $i/24: grampsweb not up yet, waiting 5s..."
-            sleep 5
-          done
+      - name: Copy owner bootstrap script to host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          source: grampsweb/bootstrap_owner.py
+          target: /tmp/
+          strip_components: 1
 
-      # In single-tree mode (GRAMPSWEB_TREE set to a fixed name, not "*"),
-      # create_owner assigns the configured tree to the new user
-      # automatically - no separate tree-creation/login dance needed, and
-      # no deadlock. This endpoint only succeeds once (it 405s with "Users
-      # already exist" the moment any user exists anywhere), so on repeat
-      # deploys this step is a no-op rather than resyncing the existing
-      # owner's password/role.
-      - name: Bootstrap owner user
-        run: |
-          RESPONSE=$(curl -sS -X POST "http://${{ vars.E7270_IP }}:88/api/token/create_owner/" \
-            -H "Content-Type: application/json" \
-            -d '{}')
-          TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty')
-
-          if [ -z "$TOKEN" ]; then
-            echo "Owner already exists, skipping bootstrap: $RESPONSE"
-            exit 0
-          fi
-
-          curl -sS --fail -X POST "http://${{ vars.E7270_IP }}:88/api/users/admin/create_owner/" \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{
-                 "password": "${{ secrets.APP_PASSWORD }}",
-                 "email": "${{ vars.HOMELAB_EMAIL }}",
-                 "full_name": "${{ vars.APP_USER }}"
-                }'
-          echo "Owner user created"
+      # Bootstraps the tree + owner user directly inside the container via
+      # the internal gramps_webapi functions, instead of the create_owner/
+      # login REST API sequence. That API sequence deadlocks in multi-tree
+      # mode (GRAMPSWEB_TREE="*"): a user with no tree can't get a login
+      # token, but creating a tree requires a login token. Idempotent -
+      # safe to rerun every deploy, resyncs password/role/tree if the user
+      # already exists.
+      - name: Bootstrap tree and owner user
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          envs: APP_USER,APP_PASSWORD,HOMELAB_EMAIL
+          script: |
+            for i in $(seq 1 24); do
+              if docker exec grampsweb true 2>/dev/null; then
+                echo "grampsweb container is up"
+                break
+              fi
+              echo "Attempt $i/24: grampsweb not up yet, waiting 5s..."
+              sleep 5
+            done
+            docker cp /tmp/bootstrap_owner.py grampsweb:/tmp/bootstrap_owner.py
+            docker exec \
+              -e BOOTSTRAP_TREE_NAME="James-Fagg_Family" \
+              -e BOOTSTRAP_USERNAME="admin" \
+              -e BOOTSTRAP_FULLNAME="$APP_USER" \
+              -e BOOTSTRAP_PASSWORD="$APP_PASSWORD" \
+              -e BOOTSTRAP_EMAIL="$HOMELAB_EMAIL" \
+              grampsweb python3 /tmp/bootstrap_owner.py
+        env:
+          APP_USER: ${{ vars.APP_USER }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          HOMELAB_EMAIL: ${{ vars.HOMELAB_EMAIL }}
 
       - name: Bring down VPN
         if: always()

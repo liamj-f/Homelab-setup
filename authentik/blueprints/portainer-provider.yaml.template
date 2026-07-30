@@ -1,0 +1,36 @@
+# Rendered via envsubst by .github/workflows/portainer-deploy.yml and copied to
+# /opt/stacks/authentik/blueprints/ on the authentik host. authentik polls its
+# blueprints directories and applies any new/changed file automatically, so
+# this declares the Portainer OAuth2 provider + application the same way the
+# rest of this repo declares infrastructure - no manual click-ops in the
+# authentik UI required.
+version: 1
+metadata:
+  name: "Portainer OAuth2/OIDC provider + application"
+entries:
+  - model: authentik_providers_oauth2.oauth2provider
+    id: portainer-provider
+    identifiers:
+      name: Portainer
+    attrs:
+      name: Portainer
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      client_type: confidential
+      client_id: ${AUTHENTIK_PORTAINER_CLIENT_ID}
+      client_secret: ${AUTHENTIK_PORTAINER_CLIENT_SECRET}
+      sub_mode: hashed_user_id
+      include_claims_in_id_token: true
+      redirect_uris:
+        - matching_mode: strict
+          url: "https://${PORTAINER_DOMAIN}/"
+  - model: authentik_core.application
+    id: portainer-application
+    identifiers:
+      slug: portainer
+    attrs:
+      name: Portainer
+      slug: portainer
+      provider: !KeyOf portainer-provider
+      meta_launch_url: "https://${PORTAINER_DOMAIN}/"
+      policy_engine_mode: any

@@ -22,7 +22,8 @@ Those in brackets are not yet fully deployed/Tested
 - Portainer-Agent
 - (GrampsWeb)
 - (Frigate)
-- Traefik/WHOAMI 
+- Traefik/WHOAMI
+- (Authentik)
 
 ### RPI4
 - Keepalived

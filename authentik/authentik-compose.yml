@@ -1,0 +1,79 @@
+services:
+  authentik-server: &authentik
+    image: ghcr.io/goauthentik/server:2026.5.4
+    container_name: authentik-server
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: ${authentik_secret_key}
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: svc_authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${svc_authentik_password}
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${authentik_bootstrap_email}
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${authentik_bootstrap_password}
+      AUTHENTIK_BOOTSTRAP_TOKEN: ${authentik_bootstrap_token}
+    volumes:
+      - authentik_media:/media
+      - authentik_certs:/certs
+      - authentik_templates:/templates
+      # Blueprints define the OAuth2/OIDC providers+applications used to protect
+      # other stacks (e.g. Portainer) - rendered and copied here by each
+      # consuming stack's own deploy pipeline, then auto-applied by authentik.
+      - /opt/stacks/authentik/blueprints:/blueprints/local:ro
+    depends_on:
+      - authentik-redis
+    networks:
+      - db_network
+    ports:
+      - "90:9000"    # HTTP UI, proxied by Nginx Proxy Manager
+      - "9444:9443"  # HTTPS UI
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  authentik-worker:
+    <<: *authentik
+    container_name: authentik-worker
+    command: worker
+    ports: []
+    volumes:
+      - authentik_media:/media
+      - authentik_certs:/certs
+      - authentik_templates:/templates
+      - /opt/stacks/authentik/blueprints:/blueprints/local:ro
+      # Needed for the embedded outpost's Docker service connection.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  authentik-redis:
+    image: ghcr.io/valkey-io/valkey:9.1.0-alpine
+    container_name: authentik-redis
+    restart: unless-stopped
+    networks:
+      - db_network
+    volumes:
+      - authentik_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  db_network:
+    driver: bridge
+    external: true
+
+volumes:
+  authentik_media:
+    name: authentik_media
+  authentik_certs:
+    name: authentik_certs
+  authentik_templates:
+    name: authentik_templates
+  authentik_redis:
+    name: authentik_redis

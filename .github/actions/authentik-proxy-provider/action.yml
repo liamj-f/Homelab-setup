@@ -1,0 +1,119 @@
+name: 'Ensure Authentik forward-auth proxy provider + application'
+description: >-
+  Idempotently creates or updates a single-application Proxy Provider (forward
+  auth) and its application in Authentik, and attaches the provider to the
+  embedded outpost so it actually starts enforcing auth. For apps with no
+  native OIDC support (e.g. Pihole), protected via nginx auth_request instead
+  of an OAuth2 client. Must run in a job that already has network access to
+  authentik_api_base.
+
+inputs:
+  authentik_api_base:
+    description: 'Authentik base URL reachable from the runner, e.g. http://192.168.0.5:90'
+    required: true
+  authentik_token:
+    description: 'Authentik API token (the akadmin bootstrap token)'
+    required: true
+  app_name:
+    description: 'Display name for the provider/application, e.g. "Pihole"'
+    required: true
+  app_slug:
+    description: 'Application slug, e.g. "pihole"'
+    required: true
+  external_host:
+    description: 'Public URL of the protected app, e.g. https://pihole.14monarch.james-fagg.uk'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: provider
+      shell: bash
+      run: |
+        set -euo pipefail
+        BASE="${{ inputs.authentik_api_base }}/api/v3"
+        AUTH_HEADER="Authorization: Bearer ${{ inputs.authentik_token }}"
+
+        authz_flow=$(curl -sS -H "$AUTH_HEADER" \
+          "$BASE/flows/instances/?slug=default-provider-authorization-implicit-consent" \
+          | jq -r '.results[0].pk')
+        invalidation_flow=$(curl -sS -H "$AUTH_HEADER" \
+          "$BASE/flows/instances/?slug=default-provider-invalidation-flow" \
+          | jq -r '.results[0].pk')
+
+        provider_payload=$(jq -n \
+          --arg name "${{ inputs.app_name }}" \
+          --argjson authz "$authz_flow" \
+          --argjson invalidation "$invalidation_flow" \
+          --arg external_host "${{ inputs.external_host }}" \
+          '{
+             name: $name,
+             authorization_flow: $authz,
+             invalidation_flow: $invalidation,
+             mode: "forward_single",
+             external_host: $external_host,
+             internal_host: $external_host,
+             internal_host_ssl_validation: true
+           }')
+
+        existing_provider_id=$(curl -sS -H "$AUTH_HEADER" \
+          "$BASE/providers/proxy/?name=${{ inputs.app_name }}" | jq -r '.results[0].pk // empty')
+
+        if [ -z "$existing_provider_id" ]; then
+          echo "Creating proxy provider for ${{ inputs.app_name }}"
+          provider=$(curl -sS -X POST "$BASE/providers/proxy/" -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" -d "$provider_payload")
+        else
+          echo "Updating proxy provider for ${{ inputs.app_name }} (id $existing_provider_id)"
+          provider=$(curl -sS -X PATCH "$BASE/providers/proxy/$existing_provider_id/" -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" -d "$provider_payload")
+        fi
+
+        provider_pk=$(echo "$provider" | jq -r '.pk')
+        if [ "$provider_pk" = "null" ] || [ -z "$provider_pk" ]; then
+          echo "Failed to create/update provider: $provider" >&2
+          exit 1
+        fi
+
+        app_payload=$(jq -n \
+          --arg name "${{ inputs.app_name }}" \
+          --arg slug "${{ inputs.app_slug }}" \
+          --argjson provider "$provider_pk" \
+          --arg launch "${{ inputs.external_host }}" \
+          '{name: $name, slug: $slug, provider: $provider, meta_launch_url: $launch, policy_engine_mode: "any"}')
+
+        app_status=$(curl -sS -o /dev/null -w '%{http_code}' -H "$AUTH_HEADER" \
+          "$BASE/core/applications/${{ inputs.app_slug }}/")
+
+        if [ "$app_status" = "200" ]; then
+          curl -sS -X PATCH "$BASE/core/applications/${{ inputs.app_slug }}/" -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" -d "$app_payload" > /dev/null
+        else
+          curl -sS -X POST "$BASE/core/applications/" -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" -d "$app_payload" > /dev/null
+        fi
+
+        # Attach the provider to authentik's embedded outpost - a provider
+        # with no outpost never actually enforces anything.
+        outpost=$(curl -sS -H "$AUTH_HEADER" \
+          "$BASE/outposts/instances/?name=authentik+Embedded+Outpost")
+        outpost_pk=$(echo "$outpost" | jq -r '.results[0].pk // empty')
+
+        if [ -z "$outpost_pk" ]; then
+          echo "Could not find the embedded outpost; skipping outpost attachment." >&2
+          exit 1
+        fi
+
+        already_attached=$(echo "$outpost" | jq -r --argjson pk "$provider_pk" \
+          '.results[0].providers | index($pk) // empty')
+
+        if [ -z "$already_attached" ]; then
+          echo "Attaching provider $provider_pk to embedded outpost $outpost_pk"
+          updated_providers=$(echo "$outpost" | jq -c --argjson pk "$provider_pk" \
+            '.results[0].providers + [$pk]')
+          curl -sS -X PATCH "$BASE/outposts/instances/$outpost_pk/" -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --argjson providers "$updated_providers" '{providers: $providers}')" > /dev/null
+        else
+          echo "Provider $provider_pk already attached to embedded outpost"
+        fi

@@ -1,0 +1,118 @@
+name: 'Ensure Authentik OIDC provider + application'
+description: >-
+  Idempotently creates or updates an OAuth2/OIDC provider and its application
+  in Authentik via the REST API, and returns the resulting client id/secret.
+  Must run in a job that already has network access to authentik_api_base
+  (e.g. after the WireGuard VPN step in this repo's deploy pipelines).
+
+inputs:
+  authentik_api_base:
+    description: 'Authentik base URL reachable from the runner, e.g. http://192.168.0.5:90'
+    required: true
+  authentik_token:
+    description: 'Authentik API token (the akadmin bootstrap token)'
+    required: true
+  app_name:
+    description: 'Display name for the provider/application, e.g. "Portainer"'
+    required: true
+  app_slug:
+    description: 'Application slug, e.g. "portainer" - also used in the /application/o/<slug>/ endpoints'
+    required: true
+  redirect_uri:
+    description: 'Exact OAuth2 redirect/callback URI the protected app expects'
+    required: true
+  launch_url:
+    description: 'URL used for the application launcher tile in Authentik'
+    required: true
+
+outputs:
+  client_id:
+    description: 'OAuth2 client ID for the application'
+    value: ${{ steps.provider.outputs.client_id }}
+  client_secret:
+    description: 'OAuth2 client secret for the application'
+    value: ${{ steps.provider.outputs.client_secret }}
+
+runs:
+  using: composite
+  steps:
+    - id: provider
+      shell: bash
+      run: |
+        set -euo pipefail
+        BASE="${{ inputs.authentik_api_base }}/api/v3"
+        AUTH_HEADER="Authorization: Bearer ${{ inputs.authentik_token }}"
+
+        authz_flow=$(curl -sS -H "$AUTH_HEADER" \
+          "$BASE/flows/instances/?slug=default-provider-authorization-implicit-consent" \
+          | jq -r '.results[0].pk')
+        invalidation_flow=$(curl -sS -H "$AUTH_HEADER" \
+          "$BASE/flows/instances/?slug=default-provider-invalidation-flow" \
+          | jq -r '.results[0].pk')
+
+        provider_payload=$(jq -n \
+          --arg name "${{ inputs.app_name }}" \
+          --argjson authz "$authz_flow" \
+          --argjson invalidation "$invalidation_flow" \
+          --arg redirect "${{ inputs.redirect_uri }}" \
+          '{
+             name: $name,
+             authorization_flow: $authz,
+             invalidation_flow: $invalidation,
+             client_type: "confidential",
+             sub_mode: "hashed_user_id",
+             include_claims_in_id_token: true,
+             redirect_uris: [{matching_mode: "strict", url: $redirect}]
+           }')
+
+        existing_provider_id=$(curl -sS -H "$AUTH_HEADER" \
+          "$BASE/providers/oauth2/?name=${{ inputs.app_name }}" | jq -r '.results[0].pk // empty')
+
+        if [ -z "$existing_provider_id" ]; then
+          echo "Creating OAuth2 provider for ${{ inputs.app_name }}"
+          provider=$(curl -sS -X POST "$BASE/providers/oauth2/" -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" -d "$provider_payload")
+        else
+          echo "Updating OAuth2 provider for ${{ inputs.app_name }} (id $existing_provider_id)"
+          provider=$(curl -sS -X PATCH "$BASE/providers/oauth2/$existing_provider_id/" -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" -d "$provider_payload")
+        fi
+
+        provider_pk=$(echo "$provider" | jq -r '.pk')
+        if [ "$provider_pk" = "null" ] || [ -z "$provider_pk" ]; then
+          echo "Failed to create/update provider: $provider" >&2
+          exit 1
+        fi
+
+        app_payload=$(jq -n \
+          --arg name "${{ inputs.app_name }}" \
+          --arg slug "${{ inputs.app_slug }}" \
+          --argjson provider "$provider_pk" \
+          --arg launch "${{ inputs.launch_url }}" \
+          '{name: $name, slug: $slug, provider: $provider, meta_launch_url: $launch, policy_engine_mode: "any"}')
+
+        app_status=$(curl -sS -o /dev/null -w '%{http_code}' -H "$AUTH_HEADER" \
+          "$BASE/core/applications/${{ inputs.app_slug }}/")
+
+        if [ "$app_status" = "200" ]; then
+          echo "Updating application ${{ inputs.app_slug }}"
+          curl -sS -X PATCH "$BASE/core/applications/${{ inputs.app_slug }}/" -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" -d "$app_payload" > /dev/null
+        else
+          echo "Creating application ${{ inputs.app_slug }}"
+          curl -sS -X POST "$BASE/core/applications/" -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" -d "$app_payload" > /dev/null
+        fi
+
+        detail=$(curl -sS -H "$AUTH_HEADER" "$BASE/providers/oauth2/$provider_pk/")
+        client_id=$(echo "$detail" | jq -r '.client_id')
+        client_secret=$(echo "$detail" | jq -r '.client_secret')
+
+        if [ -z "$client_id" ] || [ "$client_id" = "null" ]; then
+          echo "Failed to read back client_id/client_secret: $detail" >&2
+          exit 1
+        fi
+
+        echo "::add-mask::$client_secret"
+        echo "client_id=$client_id" >> "$GITHUB_OUTPUT"
+        echo "client_secret=$client_secret" >> "$GITHUB_OUTPUT"

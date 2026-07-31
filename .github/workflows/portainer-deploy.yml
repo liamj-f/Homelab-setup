@@ -171,38 +171,19 @@ jobs:
 #          fi
 
       # --- Authentik SSO: protect Portainer behind OIDC ---
-      # Declares Portainer's OAuth2 provider + application in authentik as a
-      # blueprint (same client id/secret used below when wiring Portainer's
-      # OAuth settings), then flips Portainer over to OIDC authentication.
-      - name: Render Portainer authentik blueprint
-        run: |
-          export AUTHENTIK_PORTAINER_CLIENT_ID="${{ secrets.AUTHENTIK_PORTAINER_CLIENT_ID }}"
-          export AUTHENTIK_PORTAINER_CLIENT_SECRET="${{ secrets.AUTHENTIK_PORTAINER_CLIENT_SECRET }}"
-          export PORTAINER_DOMAIN="${{ vars.PORTAINER_DOMAIN }}"
-          envsubst < authentik/blueprints/portainer-provider.yaml.template > portainer-provider.yaml
-
-      - name: Copy blueprint to Authentik host
-        uses: appleboy/scp-action@master
+      # Creates/updates Portainer's OAuth2 provider + application in authentik
+      # directly via its API (no blueprint files), then points Portainer's own
+      # OAuth settings at the client id/secret authentik just generated.
+      - name: Ensure Authentik OIDC provider for Portainer
+        id: authentik_provider
+        uses: ./.github/actions/authentik-oidc-provider
         with:
-          host: ${{ vars.E7270_IP }}
-          username: ${{ vars.E7270_USER }}
-          key: ${{ secrets.SSH_KEY_E7270 }}
-          source: portainer-provider.yaml
-          target: /opt/stacks/authentik/blueprints/
-          overwrite: true
-
-      - name: Wait for Authentik to pick up the blueprint
-        run: |
-          for i in $(seq 1 12); do
-            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-              "https://${{ vars.AUTHENTIK_DOMAIN }}/application/o/portainer/.well-known/openid-configuration" || echo "000")
-            if [ "$STATUS_CODE" -eq 200 ]; then
-              echo "Portainer application is live in authentik"
-              break
-            fi
-            echo "Attempt $i/12: application not visible yet (HTTP $STATUS_CODE), waiting 10s..."
-            sleep 10
-          done
+          authentik_api_base: "http://${{ vars.E7270_IP }}:90"
+          authentik_token: ${{ secrets.AUTHENTIK_BOOTSTRAP_TOKEN }}
+          app_name: Portainer
+          app_slug: portainer
+          redirect_uri: "https://${{ vars.PORTAINER_DOMAIN }}/"
+          launch_url: "https://${{ vars.PORTAINER_DOMAIN }}/"
 
       - name: Configure Portainer to use Authentik OIDC
         run: |
@@ -210,8 +191,8 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
 
           UPDATED=$(echo "$CURRENT" | jq \
-            --arg client_id "${{ secrets.AUTHENTIK_PORTAINER_CLIENT_ID }}" \
-            --arg client_secret "${{ secrets.AUTHENTIK_PORTAINER_CLIENT_SECRET }}" \
+            --arg client_id "${{ steps.authentik_provider.outputs.client_id }}" \
+            --arg client_secret "${{ steps.authentik_provider.outputs.client_secret }}" \
             --arg auth_uri "https://${{ vars.AUTHENTIK_DOMAIN }}/application/o/authorize/" \
             --arg token_uri "https://${{ vars.AUTHENTIK_DOMAIN }}/application/o/token/" \
             --arg userinfo_uri "https://${{ vars.AUTHENTIK_DOMAIN }}/application/o/userinfo/" \

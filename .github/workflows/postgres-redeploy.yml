@@ -119,6 +119,40 @@ jobs:
           source: postgres/database_create.sql
           target: /tmp/
 
+      # --- Authentik SSO: protect pgAdmin behind OIDC ---
+      # Runs before the stack is created/updated because pgAdmin's OIDC config
+      # (PGADMIN_CONFIG_OAUTH2_CONFIG) is wired up via environment variables
+      # baked into the stack, not a post-deploy settings API call.
+      - name: Ensure Authentik OIDC provider for pgAdmin
+        id: authentik_provider
+        uses: ./.github/actions/authentik-oidc-provider
+        with:
+          authentik_api_base: "http://${{ vars.E7270_IP }}:90"
+          authentik_token: ${{ secrets.AUTHENTIK_BOOTSTRAP_TOKEN }}
+          app_name: pgAdmin
+          app_slug: pgadmin
+          redirect_uri: "https://${{ vars.PGADMIN_DOMAIN }}/oauth2/authorize"
+          launch_url: "https://${{ vars.PGADMIN_DOMAIN }}/"
+
+      - name: Build pgAdmin OAuth2 config
+        id: pgadmin_oauth
+        run: |
+          OAUTH2_CONFIG=$(jq -c -n \
+            --arg client_id "${{ steps.authentik_provider.outputs.client_id }}" \
+            --arg client_secret "${{ steps.authentik_provider.outputs.client_secret }}" \
+            --arg metadata_url "https://${{ vars.AUTHENTIK_DOMAIN }}/application/o/pgadmin/.well-known/openid-configuration" \
+            '[{
+               OAUTH2_NAME: "authentik",
+               OAUTH2_DISPLAY_NAME: "Authentik SSO",
+               OAUTH2_CLIENT_ID: $client_id,
+               OAUTH2_CLIENT_SECRET: $client_secret,
+               OAUTH2_SERVER_METADATA_URL: $metadata_url,
+               OAUTH2_SCOPE: "openid email profile"
+            }]')
+          echo "config<<EOF_CONFIG" >> $GITHUB_OUTPUT
+          echo "$OAUTH2_CONFIG" >> $GITHUB_OUTPUT
+          echo "EOF_CONFIG" >> $GITHUB_OUTPUT
+
       - name: Authenticate to Portainer
         id: auth
         run: |
@@ -209,76 +243,73 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
           echo "Creating stack from GitHub..."
+          PAYLOAD=$(jq -n \
+            --arg webhook "${{ steps.uuid.outputs.uuid }}" \
+            --arg ref "${{ github.ref }}" \
+            --arg pg_password "${{ secrets.SVC_POSTGRES_PASSWORD }}" \
+            --arg pgadmin_email "${{ vars.HOMELAB_EMAIL }}" \
+            --arg pgadmin_password "${{ secrets.APP_PASSWORD }}" \
+            --arg oauth2_config "${{ steps.pgadmin_oauth.outputs.config }}" \
+            '{
+               Name: "postgres",
+               RepositoryURL: "https://github.com/liamj-f/homelab-setup",
+               RepositoryReferenceName: $ref,
+               ComposeFile: "postgres/postgres-compose.yml",
+               RepositoryAuthentication: false,
+               AutoUpdate: {forcePullImage: true, forceUpdate: true, Webhook: $webhook},
+               Env: [
+                 {name: "POSTGRES_PASSWORD", value: $pg_password},
+                 {name: "PGADMIN_EMAIL", value: $pgadmin_email},
+                 {name: "PGADMIN_PASSWORD", value: $pgadmin_password},
+                 {name: "PGADMIN_CONFIG_AUTHENTICATION_SOURCES", value: "['internal', 'oauth2']"},
+                 {name: "PGADMIN_CONFIG_OAUTH2_AUTO_CREATE_USER", value: "True"},
+                 {name: "PGADMIN_CONFIG_OAUTH2_CONFIG", value: $oauth2_config}
+               ],
+               Prune: true,
+               StackFileVersion: "3"
+             }')
+
           RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
-          -d '{
-               "Name": "postgres",
-               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-               "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "postgres/postgres-compose.yml",
-               "RepositoryAuthentication": false,
-               "AutoUpdate": {
-                              "forcePullImage": true,
-                              "forceUpdate": true,
-                              "Webhook": "${{ steps.uuid.outputs.uuid }}"
-                             },
-               "Env": [
-                       {
-                       "name":"POSTGRES_PASSWORD",
-                       "value":"${{ secrets.SVC_POSTGRES_PASSWORD }}"
-                        },
-                       {
-                       "name":"PGADMIN_EMAIL",
-                       "value":"${{ vars.HOMELAB_EMAIL }}"
-                        },
-                       {
-                       "name":"PGADMIN_PASSWORD",
-                       "value":"${{ secrets.APP_PASSWORD }}"
-                        }
-                     ],
-               "Prune": true,
-               "StackFileVersion": "3"
-              }')
+          -d "$PAYLOAD")
 
             echo "API Response: $RESPONSE"
             echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
 
       - name: Update Stack Environment Variables
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-        run: |          
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg webhook "${{ steps.get_webhook.outputs.webhook_token }}" \
+            --arg ref "${{ github.ref }}" \
+            --arg pg_password "${{ secrets.SVC_POSTGRES_PASSWORD }}" \
+            --arg pgadmin_email "${{ vars.HOMELAB_EMAIL }}" \
+            --arg pgadmin_password "${{ secrets.APP_PASSWORD }}" \
+            --arg oauth2_config "${{ steps.pgadmin_oauth.outputs.config }}" \
+            '{
+               Name: "postgres",
+               PullImage: true,
+               RepositoryURL: "https://github.com/liamj-f/homelab-setup",
+               RepositoryReferenceName: $ref,
+               ComposeFile: "postgres/postgres-compose.yml",
+               repositoryAuthentication: false,
+               AutoUpdate: {forcePullImage: true, forceUpdate: true, Webhook: $webhook},
+               Env: [
+                 {name: "POSTGRES_PASSWORD", value: $pg_password},
+                 {name: "PGADMIN_EMAIL", value: $pgadmin_email},
+                 {name: "PGADMIN_PASSWORD", value: $pgadmin_password},
+                 {name: "PGADMIN_CONFIG_AUTHENTICATION_SOURCES", value: "['internal', 'oauth2']"},
+                 {name: "PGADMIN_CONFIG_OAUTH2_AUTO_CREATE_USER", value: "True"},
+                 {name: "PGADMIN_CONFIG_OAUTH2_CONFIG", value: $oauth2_config}
+               ],
+               Prune: true
+             }')
+
           RESPONSE=$(curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
-          -d '{
-               "Name": "postgres",
-               "PullImage": true,
-               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-               "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "postgres/postgres-compose.yml",
-               "repositoryAuthentication": false,
-               "AutoUpdate": {
-                              "forcePullImage": true,
-                              "forceUpdate": true,
-                              "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
-                             },
-               "Env": [
-                       {
-                       "name":"POSTGRES_PASSWORD",
-                       "value":"${{ secrets.SVC_POSTGRES_PASSWORD }}"
-                        },
-                       {
-                       "name":"PGADMIN_EMAIL",
-                       "value":"${{ vars.HOMELAB_EMAIL }}"
-                        },
-                       {
-                       "name":"PGADMIN_PASSWORD",
-                       "value":"${{ secrets.APP_PASSWORD }}"
-                        }
-                     ],
-               "Prune": true
-              }'
-              )
+          -d "$PAYLOAD")
 
             echo "API Response: $RESPONSE"
 

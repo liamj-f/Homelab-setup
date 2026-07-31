@@ -32,15 +32,6 @@ jobs:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
       domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
-      - name: Set node config
-        id: node_config
-        run: |
-          echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
-          echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-          echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-          echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
-          echo "EOF_KEY" >> $GITHUB_OUTPUT
-
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
 
@@ -87,16 +78,6 @@ jobs:
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
-
-      - name: Prepare Authentik blueprints directory
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
-          script: |
-            sudo mkdir -p /opt/stacks/authentik/blueprints
-            sudo chown -R ${{ steps.node_config.outputs.ssh_user }} /opt/stacks/authentik/blueprints
 
       - name: Authenticate to Portainer
         id: auth

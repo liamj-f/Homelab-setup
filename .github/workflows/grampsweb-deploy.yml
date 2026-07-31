@@ -94,7 +94,25 @@ jobs:
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
-            
+
+      # --- Authentik SSO: protect GrampsWeb behind OIDC ---
+      # Runs before the stack is created/updated because GrampsWeb's generic
+      # OIDC provider is wired up via GRAMPSWEB_OIDC_* environment variables
+      # baked into the stack, not a post-deploy settings API call.
+      - name: Ensure Authentik OIDC provider for GrampsWeb
+        id: authentik_provider
+        uses: ./.github/actions/authentik-oidc-provider
+        with:
+          authentik_api_base: "http://${{ vars.E7270_IP }}:90"
+          authentik_token: ${{ secrets.AUTHENTIK_BOOTSTRAP_TOKEN }}
+          app_name: GrampsWeb
+          app_slug: grampsweb
+          # Must match GRAMPSWEB_BASE_URL in grampsweb-compose.yml. GrampsWeb's
+          # generic (non-Google/Microsoft) OIDC provider always calls back on
+          # this exact "custom" suffix - see gramps-web-docs/oidc.md.
+          redirect_uri: "https://familytree.james-fagg.uk/api/oidc/callback/custom"
+          launch_url: "https://familytree.james-fagg.uk/"
+
       - name: Authenticate to Portainer
         id: auth
         run: |
@@ -181,7 +199,10 @@ jobs:
                         {"name": "gmail_address", "value": "${{ vars.GMAIL_ADDRESS }}"},
                         {"name": "gmail_app_password", "value": "${{ secrets.GRAMPSWEB_GMAIL_APP_PASSWORD }}"},
                         {"name": "gcp_oauth_client_id", "value": "${{ secrets.GCP_OAUTH_CLIENT_ID }}"},
-                        {"name": "gcp_oauth_client_secret", "value": "${{ secrets.GCP_OAUTH_CLIENT_SECRET }}"}
+                        {"name": "gcp_oauth_client_secret", "value": "${{ secrets.GCP_OAUTH_CLIENT_SECRET }}"},
+                        {"name": "authentik_domain", "value": "${{ vars.AUTHENTIK_DOMAIN }}"},
+                        {"name": "authentik_client_id", "value": "${{ steps.authentik_provider.outputs.client_id }}"},
+                        {"name": "authentik_client_secret", "value": "${{ steps.authentik_provider.outputs.client_secret }}"}
                       ]
 
               }')
@@ -211,7 +232,10 @@ jobs:
                         {"name": "gmail_address", "value": "${{ vars.GMAIL_ADDRESS }}"},
                         {"name": "gmail_app_password", "value": "${{ secrets.GRAMPSWEB_GMAIL_APP_PASSWORD }}"},
                         {"name": "gcp_oauth_client_id", "value": "${{ secrets.GCP_OAUTH_CLIENT_ID }}"},
-                        {"name": "gcp_oauth_client_secret", "value": "${{ secrets.GCP_OAUTH_CLIENT_SECRET }}"}
+                        {"name": "gcp_oauth_client_secret", "value": "${{ secrets.GCP_OAUTH_CLIENT_SECRET }}"},
+                        {"name": "authentik_domain", "value": "${{ vars.AUTHENTIK_DOMAIN }}"},
+                        {"name": "authentik_client_id", "value": "${{ steps.authentik_provider.outputs.client_id }}"},
+                        {"name": "authentik_client_secret", "value": "${{ steps.authentik_provider.outputs.client_secret }}"}
                       ]
               }'          
 

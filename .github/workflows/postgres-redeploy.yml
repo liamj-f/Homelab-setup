@@ -73,9 +73,20 @@ jobs:
           
       - name: Bring up VPN on runner
         run: |
-          sudo wg-quick up ./wg0.conf
-          sudo wg show  
-
+          success=false
+          for i in 1 2 3 4 5; do
+            if sudo wg-quick up ./wg0.conf; then
+              success=true
+              break
+            fi
+            echo "wg-quick up failed (attempt $i/5) — likely a DNS blip on the DDNS endpoint. Retrying in 5s..."
+            sleep 5
+          done
+          if [ "$success" != true ]; then
+            echo "::error::wg-quick up failed after 5 attempts"
+            exit 1
+          fi
+          sudo wg show
       - name: Override system DNS resolver on runner
         run: |
           sudo rm /etc/resolv.conf

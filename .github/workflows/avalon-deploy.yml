@@ -107,7 +107,7 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            sudo docker exec postgres pg_isready -U svc_postgres
+            sudo docker exec postgres pg_isready -U svc_gitopsdeploy
 
       - name: Create database and user if not exists
         uses: appleboy/ssh-action@v1.2.5
@@ -123,7 +123,7 @@ jobs:
           key: ${{ steps.node_config.outputs.ssh_key }}
           envs: POSTGRES_USER,POSTGRES_PASSWORD
           script: |
-            docker exec -i postgres psql -U svc_gitopsdeployment -v ON_ERROR_STOP=1 \
+            docker exec -i postgres psql -U svc_gitopsdeploy -v ON_ERROR_STOP=1 \
               -v dbuser="$POSTGRES_APP_USER" \
               -v dbpass="$POSTGRES_APP_PASSWORD" \
               -v dbname="$POSTGRES_APP_DB_NAME" <<'SQL'

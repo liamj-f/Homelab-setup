@@ -140,6 +140,7 @@ jobs:
 
 
   deploy:
+    needs: database_create
     env:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
       domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
@@ -496,10 +497,10 @@ jobs:
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "avalon.james-fagg.uk" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
 
           BODY=$(jq -n \
-              --arg host_ip "${{ steps.node_config.outputs.ssh_host }}"" \
+              --arg host_ip "${{ steps.node_config.outputs.ssh_host }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: avalon.james-fagg.uk,
+                domain_names: "avalon.james-fagg.uk",
                 forward_host: $host_ip,
                 forward_port: 92,
                 forward_scheme: "http",
@@ -553,6 +554,10 @@ jobs:
             echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           fi
+
+      - name: Install WireGuard
+        run: |
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)            
 
       - name: Write SSH key to file
         run: |
@@ -674,7 +679,7 @@ jobs:
           BODY=$(jq -n \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: avalon.james-fagg.uk,
+                domain_names: ["avalon.james-fagg.uk"],
                 forward_host: "rathole-server",
                 forward_port: 3000,
                 forward_scheme: "http",

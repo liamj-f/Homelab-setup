@@ -108,7 +108,7 @@ jobs:
           export SVC_GITOPSDEPLOY_PASSWORD="${{ secrets.SVC_GITOPSDEPLOY_PASSWORD }}"
           export SVC_GRAMPSWEB_PASSWORD="${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"
           export SVC_NEXTCLOUD_PASSWORD="${{ secrets.SVC_NEXTCLOUD_PASSWORD }}"
-          envsubst < postgres/database_create.sql > postgres/database_create.sql
+          envsubst < postgres/database_create.sql.template > postgres/database_create.sql
 
       - name: Copy SQL files to host
         uses: appleboy/scp-action@v0.1.7
@@ -340,8 +340,9 @@ jobs:
           capture_stdout: true
           script: |
             docker cp /tmp/postgres/database_create.sql postgres:/tmp/database_create.sql
-            docker exec postgres psql -U svc_postgres -d postgres_db -e -f /tmp/database_create.sql            
+            docker exec postgres psql -U svc_postgres -d postgres_db -e s-f /tmp/database_create.sql -v ON_ERROR_STOP=1            
             rm -rf /tmp/postgres/
+            docker exec postgres rm -f /tmp/database_create.sql
 
 
       - name: Bring down VPN

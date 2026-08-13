@@ -1,9 +1,9 @@
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles where rolname = ${APP_USER} ) THEN
+  IF NOT EXISTS (SELECT FROM pg_roles where rolname = '${APP_USER}' ) THEN
     CREATE USER ${APP_USER} WITH PASSWORD '${APP_PASSWORD}' SUPERUSER CREATEDB CREATEROLE;
   END IF;
-  IF NOT EXISTS (SELECT FROM pg_roles where rolname = svc_gitopsdeploy ) THEN
+  IF NOT EXISTS (SELECT FROM pg_roles where rolname = 'svc_gitopsdeploy' ) THEN
     CREATE USER svc_gitopsdeploy WITH PASSWORD '${SVC_GITOPSDEPLOY_PASSWORD}' CREATEDB CREATEROLE;
   END IF;
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'svc_grampsweb') THEN

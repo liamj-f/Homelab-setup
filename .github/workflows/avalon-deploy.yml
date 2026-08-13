@@ -129,7 +129,7 @@ jobs:
           key: ${{ steps.node_config.outputs.ssh_key }}
           envs: POSTGRES_USER,POSTGRES_PASSWORD
           script: |
-            docker exec -i postgres psql -U svc_gitopsdpeloyment -v ON_ERROR_STOP=1 \
+            docker exec -i postgres psql -U svc_gitopsdeployment -v ON_ERROR_STOP=1 \
               -v dbuser="$POSTGRES_APP_USER" \
               -v dbpass="$POSTGRES_APP_PASSWORD" \
               -v dbname="$POSTGRES_APP_DB_NAME" <<'SQL'

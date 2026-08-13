@@ -130,7 +130,8 @@ jobs:
             SELECT 'CREATE ROLE ' || quote_ident(:'dbuser') || ' WITH LOGIN PASSWORD ' || quote_literal(:'dbpass')
             WHERE NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = :'dbuser')
             \gexec
- 
+            GRANT :"dbuser" TO CURRENT_USER WITH SET TRUE;
+            
             SELECT 'CREATE DATABASE ' || quote_ident(:'dbname') || ' OWNER ' || quote_ident(:'dbuser')
             WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'dbname')
             \gexec

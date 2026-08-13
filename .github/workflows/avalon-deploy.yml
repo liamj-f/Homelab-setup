@@ -66,7 +66,7 @@ jobs:
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
           Address = 10.5.5.5/32
-          DNS = 1.1.1.1
+          DNS = 10.5.5.1
           MTU = 1250
 
           [Peer]
@@ -94,6 +94,17 @@ jobs:
             sleep 10
           done
           sudo wg show
+
+      - name: Override system DNS resolver on runner
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+          
+      - name: Add host key to known_hosts of runner
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ steps.node_config.outputs.ssh_host }} >> ~/.ssh/known_hosts
+
 
       - name: Check postgres is up
         uses: appleboy/ssh-action@v1.2.5

@@ -77,21 +77,28 @@ jobs:
           PersistentKeepalive = 25
           EOF
 
-      - name: Bring up VPN
+      - name: Bring up VPN on runner
         run: |
-          for i in $(seq 1 5); do
-            echo "Attempt $i/5: bringing up WireGuard..."
+          success=false
+          for i in 1 2 3 4 5; do
             if sudo wg-quick up ./wg0.conf; then
-              echo "WireGuard up successfully"
+              success=true
               break
             fi
-            if [ $i -eq 5 ]; then
-              echo "WireGuard failed after 5 attempts"
-              exit 1
+            echo "wg-quick up failed (attempt $i/5). Retrying in 5s..."
+            sleep 5
+          done
+          if [ "$success" != true ]; then
+            echo "::error::wg-quick up failed after 5 attempts"
+            exit 1
+          fi
+
+          for i in 1 2 3 4 5; do
+            if sudo wg show wg0 latest-handshakes | grep -qv '^\s*[a-zA-Z0-9+/=]*\s*0$'; then
+              break
             fi
-            echo "Failed, waiting 10s before retry..."
-            sudo ip link delete dev wg0 2>/dev/null || true
-            sleep 10
+            echo "No WireGuard handshake yet (attempt $i/5). Waiting 2s..."
+            sleep 2
           done
           sudo wg show
 
@@ -291,7 +298,7 @@ jobs:
                "Name": "avalon",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "avalon-compose.yml",
+               "ComposeFile": "avalon/avalon-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,

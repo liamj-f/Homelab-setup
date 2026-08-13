@@ -105,6 +105,7 @@ jobs:
         run: |
           export APP_USER="${{ vars.APP_USER }}"
           export APP_PASSWORD="${{ secrets.APP_PASSWORD }}"
+          export SVC_GITOPSDEPLOY_PASSWORD="${{ secrets.SVC_GITOPSDEPLOY_PASSWORD }}"
           export SVC_GRAMPSWEB_PASSWORD="${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"
           export SVC_NEXTCLOUD_PASSWORD="${{ secrets.SVC_NEXTCLOUD_PASSWORD }}"
           envsubst < postgres/database_create.sql.template > postgres/database_create.sql

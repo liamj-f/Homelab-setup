@@ -13,7 +13,7 @@ services:
       CORS_ORIGIN: "*"
 
     
-avalon-ui:
+  avalon-ui:
     container_name: avalon-ui
     image: ghcr.io/liamj-f/avalon-docker/frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped

@@ -13,6 +13,7 @@ services:
       CORS_ORIGIN: "*"
     networks:
       - db_network
+      - avalon_network
 
     
   avalon-ui:
@@ -26,3 +27,12 @@ services:
       - "92:80"
     depends_on:
       - avalon-backend
+    networks:
+      - avalon_network
+      
+networks:
+  db_network: 
+    external: true
+    name: db_network
+  avalon_network:
+    name: avalon_network

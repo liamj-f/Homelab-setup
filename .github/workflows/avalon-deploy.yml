@@ -308,7 +308,7 @@ jobs:
                               "Env": [
                                     {"name":"POSTGRES_DB",         "value":"avalon"},
                                     {"name":"POSTGRES_USER",       "value":"svc_avalon"},
-                                    {"name":"POSTGRES_PASSWORD",   "value":"${{ secrets.svc_postgres_password }}"}
+                                    {"name":"POSTGRES_PASSWORD",   "value":"${{ secrets.svc_avalon_password }}"}
                                     ],
                "Prune": true,
                "StackFileVersion": "3"
@@ -338,7 +338,7 @@ jobs:
                               "Env": [
                                     {"name":"POSTGRES_DB",         "value":"avalon"},
                                     {"name":"POSTGRES_USER",       "value":"svc_avalon"},
-                                    {"name":"POSTGRES_PASSWORD",   "value":"${{ secrets.svc_postgres_password }}"}
+                                    {"name":"POSTGRES_PASSWORD",   "value":"${{ secrets.svc_avalon_password }}"}
                                     ],
                   "Prune": false
                 }'  )

@@ -5,10 +5,15 @@ services:
     restart: unless-stopped
     environment:
       PORT: 4000
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      DB_HOST: postgres
+      DB_PORT: 5432
       CORS_ORIGIN: "*"
 
-  avalon-ui:
+    
+avalon-ui:
     container_name: avalon-ui
     image: ghcr.io/liamj-f/avalon-docker/frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped

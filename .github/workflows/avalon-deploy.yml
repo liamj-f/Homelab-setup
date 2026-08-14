@@ -23,7 +23,7 @@ on:
       - '**'
     paths:
       - '.github/workflows/avalon-deploy.yml'    
-      - '/avalon/*'
+      - 'avalon/**'
 jobs:
   database_create:
     env:

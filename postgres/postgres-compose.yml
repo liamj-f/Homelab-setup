@@ -20,7 +20,7 @@ services:
       - db_network
 
   pgadmin:
-    image: dpage/pgadmin4:9.14.0
+    image: dpage/pgadmin4:9.17
     container_name: pgadmin
     restart: unless-stopped
     ports:

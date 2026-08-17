@@ -28,7 +28,7 @@ jobs:
   database_create:
     env:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
-      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
+      domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -156,7 +156,7 @@ jobs:
     needs: database_create
     env:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
-      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
+      domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -363,7 +363,7 @@ jobs:
 
   proxy_setup_onprem:
     env:
-      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
+      domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -549,7 +549,7 @@ jobs:
           sudo wg show
   proxy_setup_oci:
     env:
-      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
+      domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
       host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
     runs-on: ubuntu-latest
     steps:
@@ -646,7 +646,7 @@ jobs:
         continue-on-error: true
         run: |
           PAYLOAD=$(jq -n \
-            --arg domain "$domain" \
+            --arg domain "${{ env.domain }}" \
             --arg key "${{ secrets.PORKBUN_API_KEY }}" \
             --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
             '{
@@ -690,6 +690,7 @@ jobs:
 
           BODY=$(jq -n \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
+              --arg domain "${{ env.domain }}" \
               '{
                 domain_names: ["avalon.james-fagg.uk"],
                 forward_host: "rathole-server",
@@ -726,7 +727,7 @@ jobs:
           sudo wg show
   f2b:
     env:
-      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
+      domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
       host_machine: ${{inputs. host_machine || 'e7270-server' }}
     runs-on: ubuntu-latest
     steps:

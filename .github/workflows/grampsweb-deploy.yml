@@ -267,4 +267,98 @@ jobs:
         if: always()
         run: |
           sudo wg-quick down ./wg0.conf
-          sudo wg show   
+          sudo wg show
+
+  f2b:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install WireGuard
+        run: |
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)
+
+      - name: Write SSH key to file
+        run: |
+          echo "${{ secrets.SSH_KEY_E7270 }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+      - name: Write WireGuard config
+        run: |
+          cat > wg0.conf << EOF
+          [Interface]
+          PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
+          Address = 10.5.5.5/32
+          DNS = 10.5.5.1
+          MTU = 1250
+
+          [Peer]
+          PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
+          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
+          AllowedIPs = 192.168.0.0/24, ${{ vars.E7270_IP }}/32
+          Endpoint = ${{ vars.WG_ENDPOINT }}:51820
+          PersistentKeepalive = 25
+          EOF
+
+      - name: Bring up VPN
+        run: |
+          for i in $(seq 1 5); do
+            echo "Attempt $i/5: bringing up WireGuard..."
+            if sudo wg-quick up ./wg0.conf; then
+              echo "WireGuard up successfully"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "WireGuard failed after 5 attempts"
+              exit 1
+            fi
+            echo "Failed, waiting 10s before retry..."
+            sudo ip link delete dev wg0 2>/dev/null || true
+            sleep 10
+          done
+          sudo wg show
+
+      - name: make log directory
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+            host: ${{ vars.E7270_IP }}
+            username: ${{ vars.E7270_USER }}
+            key: ${{ secrets.SSH_KEY_E7270 }}
+            script:
+              sudo mkdir -p /opt/f2b-logs/grampsweb
+
+      - name: Copy f2b filter to host
+        uses: appleboy/scp-action@v1.0.0
+        with:
+            host: ${{ vars.E7270_IP }}
+            username: ${{ vars.E7270_USER }}
+            key: ${{ secrets.SSH_KEY_E7270 }}
+            source: "grampsweb/filter.d/grampsweb.local"
+            target: "/opt/stacks/fail2ban/data/filter.d/"
+            strip_components: 2
+
+      - name: Copy f2b jail to host
+        uses: appleboy/scp-action@v1.0.0
+        with:
+            host: ${{ vars.E7270_IP }}
+            username: ${{ vars.E7270_USER }}
+            key: ${{ secrets.SSH_KEY_E7270 }}
+            source: "grampsweb/jail.d/grampsweb.local"
+            target: "/opt/stacks/fail2ban/data/jail.d/"
+            strip_components: 2
+
+      - name: Reload f2b
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+            host: ${{ vars.E7270_IP }}
+            username: ${{ vars.E7270_USER }}
+            key: ${{ secrets.SSH_KEY_E7270 }}
+            script:
+              docker exec fail2ban fail2ban-client reload
+
+      - name: Bring down VPN
+        if: always()
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show

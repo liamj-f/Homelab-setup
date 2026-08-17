@@ -799,17 +799,28 @@ jobs:
             host: ${{ steps.node_config.outputs.ssh_host }}
             username: ${{ steps.node_config.outputs.ssh_user }}
             key: ${{ steps.node_config.outputs.ssh_key }}
-            script: 
-              sudo mkdir /opt/f2b-logs/avalon
+            script:
+              sudo mkdir -p /opt/f2b-logs/avalon
 
-      - name: Copy f2b files to host
+      - name: Copy f2b filter to host
         uses: appleboy/scp-action@v1.0.0
         with:
             host: ${{ steps.node_config.outputs.ssh_host }}
             username: ${{ steps.node_config.outputs.ssh_user }}
             key: ${{ steps.node_config.outputs.ssh_key }}
-            source: "avalon/filter.d/avalon.local, avalon/jail.d/avalon.local"
-            target: "/opt/stacks/fail2ban/data/"
+            source: "avalon/filter.d/avalon.local"
+            target: "/opt/stacks/fail2ban/data/filter.d/"
+            strip_components: 2
+
+      - name: Copy f2b jail to host
+        uses: appleboy/scp-action@v1.0.0
+        with:
+            host: ${{ steps.node_config.outputs.ssh_host }}
+            username: ${{ steps.node_config.outputs.ssh_user }}
+            key: ${{ steps.node_config.outputs.ssh_key }}
+            source: "avalon/jail.d/avalon.local"
+            target: "/opt/stacks/fail2ban/data/jail.d/"
+            strip_components: 2
 
       - name: Reload f2b
         uses: appleboy/ssh-action@v1.2.5
@@ -817,8 +828,8 @@ jobs:
             host: ${{ steps.node_config.outputs.ssh_host }}
             username: ${{ steps.node_config.outputs.ssh_user }}
             key: ${{ steps.node_config.outputs.ssh_key }}
-            script:  
-              docker exec fail2ban fail2ban reload 
+            script:
+              docker exec fail2ban fail2ban-client reload
 
       - name: Bring down VPN
         if: always()

@@ -1,0 +1,8 @@
+[avalon]
+enabled   = true
+filter    = avalon
+action    = oci-waf
+logpath   = /remotelogs/avalon/access.log
+maxretry  = 5
+findtime  = 600
+bantime   = 86400

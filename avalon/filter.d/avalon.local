@@ -1,0 +1,5 @@
+[Definition]
+failregex = 
+    room:create ip=<HOST>\b
+    failed room:join ip=<HOST>\b
+ignoreregex =

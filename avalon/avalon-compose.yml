@@ -11,6 +11,14 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       CORS_ORIGIN: "*"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    volumes:
+      - /opt/f2b-logs/avalon:/app/logs
     networks:
       - db_network
       - avalon_network
@@ -23,10 +31,17 @@ services:
     environment:
       BACKEND_HOST: avalon-backend
       BACKEND_PORT: 4000
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     ports:
       - "92:80"
     depends_on:
-      - avalon-backend
+      avalon-backend:
+        condition: service_healthy
     networks:
       - avalon_network
       

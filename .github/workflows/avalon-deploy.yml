@@ -724,3 +724,104 @@ jobs:
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show
+  f2b:
+    env:
+      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
+      host_machine: ${{inputs. host_machine || 'e7270-server' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6.0.2
+
+      - name: Set node config
+        id: node_config
+        run: |
+          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
+            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
+            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          fi
+      - name: Install WireGuard
+        run: |
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
+
+      - name: Write SSH key to file
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+      - name: Write WireGuard config
+        run: |
+          cat > wg0.conf << EOF
+          [Interface]
+          PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
+          Address = 10.5.5.5/32
+          DNS = 10.5.5.1
+          MTU = 1250
+
+          [Peer]
+          PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
+          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
+          AllowedIPs = 192.168.0.0/24, ${{ steps.node_config.outputs.ssh_host }}/32
+          Endpoint = ${{ vars.WG_ENDPOINT }}:51820
+          PersistentKeepalive = 25
+          EOF
+
+      - name: Bring up VPN
+        run: |
+          for i in $(seq 1 5); do
+            echo "Attempt $i/5: bringing up WireGuard..."
+            if sudo wg-quick up ./wg0.conf; then
+              echo "WireGuard up successfully"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "WireGuard failed after 5 attempts"
+              exit 1
+            fi
+            echo "Failed, waiting 10s before retry..."
+            sudo ip link delete dev wg0 2>/dev/null || true
+            sleep 10
+          done
+          sudo wg show
+      
+      - name: make log directory
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+            host: ${{ steps.node_config.outputs.ssh_host }}
+            username: ${{ steps.node_config.outputs.ssh_user }}
+            key: ${{ steps.node_config.outputs.ssh_key }}
+            script: 
+              sudo mkdir /opt/f2b-logs/avalon
+
+      - name: Copy f2b files to host
+        uses: appleboy/scp-action@v1.0.0
+        with:
+            host: ${{ steps.node_config.outputs.ssh_host }}
+            username: ${{ steps.node_config.outputs.ssh_user }}
+            key: ${{ steps.node_config.outputs.ssh_key }}
+            source: "avalon/filter.d/avalon.local, avalon/jail.d/avalon.local"
+            target: "/opt/stacks/fail2ban/data/"
+
+      - name: Reload f2b
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+            host: ${{ steps.node_config.outputs.ssh_host }}
+            username: ${{ steps.node_config.outputs.ssh_user }}
+            key: ${{ steps.node_config.outputs.ssh_key }}
+            script:  
+              docker exec fail2ban fail2ban reload 
+
+      - name: Bring down VPN
+        if: always()
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show

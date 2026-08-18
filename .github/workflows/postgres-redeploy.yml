@@ -126,24 +126,6 @@ jobs:
           target: /opt/stacks/pgadmin/
           strip_components: 1
 
-      - name: Render SQL files
-        run: |
-          export APP_USER="${{ vars.APP_USER }}"
-          export APP_PASSWORD="${{ secrets.APP_PASSWORD }}"
-          export SVC_GITOPSDEPLOY_PASSWORD="${{ secrets.SVC_GITOPSDEPLOY_PASSWORD }}"
-          export SVC_GRAMPSWEB_PASSWORD="${{ secrets.SVC_GRAMPSWEB_PASSWORD }}"
-          export SVC_NEXTCLOUD_PASSWORD="${{ secrets.SVC_NEXTCLOUD_PASSWORD }}"
-          envsubst < postgres/database_create.sql.template > postgres/database_create.sql
-
-      - name: Copy SQL files to host
-        uses: appleboy/scp-action@v0.1.7
-        with:   
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}    
-          source: postgres/database_create.sql
-          target: /tmp/
-
       - name: Authenticate to Portainer
         id: auth
         run: |
@@ -358,8 +340,6 @@ jobs:
       - name: Create gitops user if not exists
         uses: appleboy/ssh-action@v1.2.5
         env:
-          POSTGRES_DEPLOYMENT_USER: svc_postgres
-          POSTGRES_DEPLOYMENT_USER_PASSWORD: ${{ secrets.svc_postgres_password }}
           POSTGRES_APP_USER: svc_gitopsdeploy
           POSTGRES_APP_PASSWORD: ${{ secrets.svc_gitopsdeploy_password }}
         with:
@@ -370,23 +350,19 @@ jobs:
           script: |
             docker exec -i postgres psql -U svc_postgres -d postgres_db -v ON_ERROR_STOP=1 \
               -v dbuser="$POSTGRES_APP_USER" \
-              -v dbpass="$POSTGRES_APP_PASSWORD" \
-              -v dbname="$POSTGRES_APP_DB_NAME" <<'SQL'
+              -v dbpass="$POSTGRES_APP_PASSWORD" <<'SQL'
+            SELECT 'CREATE USER ' || quote_ident(:'dbuser') || ' WITH PASSWORD ' || quote_literal(:'dbpass') || ' CREATEDB CREATEROLE'
+            WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'dbuser')
+            \gexec
 
-              -- svc_gitopsdeploy
-              SELECT 'CREATE USER svc_gitopsdeploy WITH PASSWORD ' || quote_literal('${SVC_GITOPSDEPLOY_PASSWORD}') || ' CREATEDB CREATEROLE'
-              WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'svc_gitopsdeploy')
-              \gexec
-
-              SELECT 'ALTER USER svc_gitopsdeploy WITH PASSWORD ' || quote_literal('${SVC_GITOPSDEPLOY_PASSWORD}')
-              WHERE EXISTS (SELECT FROM pg_roles WHERE rolname = 'svc_gitopsdeploy')
-              \gexec
+            SELECT 'ALTER USER ' || quote_ident(:'dbuser') || ' WITH PASSWORD ' || quote_literal(:'dbpass')
+            WHERE EXISTS (SELECT FROM pg_roles WHERE rolname = :'dbuser')
+            \gexec
+            SQL
 
       - name: Create my user if not exists
         uses: appleboy/ssh-action@v1.2.5
         env:
-          POSTGRES_DEPLOYMENT_USER: svc_postgres
-          POSTGRES_DEPLOYMENT_USER_PASSWORD: ${{ secrets.svc_postgres_password }}
           POSTGRES_APP_USER: ${{ vars.APP_USER }}
           POSTGRES_APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
         with:
@@ -396,14 +372,16 @@ jobs:
           envs: POSTGRES_APP_USER,POSTGRES_APP_PASSWORD
           script: |
             docker exec -i postgres psql -U svc_postgres -d postgres_db -v ON_ERROR_STOP=1 \
-              -- ${APP_USER} (personal superuser)
-              SELECT 'CREATE USER ' || quote_ident('${APP_USER}') || ' WITH PASSWORD ' || quote_literal('${APP_PASSWORD}') || ' SUPERUSER CREATEDB CREATEROLE'
-              WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = || quote_ident('${APP_USER}'))
-              \gexec
+              -v dbuser="$POSTGRES_APP_USER" \
+              -v dbpass="$POSTGRES_APP_PASSWORD" <<'SQL'
+            SELECT 'CREATE USER ' || quote_ident(:'dbuser') || ' WITH PASSWORD ' || quote_literal(:'dbpass') || ' SUPERUSER CREATEDB CREATEROLE'
+            WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'dbuser')
+            \gexec
 
-              SELECT 'ALTER USER ' || quote_ident('${APP_USER}') || ' WITH PASSWORD ' || quote_literal('${APP_PASSWORD}')
-              WHERE EXISTS (SELECT FROM pg_roles WHERE rolname = || quote_ident('${APP_USER}'))
-              \gexec
+            SELECT 'ALTER USER ' || quote_ident(:'dbuser') || ' WITH PASSWORD ' || quote_literal(:'dbpass')
+            WHERE EXISTS (SELECT FROM pg_roles WHERE rolname = :'dbuser')
+            \gexec
+            SQL
 
 
       - name: Bring down VPN

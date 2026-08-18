@@ -928,6 +928,16 @@ jobs:
             script:
               sudo mkdir -p /opt/f2b-logs/grampsweb
 
+      - name: Ensure fail2ban config dirs are writable
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+            host: ${{ vars.E7270_IP }}
+            username: ${{ vars.E7270_USER }}
+            key: ${{ secrets.SSH_KEY_E7270 }}
+            script: |
+              sudo mkdir -p /opt/stacks/fail2ban/data/filter.d /opt/stacks/fail2ban/data/jail.d
+              sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/filter.d /opt/stacks/fail2ban/data/jail.d
+
       - name: Copy f2b filter to host
         uses: appleboy/scp-action@v1.0.0
         with:

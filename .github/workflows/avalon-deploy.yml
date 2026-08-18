@@ -854,6 +854,16 @@ jobs:
             script:
               sudo mkdir -p /opt/f2b-logs/avalon
 
+      - name: Ensure fail2ban config dirs are writable
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+            host: ${{ steps.node_config.outputs.ssh_host }}
+            username: ${{ steps.node_config.outputs.ssh_user }}
+            key: ${{ steps.node_config.outputs.ssh_key }}
+            script: |
+              sudo mkdir -p /opt/stacks/fail2ban/data/filter.d /opt/stacks/fail2ban/data/jail.d
+              sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/fail2ban/data/filter.d /opt/stacks/fail2ban/data/jail.d
+
       - name: Copy f2b filter to host
         uses: appleboy/scp-action@v1.0.0
         with:

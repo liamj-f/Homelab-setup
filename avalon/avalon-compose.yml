@@ -32,7 +32,7 @@ services:
       BACKEND_HOST: avalon-backend
       BACKEND_PORT: 4000
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1/"]
       interval: 10s
       timeout: 5s
       retries: 5

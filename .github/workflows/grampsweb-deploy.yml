@@ -145,6 +145,8 @@ jobs:
               -v dbuser="$POSTGRES_APP_USER" \
               -v dbpass="$POSTGRES_APP_PASSWORD" \
               -v dbname="$POSTGRES_APP_DB_NAME" <<'SQL'
+            SET createrole_self_grant = 'set,inherit';
+
             SELECT 'CREATE ROLE ' || quote_ident(:'dbuser') || ' WITH LOGIN PASSWORD ' || quote_literal(:'dbpass')
             WHERE NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = :'dbuser')
             \gexec
@@ -174,6 +176,8 @@ jobs:
               -v dbuser="$POSTGRES_APP_USER" \
               -v dbpass="$POSTGRES_APP_PASSWORD" \
               -v dbname="$POSTGRES_APP_DB_NAME" <<'SQL'
+            SET createrole_self_grant = 'set,inherit';
+
             SELECT 'CREATE ROLE ' || quote_ident(:'dbuser') || ' WITH LOGIN PASSWORD ' || quote_literal(:'dbpass')
             WHERE NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = :'dbuser')
             \gexec
@@ -202,6 +206,8 @@ jobs:
               -v dbuser="$POSTGRES_APP_USER" \
               -v dbpass="$POSTGRES_APP_PASSWORD" \
               -v dbname="$POSTGRES_APP_DB_NAME" <<'SQL'
+            SET createrole_self_grant = 'set,inherit';
+
             SELECT 'CREATE ROLE ' || quote_ident(:'dbuser') || ' WITH LOGIN PASSWORD ' || quote_literal(:'dbpass')
             WHERE NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = :'dbuser')
             \gexec

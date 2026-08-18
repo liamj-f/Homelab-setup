@@ -72,7 +72,7 @@ jobs:
           cat > wg0.conf << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 192.168.2.1/30
+          Address = 192.168.2.2/30
           DNS = ${{ vars.Keepalived_IP }}
           MTU = 1250
 
@@ -444,7 +444,7 @@ jobs:
           cat > wg0.conf << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 192.168.2.1/30
+          Address = 192.168.2.2/30
           DNS = ${{ vars.Keepalived_IP }}
           MTU = 1250
 
@@ -509,7 +509,7 @@ jobs:
         continue-on-error: true
         run: |
           PAYLOAD=$(jq -n \
-            --arg rootdomain "$" \
+            --arg rootdomain "$rootdomain" \
             --arg key "${{ secrets.PORKBUN_API_KEY }}" \
             --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
             '{
@@ -632,7 +632,7 @@ jobs:
           cat > wg0.conf << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 192.168.2.1/30
+          Address = 192.168.2.2/30
           DNS = ${{ vars.Keepalived_IP }}
           MTU = 1250
 
@@ -697,7 +697,7 @@ jobs:
         continue-on-error: true
         run: |
           PAYLOAD=$(jq -n \
-            --arg domain "${{ env.domain }}" \
+            --arg rootdomain "$rootdomain" \
             --arg key "${{ secrets.PORKBUN_API_KEY }}" \
             --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
             '{
@@ -740,10 +740,10 @@ jobs:
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
 
           BODY=$(jq -n \
-              --arg $domain "${{ env.domain }}" \
+              --arg domain "${{ env.domain }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: $domain
+                domain_names: $domain,
                 forward_host: "rathole-server",
                 forward_port: 3000,
                 forward_scheme: "http",

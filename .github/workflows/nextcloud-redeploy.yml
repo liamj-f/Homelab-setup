@@ -2,10 +2,6 @@ name: Redeploy Nextloud via Portainer GitOps
 #ToDo:
 # create the mount points and automount
 # then rescan files if the database isn't intact.
-concurrency:
-  group: homelab-deployments
-  cancel-in-progress: false
-  queue: max
 on:
   push:
     branches:
@@ -40,6 +36,10 @@ env:
 jobs:
   database_create:
     runs-on: ubuntu-latest
+    concurrency:
+      group: homelab-deployments
+      cancel-in-progress: false
+      queue: max
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
@@ -161,6 +161,10 @@ jobs:
           sudo wg show
   deploy:
     runs-on: ubuntu-latest
+    concurrency:
+      group: homelab-deployments
+      cancel-in-progress: false
+      queue: max   
     needs: database_create
     steps:
       - name: Checkout repo
@@ -384,7 +388,12 @@ jobs:
           sudo wg show   
   proxy_setup_onprem:
     runs-on: ubuntu-latest
+    concurrency:
+      group: homelab-deployments
+      cancel-in-progress: false
+      queue: max
     strategy:
+      max-parallel: 1
       matrix:
         host_machine: [rpi4-server, e7270-server]
     steps:
@@ -594,6 +603,10 @@ jobs:
     env:
       host_machine: 'ljfcloud-arm'
     runs-on: ubuntu-latest
+    concurrency:
+      group: homelab-deployments
+      cancel-in-progress: false
+      queue: max
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2

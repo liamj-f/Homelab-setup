@@ -65,14 +65,14 @@ jobs:
           cat > wg0.conf << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 10.5.5.5/32
-          DNS = 10.5.5.1
+          Address = 192.168.2.1/30
+          DNS = ${{ vars.Keepalived_IP }}
           MTU = 1250
 
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
           PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, ${{ steps.node_config.outputs.ssh_host }}/32
+          AllowedIPs = 192.168.0.0/24, ${{ secrets.IP_LJFCLOUD_ARM }}/32
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF
@@ -193,14 +193,14 @@ jobs:
           cat > wg0.conf << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 10.5.5.5/32
-          DNS = 10.5.5.1
+          Address = 192.168.2.1/30
+          DNS = ${{ vars.Keepalived_IP }}
           MTU = 1250
 
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
           PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, ${{ steps.node_config.outputs.ssh_host }}/32
+          AllowedIPs = 192.168.0.0/24, ${{ secrets.IP_LJFCLOUD_ARM }}/32
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF
@@ -403,14 +403,14 @@ jobs:
           cat > wg0.conf << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 10.5.5.5/32
-          DNS = 10.5.5.1
+          Address = 192.168.2.1/30
+          DNS = ${{ vars.Keepalived_IP }}
           MTU = 1250
 
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
           PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, ${{ steps.node_config.outputs.ssh_host }}/32
+          AllowedIPs = 192.168.0.0/24, ${{ secrets.IP_LJFCLOUD_ARM }}/32
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF
@@ -581,14 +581,14 @@ jobs:
           cat > wg0.conf << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 10.5.5.5/32
-          DNS = 10.5.5.1
+          Address = 192.168.2.1/30
+          DNS = ${{ vars.Keepalived_IP }}
           MTU = 1250
 
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
           PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, ${{ steps.node_config.outputs.ssh_host }}/32
+          AllowedIPs = 192.168.0.0/24, ${{ secrets.IP_LJFCLOUD_ARM }}/32
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF
@@ -764,14 +764,14 @@ jobs:
           cat > wg0.conf << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 10.5.5.5/32
-          DNS = 10.5.5.1
+          Address = 192.168.2.1/30
+          DNS = ${{ vars.Keepalived_IP }}
           MTU = 1250
 
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
           PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, ${{ steps.node_config.outputs.ssh_host }}/32
+          AllowedIPs = 192.168.0.0/24, ${{ secrets.IP_LJFCLOUD_ARM }}/32
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF

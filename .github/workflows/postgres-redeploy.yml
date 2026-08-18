@@ -4,19 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       host_machine:
-        required: true
+        required: false
         type: string 
+        default: 'e7270-server'
       domain:
-        required: true
+        required: false
         type: string
+        default: 'pgadmin.14monarch.james-fagg.uk'
   workflow_call:
     inputs:
       host_machine:
-        required: true
+        required: false
         type: string 
+        default: 'e7270-server'
       domain:
-        required: true
-        type: string       
+        required: false
+        type: string  
+        default: 'pgadmin.14monarch.james-fagg.uk'
+     
   push:
     branches:
       - main
@@ -36,8 +41,8 @@ jobs:
       group: homelab-deployments
       cancel-in-progress: false
     env:
-      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
-      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
+      host_machine: ${{ inputs.host_machine }}
+      domain: ${{ inputs.domain }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
@@ -373,7 +378,8 @@ jobs:
           sudo wg show   
   proxy_setup_onprem:
     env:
-      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
+      domain: ${{ inputs.domain }}
+      host_machine: ${{ inputs.host_machine }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -384,6 +390,12 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
+
+      - name: Calculate base domain
+        shell: bash
+        run: |
+          rootdomain=$(echo "$DOMAIN" | awk -F. '{print $(NF-2)"."$(NF-1)"."$NF}')
+          echo "rootdomain=$rootdomain" >> "$GITHUB_ENV"
 
       - name: Set node config
         id: node_config
@@ -398,6 +410,23 @@ jobs:
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set node config
+        id: env_host_config
+        run: |
+          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
+            echo "env_ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "env_ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
+            echo "env_ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
+            echo "env_ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "env_ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "env_ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           fi
@@ -465,7 +494,7 @@ jobs:
           cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s \
             -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
-            jq -r --arg d "*.$domain" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
+            jq -r --arg d "*.$rootdomain" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
 
           if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
             echo "Found existing cert: $cert_id"
@@ -481,12 +510,12 @@ jobs:
         continue-on-error: true
         run: |
           PAYLOAD=$(jq -n \
-            --arg domain "$domain" \
+            --arg rootdomain "$" \
             --arg key "${{ secrets.PORKBUN_API_KEY }}" \
             --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
             '{
               provider: "letsencrypt",
-              domain_names: ["*." + $domain, $domain],
+              domain_names: ["*." + $rootdomain, $rootdomain],
               meta: {
                 dns_challenge: true,
                 dns_provider: "porkbun",
@@ -495,7 +524,7 @@ jobs:
               }
             }')
 
-          echo "Creating certificate for domains: *.${domain}, ${domain}"
+          echo "Creating certificate for domains: *.${rootdomain}, ${rootdomain}"
 
           RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -sS \
             -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
@@ -521,15 +550,16 @@ jobs:
           echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
           
           Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "pgadmin.14monarch.james-fagg.uk" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
 
           BODY=$(jq -n \
-              --arg host_ip "${{ steps.node_config.outputs.ssh_host }}" \
+              --arg domain "${{ env.domain }}" \
+              --arg host_ip "${{ steps.env_host_config.outputs.env_ssh_host }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: "pgadmin.14monarch.james-fagg.uk",
+                domain_names: $domain,
                 forward_host: $host_ip,
-                forward_port: 92,
+                forward_port: 89,
                 forward_scheme: "http",
                 certificate_id: $cert_id,
                 allow_websocket_upgrade: 1,
@@ -547,7 +577,7 @@ jobs:
                 -H "Content-Type: application/json" \
                 -d "$BODY" | jq -r '.id // "error"'
             else
-              echo "Creating new proxy host for domain: avalon.james-fagg.uk"
+              echo "Creating new proxy host for domain: ${{ env.domain }}"
               curl --retry 3 --retry-delay 5 --retry-all-errors -s \
                 -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
                 -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
@@ -562,8 +592,8 @@ jobs:
           sudo wg show
   proxy_setup_oci:
     env:
-      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
-      host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
+      domain: ${{ inputs.domain  }}
+      host_machine: 'ljfcloud-arm'
     runs-on: ubuntu-latest
     concurrency:
       group: homelab-deployments
@@ -571,6 +601,12 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
+
+      - name: Calculate base domain
+        shell: bash
+        run: |
+          rootdomain=$(echo "$DOMAIN" | awk -F. '{print $(NF-2)"."$(NF-1)"."$NF}')
+          echo "rootdomain=$rootdomain" >> "$GITHUB_ENV"
 
       - name: Set node config
         id: node_config
@@ -646,7 +682,7 @@ jobs:
           cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s \
             -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
-            jq -r --arg d "*.$domain" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
+            jq -r --arg d "*.$rootdomain" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
 
           if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
             echo "Found existing cert: $cert_id"
@@ -667,7 +703,7 @@ jobs:
             --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
             '{
               provider: "letsencrypt",
-              domain_names: ["*." + $domain, $domain],
+              domain_names: ["*." + $rootdomain, $rootdomain],
               meta: {
                 dns_challenge: true,
                 dns_provider: "porkbun",
@@ -702,13 +738,13 @@ jobs:
           echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
           
           Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "avalon.james-fagg.uk" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
 
           BODY=$(jq -n \
+              --arg $domain "${{ env.domain }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              --arg domain "${{ env.domain }}" \
               '{
-                domain_names: ["pgadmin.14monarch.james-fagg.uk"],
+                domain_names: $domain
                 forward_host: "rathole-server",
                 forward_port: 3000,
                 forward_scheme: "http",

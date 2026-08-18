@@ -50,7 +50,7 @@ jobs:
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
           PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, 145.241.244.229/32
+          AllowedIPs = 192.168.0.0/24, ${{ vars.IP_LJFCLOUD_ARM }}/32
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF
@@ -68,7 +68,7 @@ jobs:
       - name: Add host key to known_hosts of runner
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ vars.IP_LJFCLOUD_ARM }} >> ~/.ssh/known_hosts
 
       - name: Extract Subdomain
         id: subdomain

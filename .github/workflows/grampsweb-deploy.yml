@@ -925,8 +925,10 @@ jobs:
             host: ${{ vars.E7270_IP }}
             username: ${{ vars.E7270_USER }}
             key: ${{ secrets.SSH_KEY_E7270 }}
-            script:
+            script: |
               sudo mkdir -p /opt/f2b-logs/grampsweb
+              sudo touch /opt/f2b-logs/grampsweb/access.log
+              sudo chmod 666 /opt/f2b-logs/grampsweb/access.log
 
       - name: Ensure fail2ban config dirs are writable
         uses: appleboy/ssh-action@v1.2.5

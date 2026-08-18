@@ -394,7 +394,7 @@ jobs:
       - name: Calculate base domain
         shell: bash
         run: |
-          rootdomain=$(echo "$DOMAIN" | awk -F. '{print $(NF-2)"."$(NF-1)"."$NF}')
+          rootdomain="${domain#*.}"
           echo "rootdomain=$rootdomain" >> "$GITHUB_ENV"
 
       - name: Set node config
@@ -601,7 +601,7 @@ jobs:
       - name: Calculate base domain
         shell: bash
         run: |
-          rootdomain=$(echo "$DOMAIN" | awk -F. '{print $(NF-2)"."$(NF-1)"."$NF}')
+          rootdomain="${domain#*.}"
           echo "rootdomain=$rootdomain" >> "$GITHUB_ENV"
 
       - name: Set node config

@@ -32,7 +32,7 @@ env:
   host_machine: ${{ inputs.host_machine || 'e7270-server' }}
   domain: ${{ inputs.domain || 'whoami.james-fagg.uk' }}
 jobs:
-  add_Postgres_stack:
+  deploy:
     runs-on: ubuntu-latest
     concurrency:
       group: homelab-deployments
@@ -355,18 +355,55 @@ jobs:
               docker exec postgres locale-gen
               docker exec postgres bash -c 'rm -rf /var/lib/apt/lists/*'
 
-      - name: Create databases and users
+      - name: Create gitops user if not exists
         uses: appleboy/ssh-action@v1.2.5
+        env:
+          POSTGRES_DEPLOYMENT_USER: svc_postgres
+          POSTGRES_DEPLOYMENT_USER_PASSWORD: ${{ secrets.svc_postgres_password }}
+          POSTGRES_APP_USER: svc_gitopsdeploy
+          POSTGRES_APP_PASSWORD: ${{ secrets.svc_gitopsdeploy_password }}
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
-          capture_stdout: true
+          envs: POSTGRES_APP_USER,POSTGRES_APP_PASSWORD
           script: |
-            docker cp /tmp/postgres/database_create.sql postgres:/tmp/database_create.sql
-            docker exec postgres psql -U svc_postgres -d postgres_db -e -f /tmp/database_create.sql -v ON_ERROR_STOP=1            
-            rm -rf /tmp/postgres/
-            docker exec postgres rm -f /tmp/database_create.sql
+            docker exec -i postgres psql -U svc_postgres -d postgres_db -v ON_ERROR_STOP=1 \
+              -v dbuser="$POSTGRES_APP_USER" \
+              -v dbpass="$POSTGRES_APP_PASSWORD" \
+              -v dbname="$POSTGRES_APP_DB_NAME" <<'SQL'
+
+              -- svc_gitopsdeploy
+              SELECT 'CREATE USER svc_gitopsdeploy WITH PASSWORD ' || quote_literal('${SVC_GITOPSDEPLOY_PASSWORD}') || ' CREATEDB CREATEROLE'
+              WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'svc_gitopsdeploy')
+              \gexec
+
+              SELECT 'ALTER USER svc_gitopsdeploy WITH PASSWORD ' || quote_literal('${SVC_GITOPSDEPLOY_PASSWORD}')
+              WHERE EXISTS (SELECT FROM pg_roles WHERE rolname = 'svc_gitopsdeploy')
+              \gexec
+
+      - name: Create my user if not exists
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          POSTGRES_DEPLOYMENT_USER: svc_postgres
+          POSTGRES_DEPLOYMENT_USER_PASSWORD: ${{ secrets.svc_postgres_password }}
+          POSTGRES_APP_USER: svc_gitopsdeploy
+          POSTGRES_APP_PASSWORD: ${{ secrets.svc_gitopsdeploy_password }}
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          envs: POSTGRES_APP_USER,POSTGRES_APP_PASSWORD
+          script: |
+            docker exec -i postgres psql -U svc_postgres -d postgres_db -v ON_ERROR_STOP=1 \
+              -- ${APP_USER} (personal superuser)
+              SELECT 'CREATE USER ' || quote_ident('${APP_USER}') || ' WITH PASSWORD ' || quote_literal('${APP_PASSWORD}') || ' SUPERUSER CREATEDB CREATEROLE'
+              WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${APP_USER}')
+              \gexec
+
+              SELECT 'ALTER USER ' || quote_ident('${APP_USER}') || ' WITH PASSWORD ' || quote_literal('${APP_PASSWORD}')
+              WHERE EXISTS (SELECT FROM pg_roles WHERE rolname = '${APP_USER}')
+              \gexec
 
 
       - name: Bring down VPN

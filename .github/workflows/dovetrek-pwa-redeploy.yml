@@ -33,7 +33,7 @@ env:
   host_machine: ${{ inputs.host_machine || 'e7270-server' }}
   domain: ${{ inputs.domain || 'dovetrek.james-fagg.uk' }}    
 jobs:
-  add_dovetrek-pwa:
+  deploy:
     runs-on: ubuntu-latest
     concurrency:
       group: homelab-deployments

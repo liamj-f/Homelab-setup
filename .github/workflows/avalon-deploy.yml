@@ -774,6 +774,11 @@ jobs:
 
   f2b:
     runs-on: ubuntu-latest
+    needs: deploy
+    concurrency:
+      group: homelab-deployments
+      cancel-in-progress: false
+      queue: max
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2

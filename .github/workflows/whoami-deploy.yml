@@ -34,12 +34,12 @@ on:
         required: false
         type: string  
         default: 'whoami.james-fagg.uk'  
+env:
+  host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+  domain: ${{ inputs.domain || 'whoami.james-fagg.uk' }}
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
-      domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -101,8 +101,6 @@ jobs:
 
       - name: Get Portainer EndpointId
         id: endpoint
-        env:
-          HOST_MACHINE: ${{ inputs.host_machine || 'e7270-server' }}
         run: |
           echo "Looking for endpoint with name: $HOST_MACHINE"
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
@@ -177,9 +175,6 @@ jobs:
           sudo wg-quick down ./wg0.conf
           sudo wg show   
   proxy_setup_onprem:
-    env:
-      domain: ${{ inputs.domain }}
-      host_machine: ${{ inputs.host_machine }}
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 1
@@ -390,7 +385,6 @@ jobs:
           sudo wg show
   proxy_setup_oci:
     env:
-      domain: ${{ inputs.domain  }}
       host_machine: 'ljfcloud-arm'
     runs-on: ubuntu-latest
     steps:

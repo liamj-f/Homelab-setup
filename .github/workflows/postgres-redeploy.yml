@@ -24,8 +24,7 @@ on:
       domain:
         required: false
         type: string  
-        default: 'pgadmin.14monarch.james-fagg.uk'
-     
+        default: 'pgadmin.14monarch.james-fagg.uk'  
   push:
     branches:
       - main
@@ -33,7 +32,9 @@ on:
     paths:
       - '.github/workflows/postgres-redeploy.yml'    
       - 'postgres/**'
-    
+env:
+  host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+  domain: ${{ inputs.domain || 'whoami.james-fagg.uk' }}
 jobs:
   add_Postgres_stack:
     runs-on: ubuntu-latest
@@ -41,9 +42,6 @@ jobs:
       matrix:
         host_machine: [e7270-server]
       max-parallel: 1
-    env:
-      host_machine: ${{ inputs.host_machine }}
-      domain: ${{ inputs.domain }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
@@ -378,9 +376,6 @@ jobs:
           sudo wg-quick down ./wg0.conf
           sudo wg show   
   proxy_setup_onprem:
-    env:
-      domain: ${{ inputs.domain }}
-      host_machine: ${{ inputs.host_machine }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -590,7 +585,6 @@ jobs:
           sudo wg show
   proxy_setup_oci:
     env:
-      domain: ${{ inputs.domain  }}
       host_machine: 'ljfcloud-arm'
     runs-on: ubuntu-latest
     steps:

@@ -32,12 +32,12 @@ on:
     paths:
       - '.github/workflows/avalon-deploy.yml'    
       - 'avalon/**'
+env:
+  host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+  domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
 
 jobs:
   database_create:
-    env:
-      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
-      domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -163,9 +163,6 @@ jobs:
 
   deploy:
     needs: database_create
-    env:
-      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
-      domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -371,9 +368,6 @@ jobs:
           sudo wg show
 
   proxy_setup_onprem:
-    env:
-      domain: ${{ inputs.domain }}
-      host_machine: ${{ inputs.host_machine }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -583,7 +577,6 @@ jobs:
           sudo wg show
   proxy_setup_oci:
     env:
-      domain: ${{ inputs.domain  }}
       host_machine: 'ljfcloud-arm'
     runs-on: ubuntu-latest
     steps:
@@ -767,9 +760,6 @@ jobs:
           sudo wg show
 
   f2b:
-    env:
-      domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
-      host_machine: ${{inputs. host_machine || 'e7270-server' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo

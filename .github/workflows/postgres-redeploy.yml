@@ -387,8 +387,8 @@ jobs:
         env:
           POSTGRES_DEPLOYMENT_USER: svc_postgres
           POSTGRES_DEPLOYMENT_USER_PASSWORD: ${{ secrets.svc_postgres_password }}
-          POSTGRES_APP_USER: svc_gitopsdeploy
-          POSTGRES_APP_PASSWORD: ${{ secrets.svc_gitopsdeploy_password }}
+          POSTGRES_APP_USER: ${{ vars.APP_USER }}
+          POSTGRES_APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
@@ -398,11 +398,11 @@ jobs:
             docker exec -i postgres psql -U svc_postgres -d postgres_db -v ON_ERROR_STOP=1 \
               -- ${APP_USER} (personal superuser)
               SELECT 'CREATE USER ' || quote_ident('${APP_USER}') || ' WITH PASSWORD ' || quote_literal('${APP_PASSWORD}') || ' SUPERUSER CREATEDB CREATEROLE'
-              WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${APP_USER}')
+              WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = || quote_ident('${APP_USER}'))
               \gexec
 
               SELECT 'ALTER USER ' || quote_ident('${APP_USER}') || ' WITH PASSWORD ' || quote_literal('${APP_PASSWORD}')
-              WHERE EXISTS (SELECT FROM pg_roles WHERE rolname = '${APP_USER}')
+              WHERE EXISTS (SELECT FROM pg_roles WHERE rolname = || quote_ident('${APP_USER}'))
               \gexec
 
 

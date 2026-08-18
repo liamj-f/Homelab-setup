@@ -1,5 +1,9 @@
 
-name: Redeploy Dovetrek-PWA via Portainer GitOps 
+name: Redeploy Dovetrek-PWA via Portainer GitOps
+concurrency:
+  group: homelab-deployments
+  cancel-in-progress: false
+  queue: max 
 on:
   workflow_dispatch:
     inputs:
@@ -35,9 +39,6 @@ jobs:
     env:
       host_machine: ${{ inputs.host_machine }}
       domain: ${{ inputs.domain || '14monarch.local' }}
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -200,9 +201,6 @@ jobs:
       domain: ${{ inputs.domain  }}
       host_machine: 'ljfcloud-arm'
     runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2

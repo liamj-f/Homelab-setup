@@ -1,5 +1,9 @@
 
 name: Redeploy Postgres via Portainer GitOps 
+concurrency:
+  group: homelab-deployments
+  cancel-in-progress: false
+  queue: max
 on:
   workflow_dispatch:
     inputs:
@@ -37,9 +41,6 @@ jobs:
       matrix:
         host_machine: [e7270-server]
       max-parallel: 1
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
     env:
       host_machine: ${{ inputs.host_machine }}
       domain: ${{ inputs.domain }}
@@ -384,9 +385,6 @@ jobs:
     strategy:
       matrix:
         host_machine: [rpi4-server, e7270-server]
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
@@ -595,9 +593,6 @@ jobs:
       domain: ${{ inputs.domain  }}
       host_machine: 'ljfcloud-arm'
     runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2

@@ -1,5 +1,9 @@
 
 name: Deploy Avalon PWA 
+concurrency:
+  group: homelab-deployments
+  cancel-in-progress: false
+  queue: max
 on:
   workflow_dispatch:
     inputs:
@@ -28,15 +32,13 @@ on:
     paths:
       - '.github/workflows/avalon-deploy.yml'    
       - 'avalon/**'
+
 jobs:
   database_create:
     env:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
       domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
     runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
@@ -165,9 +167,6 @@ jobs:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
       domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
     runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
@@ -379,9 +378,6 @@ jobs:
     strategy:
       matrix:
         host_machine: [rpi4-server, e7270-server]
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
@@ -590,9 +586,6 @@ jobs:
       domain: ${{ inputs.domain  }}
       host_machine: 'ljfcloud-arm'
     runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2

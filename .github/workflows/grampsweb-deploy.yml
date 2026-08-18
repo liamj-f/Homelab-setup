@@ -2,7 +2,10 @@ name: Redeploy GrampsWeb via Portainer GitOps
 #ToDo:
 # create the mount points and automount
 # then rescan files if the database isn't intact.
-
+concurrency:
+  group: homelab-deployments
+  cancel-in-progress: false
+  queue: max
 on:
   push:
     branches:
@@ -461,11 +464,9 @@ jobs:
       host_machine: ${{ inputs.host_machine }}
     runs-on: ubuntu-latest
     strategy:
+      max-parallel: 1
       matrix:
         host_machine: [rpi4-server, e7270-server]
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
@@ -674,9 +675,6 @@ jobs:
       domain: ${{ inputs.domain  }}
       host_machine: 'ljfcloud-arm'
     runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2

@@ -24,7 +24,9 @@ on:
       domain:
         required: true
         type: string
-
+env:
+  domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
+  host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
 jobs:
   build-image-and-push:
     name: Build and push images to ghcr.io
@@ -80,9 +82,10 @@ jobs:
   deploy:
     needs: build-image-and-push
     runs-on: ubuntu-latest
-    env:
-      domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
-      host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
+    concurrency:
+      group: homelab-deployments
+      cancel-in-progress: false
+      queue: max   
     steps:
 
       - name: Checkout repo
@@ -380,13 +383,13 @@ jobs:
 
               echo "API Response: $RESPONSE" 
 
-#      - name: Redeploy Stack using webhook
-#        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-#        run: |
-#          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
-#          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
-#
-#          echo "API Response: $RESPONSE"
+      #- name: Redeploy Stack using webhook
+      #  if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+      #  run: |
+      #    RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
+      #    -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
+
+      #     echo "API Response: $RESPONSE"
 
 
       - name: Copy XFF config to host

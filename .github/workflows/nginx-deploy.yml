@@ -53,7 +53,7 @@ jobs:
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
             echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
-            echo "ssh_user=${{ vars.USER_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
@@ -849,7 +849,7 @@ jobs:
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
-          key_path: /tmp/deploy_key
+          key: ${{ steps.node_config.outputs.ssh_key }}
           source: "nginx/http_top.conf"
           target: "/tmp/"
 
@@ -858,7 +858,7 @@ jobs:
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
-          key_path: /tmp/deploy_key
+          key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             docker exec nginx-proxy-manager mkdir -p /data/nginx/custom
             docker cp /tmp/http_top.conf nginx-proxy-manager:/data/nginx/custom/http_top.conf

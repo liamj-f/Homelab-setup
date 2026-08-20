@@ -473,7 +473,7 @@ jobs:
               '{
                 domain_names: $domain,
                 forward_host: $host_ip,
-                forward_port: [80,81,443]
+                forward_port: [80,81,443],
                 forward_scheme: "http",
                 certificate_id: $cert_id,
                 allow_websocket_upgrade: 1,

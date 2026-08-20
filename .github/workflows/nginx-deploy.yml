@@ -354,6 +354,11 @@ jobs:
           echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
 
+      - name: Add host key to known_hosts of runner
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ steps.node_config.outputs.ssh_host }} >> ~/.ssh/known_hosts
+
       - name: Write WireGuard config
         run: |
           cat > wg0.conf << EOF
@@ -646,6 +651,11 @@ jobs:
         run: |
           echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
+
+      - name: Add host key to known_hosts of runner
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ steps.node_config.outputs.ssh_host }} >> ~/.ssh/known_hosts
 
       - name: Write WireGuard config
         run: |

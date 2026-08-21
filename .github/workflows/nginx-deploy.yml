@@ -284,6 +284,22 @@ jobs:
             source: "nginx/http_top.conf"
             target: "/tmp/"
 
+      - name: Wait for NPM to be healthy
+        run: |
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
+              ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
+              "for i in \$(seq 1 25); do
+                STATUS=\$(docker inspect --format='{{.State.Health.Status}}' nginx-proxy-manager 2>/dev/null)
+                echo \"Attempt \$i/25: NPM health = \$STATUS\"
+                if [ \"\$STATUS\" = \"healthy\" ]; then
+                  echo \"NPM is healthy\"
+                  exit 0
+                fi
+                sleep 5
+              done
+              echo \"NPM did not become healthy in time\"
+              exit 1"
+              
       - name: Load config into NPM container and reload
         uses: appleboy/ssh-action@v0.1.7
         with:
@@ -581,27 +597,19 @@ jobs:
                 -d "$BODY" | jq -r '.id // "error"'
             fi
 
-      - name: Copy NGINX XFF config to host
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
-          source: "nginx/http_top.conf"
-          target: "/tmp/"
+      - name: Set NPM default site
+        run: |
+            RESPONSE=$(curl -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/settings/default-site" \
+            -H 'Authorization: Bearer ${{ steps.token.outputs.token }}' \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "value": "html",
+              "meta": {
+                "html": "<body>\n<pre>{ \"code\":\"404\",\"message\":\"No route to host\",\"source\":\"${{ matrix.host_machine }}\" }\n</pre>\n</body>"
+              }
+              }')
 
-      - name: Load config into NPM container and reload
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
-          script: |
-            docker exec nginx-proxy-manager mkdir -p /data/nginx/custom
-            docker cp /tmp/http_top.conf nginx-proxy-manager:/data/nginx/custom/http_top.conf
-            rm /tmp/http_top.conf
-            docker exec nginx-proxy-manager nginx -s reload
-
+              echo $RESPONSE
 
       - name: Bring down VPN
         if: always()
@@ -834,26 +842,19 @@ jobs:
                 -d "$BODY" | jq -r '.id // "error"'
             fi
 
-      - name: Copy NGINX XFF config to host
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
-          source: "nginx/http_top.conf"
-          target: "/tmp/"
+      - name: Set NPM default site
+        run: |
+            RESPONSE=$(curl -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/settings/default-site" \
+            -H 'Authorization: Bearer ${{ steps.token.outputs.token }}' \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "value": "html",
+              "meta": {
+                "html": "<body>\n<pre>{ \"code\":\"404\",\"message\":\"No route to host\",\"source\":\"${{ env.host_machine }}\" }\n</pre>\n</body>"
+              }
+              }')
 
-      - name: Load config into NPM container and reload
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
-          script: |
-            docker exec nginx-proxy-manager mkdir -p /data/nginx/custom
-            docker cp /tmp/http_top.conf nginx-proxy-manager:/data/nginx/custom/http_top.conf
-            rm /tmp/http_top.conf
-            docker exec nginx-proxy-manager nginx -s reload
+              echo $RESPONSE
 
       - name: Bring down VPN
         if: always()

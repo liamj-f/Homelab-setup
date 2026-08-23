@@ -77,13 +77,6 @@ jobs:
           export PIHOLE_WEBPASSWORD="${{ secrets.APP_PASSWORD }}"
           envsubst '${PRIMARY_IP} ${PIHOLE_WEBPASSWORD}' < keepalived/notify.sh.template > keepalived/notify.sh
 
-      - name: Render rathole client toml
-        run: |
-          export LJFCLOUD_IP="${{ vars.IP_LJFCLOUD_ARM }}"
-          export RATHOLE_AUTH_SECRET="${{ secrets.RATHOLE_AUTH_SECRET }}"
-          export KEEPALIVED_VIRTUAL_IP="${{ vars.KEEPALIVED_IP }}"
-          envsubst < keepalived/rathole-client.toml.template > keepalived/rathole-client.toml
-
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  

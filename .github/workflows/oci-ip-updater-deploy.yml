@@ -1,0 +1,305 @@
+name: Redeploy OCI IP Updater via Portainer GitOps
+on:
+  push:
+    branches:
+      - main
+      - '**'
+    paths:
+      - 'dynamic-ip-updater/dynamic-ip-updater-compose.yml'
+      - '.github/workflows/oci-ip-updater-deploy.yml'
+      - 'dynamic-ip-updater/**'
+  workflow_dispatch:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      host_machine:
+        required: true
+        type: string 
+      domain:
+        required: true
+        type: string
+env:
+  domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
+  host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
+jobs:
+  build-image-and-push:
+    name: Build and push images to ghcr.io
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata dynamic-ip-updater
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/liamj-f/oci-dynamic-ip-updater
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push dynamic-ip-updater
+        uses: docker/build-push-action@v6
+        with:
+          context: ./dynamic-ip-updater
+          push: true
+          tags: ${{ steps.meta2.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: build-image-and-push
+    runs-on: ubuntu-latest
+    concurrency:
+      group: homelab-deployments
+      cancel-in-progress: false
+      queue: max   
+    steps:
+
+      - name: Checkout repo
+        uses: actions/checkout@v6.0.2
+
+      - name: Install WireGuard
+        run: |
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
+
+      - name: Set node config
+        id: node_config
+        run: |
+          if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
+            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
+            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
+            echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          fi
+     
+
+      - name: Write SSH key to file
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+      - name: Write WireGuard config
+        run: |
+          cat > wg0.conf << EOF
+          [Interface]
+          PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
+          Address = 192.168.2.2/30
+          DNS = ${{ vars.Keepalived_IP }}
+          MTU = 1250
+
+          [Peer]
+          PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
+          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
+          AllowedIPs = 192.168.0.0/24, ${{ steps.node_config.outputs.ssh_host }}/32
+          Endpoint = ${{ vars.WG_ENDPOINT }}:51820
+          PersistentKeepalive = 25
+          EOF
+
+      - name: Render Rathole config
+        run: |
+          export RATHOLE_AUTH_SECRET="${{ secrets.RATHOLE_AUTH_SECRET }}"
+          envsubst < keepalived/rathole-server.toml.template > keepalived/rathole-server.toml 
+
+      - name: Bring up VPN
+        run: |
+          for i in $(seq 1 5); do
+            echo "Attempt $i/5: bringing up WireGuard..."
+            if sudo wg-quick up ./wg0.conf; then
+              echo "WireGuard up successfully"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "WireGuard failed after 5 attempts"
+              exit 1
+            fi
+            echo "Failed, waiting 10s before retry..."
+            sudo ip link delete dev wg0 2>/dev/null || true
+            sleep 10
+          done
+          sudo wg show
+
+      - name: Authenticate to Portainer
+        id: auth
+        run: |
+          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/auth" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "Username":"${{ vars.APP_USER }}",
+                 "Password":"${{ secrets.APP_PASSWORD }}"
+                 }')
+          TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Get Portainer EndpointId
+        id: endpoint
+        env:
+          host_machine: ${{ env.host_machine || 'ljfcloud-arm' }}
+        run: |
+          echo "Looking for endpoint with name: $host_machine"
+          RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+          ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')
+          echo "endpoint_id=$ENDPOINT_ID" >> $GITHUB_OUTPUT
+
+      - name: Get Stack ID (if exists)
+        id: get_stack_id
+        run: |
+          STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
+ 
+          # Filter by both Name AND EndpointId
+          STACK_ID=$(echo "$STACKS" | jq -r \
+            --arg name "oci-ip-updater" \
+            --argjson endpoint_id "${{ steps.endpoint.outputs.endpoint_id }}" \
+            '.[] | select(.Name==$name and .EndpointId==$endpoint_id) | .Id')
+
+          if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
+            echo "Stack not found for this endpoint."
+            echo "stack_id=0" >> $GITHUB_OUTPUT
+          else
+            echo "Stack found with ID: $STACK_ID"
+            echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get stack webhook token
+        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+        id: get_webhook
+        run: |
+          WEBHOOK_TOKEN=$(curl -s \
+            --max-time 10 \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            | jq -r '.AutoUpdate.Webhook')
+
+          echo "Webhook token: $WEBHOOK_TOKEN"
+          echo "webhook_token=$WEBHOOK_TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Generate UUID
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
+        id: uuid
+        run: |
+          echo "uuid=$(uuidgen)" >> $GITHUB_OUTPUT
+
+      - name: Create Stack from GitHub
+        if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
+        run: |
+          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+
+          echo "Creating stack from GitHub..."
+          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+               "Name": "oci-ip-updater",
+               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
+               "RepositoryReferenceName": "${{ github.ref }}",
+               "ComposeFile": "dynamic-ip-updater/dynamic-ip-updater-compose.yml",
+               "RepositoryAuthentication": false,
+               "AutoUpdate": {
+                              "forcePullImage": true,
+                              "forceUpdate": true,
+                              "Webhook": "${{ steps.uuid.outputs.uuid }}"                           
+                             },
+                              "Env": [
+                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001,14monarch.tplinkdns.com:2333, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
+                                    {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
+                                    {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
+                                    {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
+                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
+                                    {
+                                    "name":"SECURITY_LIST_ID",
+                                    "value":"${{ vars.OCID_SECURITY_LIST }}"
+                                    },
+                                    {
+                                    "name":"NSG_ID",
+                                    "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+                                    },
+                                    {
+                                    "name":"WAF_ALLOWLIST_ID",
+                                    "value":"${{ vars.OCID_WAF_ALLOWLIST }}"
+                                    }
+                                    ],
+               "Prune": true,
+               "StackFileVersion": "3"
+              }'
+                    )
+
+            echo "API Response: $RESPONSE"
+            echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
+
+      - name: Update Stack Environment Variables
+        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+        run: |
+            OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
+
+            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+                  "AutoUpdate": {
+                          "forcePullImage": true,
+                          "forceUpdate": true,
+                          "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
+                          },
+                  "PullImage": false,
+                  "RepositoryReferenceName": "${{ github.ref }}",
+                  "repositoryAuthentication": false,
+                              "Env": [
+                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001,14monarch.tplinkdns.com:2333, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
+                                    {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
+                                    {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
+                                    {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
+                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
+                                    {
+                                    "name":"SECURITY_LIST_ID",
+                                    "value":"${{ vars.OCID_SECURITY_LIST }}"
+                                    },
+                                    {
+                                    "name":"NSG_ID",
+                                    "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
+                                    },
+                                    {
+                                    "name":"WAF_ALLOWLIST_ID",
+                                    "value":"${{ vars.OCID_WAF_ALLOWLIST }}"
+                                    }
+                                    ],
+                  "Prune": false
+                }'  )
+
+              echo "API Response: $RESPONSE" 
+
+
+      - name: Bring down VPN
+        if: always()
+        run: |
+          sudo wg-quick down ./wg0.conf
+          sudo wg show

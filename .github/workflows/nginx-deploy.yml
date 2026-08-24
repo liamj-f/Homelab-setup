@@ -521,16 +521,15 @@ jobs:
         if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
         run: |
           echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
-          
+          node_domain="nginx${{ steps.node_config.outputs.nginx_number }}.$rootdomain"          
           Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
-          node_domain="nginx${{ steps.node_config.outputs.nginx_number }}.$rootdomain"
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$node_domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
+
           BODY=$(jq -n \
-              --arg domain "$node_domain" \
               --arg host_ip "${{ steps.node_config.outputs.ssh_host }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: $domain,
+                domain_names: [$node_domain],
                 forward_host: $host_ip,
                 forward_port: [81]
                 forward_scheme: "http",
@@ -562,16 +561,15 @@ jobs:
         if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
         run: |
           echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
-          
+          node_domain="nginx${{ steps.node_config.outputs.other_nginx_number }}.$rootdomain"                    
           Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$node_domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
           node_domain="nginx${{ steps.node_config.outputs.other_nginx_number }}.$rootdomain"
           BODY=$(jq -n \
-              --arg domain "$node_domain" \
               --arg host_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: [$domain],
+                domain_names: [$node_domain],
                 forward_host: $host_ip,
                 forward_port: [81],
                 forward_scheme: "http",

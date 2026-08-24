@@ -526,12 +526,13 @@ jobs:
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$node_domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
 
           BODY=$(jq -n \
+              --arg domain "$node_domain"
               --arg host_ip "${{ steps.node_config.outputs.ssh_host }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: [$node_domain],
+                domain_names: [$domain],
                 forward_host: $host_ip,
-                forward_port: [81]
+                forward_port: [81],
                 forward_scheme: "http",
                 certificate_id: $cert_id,
                 allow_websocket_upgrade: 1,
@@ -566,10 +567,11 @@ jobs:
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$node_domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
           node_domain="nginx${{ steps.node_config.outputs.other_nginx_number }}.$rootdomain"
           BODY=$(jq -n \
+              --arg domain "$node_domain"
               --arg host_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: [$node_domain],
+                domain_names: [$domain],
                 forward_host: $host_ip,
                 forward_port: [81],
                 forward_scheme: "http",

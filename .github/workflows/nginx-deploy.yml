@@ -310,8 +310,8 @@ jobs:
             key: ${{ steps.node_config.outputs.ssh_key }}
             script: |
                 docker exec nginx-proxy-manager mkdir -p /data/nginx/custom
-                docker cp /tmp/http_top.conf nginx-proxy-manager:/data/nginx/custom/http_top.conf
-                rm /tmp/http_top.conf
+                docker cp /tmp/nginx/http_top.conf nginx-proxy-manager:/data/nginx/custom/http_top.conf
+                rm /tmp/nginx/http_top.conf
                 docker exec nginx-proxy-manager nginx -s reload
 
       - name: Bring down VPN

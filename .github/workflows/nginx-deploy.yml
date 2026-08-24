@@ -489,7 +489,7 @@ jobs:
               --arg host_ip "${{ vars.KEEPALIVED_IP }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: $domain,
+                domain_names: [$domain],
                 forward_host: $host_ip,
                 forward_port: [80,81,443],
                 forward_scheme: "http",
@@ -532,7 +532,7 @@ jobs:
               '{
                 domain_names: $domain,
                 forward_host: $host_ip,
-                forward_port: [80,81,443]
+                forward_port: [81]
                 forward_scheme: "http",
                 certificate_id: $cert_id,
                 allow_websocket_upgrade: 1,
@@ -571,9 +571,9 @@ jobs:
               --arg host_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: $domain,
+                domain_names: [$domain],
                 forward_host: $host_ip,
-                forward_port: [80,81,443]
+                forward_port: [81],
                 forward_scheme: "http",
                 certificate_id: $cert_id,
                 allow_websocket_upgrade: 1,

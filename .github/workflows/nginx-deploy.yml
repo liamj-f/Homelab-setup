@@ -58,11 +58,6 @@ jobs:
             echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           fi
-     
-      - name: Write SSH key to file
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
 
       - name: Install WireGuard
         run: |
@@ -281,6 +276,7 @@ jobs:
             host: ${{ steps.node_config.outputs.ssh_host }}
             username: ${{ steps.node_config.outputs.ssh_user }}
             key: ${{ steps.node_config.outputs.ssh_key }}
+            debug: true
             source: "nginx/http_top.conf"
             target: "/tmp/"
 

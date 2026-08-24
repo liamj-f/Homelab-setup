@@ -124,11 +124,6 @@ jobs:
           PersistentKeepalive = 25
           EOF
 
-      - name: Render Rathole config
-        run: |
-          export RATHOLE_AUTH_SECRET="${{ secrets.RATHOLE_AUTH_SECRET }}"
-          envsubst < keepalived/rathole-server.toml.template > keepalived/rathole-server.toml 
-
       - name: Bring up VPN
         run: |
           for i in $(seq 1 5); do

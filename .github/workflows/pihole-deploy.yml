@@ -35,6 +35,11 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    concurrency:
+      group: homelab-deployments
+      cancel-in-progress: false
+      queue: max
+
     strategy:
       matrix:
         host_machine: [rpi4-server, e7270-server]
@@ -409,16 +414,17 @@ jobs:
 
       - name: Add Phone to Bypass Group
         run: |
+          PAYLOAD=$(jq -n --argjson group_id "$group_id" '{
+              client: "B8:A8:25:5E:17:7A",
+              comment: "HJ-F phone - bypass group",
+              groups: [$group_id]
+              }')
           curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/clients" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
           -H 'content-type: application/json' \
-          -d '{
-              "client": "B8:A8:25:5E:17:7A",
-              "comment": "HJ-F phone - bypass group",
-              "groups": [$GROUP_ID]
-              }'
+          -d "$PAYLOAD"
           
       - name: End Pihole API Session
         run: |

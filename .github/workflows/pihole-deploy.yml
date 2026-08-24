@@ -56,11 +56,13 @@ jobs:
           if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
             echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "other_ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "dhcp_active"=true >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
+            echo "dhcp_active"=false >> $GITHUB_OUTPUT
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "other_ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
@@ -308,6 +310,7 @@ jobs:
                               ]
                            },                          
                   "dhcp": {
+                        "active": ${{ steps.node_config.outputs.dhcp_active }}
                         "start": "192.168.0.10",
                         "end": "192.168.0.254",
                         "router": "192.168.0.1",
@@ -426,6 +429,9 @@ jobs:
           -H 'content-type: application/json' \
           -d "$PAYLOAD"
           
+
+
+
       - name: End Pihole API Session
         run: |
           curl --retry 3 --retry-delay 5 --retry-all-errors -X DELETE "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \

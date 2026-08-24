@@ -9,8 +9,28 @@ on:
       - '.github/workflows/keepalived-deploy.yml'
       - 'keepalived/**'
   workflow_dispatch:
+    inputs:
+      host_machine:
+        required: false
+        type: string 
+        default: 'e7270-server'
+      domain:
+        required: false
+        type: string
+        default: '14monarch.james-fagg.uk'
   workflow_call:
-
+    inputs:
+      host_machine:
+        required: false
+        type: string 
+        default: 'e7270-server'
+      domain:
+        required: false
+        type: string  
+        default: '14monarch.james-fagg.uk' 
+env:
+  domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
+  host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -75,7 +95,7 @@ jobs:
         run: |
           export PRIMARY_IP="${{ steps.node_config.outputs.ssh_host }}"
           export PIHOLE_WEBPASSWORD="${{ secrets.APP_PASSWORD }}"
-          envsubst '${PRIMARY_IP} ${PIHOLE_WEBPASSWORD}' < keepalived/notify.sh.template > keepalived/notify.sh
+          envsubst < keepalived/notify.sh.template > keepalived/notify.sh
 
       - name: Install WireGuard
         run: |
@@ -121,46 +141,34 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
-      - name: Copy configs to host
-        run: |
-          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
-              ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }} \
-              "sudo mkdir -p /opt/stacks/keepalived && sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks"
-          scp -i /tmp/deploy_key -o StrictHostKeyChecking=no \
-            keepalived/keepalived.conf \
-            keepalived/notify.sh \
-            keepalived/rathole-client.toml \
-            keepalived/http_top.conf \
-            ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}:/opt/stacks/keepalived/
-
-      - name: Set permissions
+      - name: Make keepalived directory
         uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
           key_path: /tmp/deploy_key
           script: |
+            sudo mkdir -p /opt/stacks/keepalived
+            sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks
+
+      - name: Copy configs into keepalived directory
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key_path: ${{ steps.node_config.outputs.ssh_key }}
+          source: "keepalived /keepalived.conf,keepalived/notify.sh"
+          target: /opt/stacks/keepalived/
+
+      - name: Set permissions
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key_path: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
             chmod a+rx /opt/stacks/keepalived/notify.sh
             ls -la /opt/stacks/keepalived/
-
-#      - name: Write key files
-#        run: |
-#          printf '%s' "${{ steps.node_config.outputs.rsync_target_key }}" > /tmp/rsync_key
-#          chmod 600 /tmp/rsync_key
-#          printf '%s' "${{ steps.node_config.outputs.rsync_target_key }}" > /tmp/rsync_target_key
-#          chmod 600 /tmp/rsync_target_key
-#
-#      - name: Deploy rsync SSH key to host
-#        uses: appleboy/ssh-action@master
-#        with:
-#          host: ${{ steps.node_config.outputs.ssh_host }}
-#          username: ${{ steps.node_config.outputs.ssh_user }}
-#          key_path: /tmp/deploy_key
-#          script: |
-#            mkdir -p ~/.ssh
-#            chmod 700 ~/.ssh
-#            printf '%s' '${{ steps.node_config.outputs.rsync_target_key }}' > ~/.ssh/rsync_id
-#            chmod 600 ~/.ssh/rsync_id
 
       - name: Authenticate to Portainer
         id: auth

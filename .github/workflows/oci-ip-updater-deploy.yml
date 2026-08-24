@@ -59,7 +59,7 @@ jobs:
         with:
           context: ./dynamic-ip-updater
           push: true
-          tags: ${{ steps.meta2.outputs.tags }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
   deploy:

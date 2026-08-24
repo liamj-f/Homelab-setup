@@ -26,6 +26,13 @@ on:
 jobs:
   Deploy_Portainer_Container:
     runs-on: ubuntu-latest
+    concurrency:
+      group: homelab-deployments
+      cancel-in-progress: false
+      queue: max   
+    strategy:
+      matrix:
+        host_machine: ['rpi4-server','e7270-server','ljfcloud-arm']
     env:
       host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
       domain: ${{ inputs.domain || '14monarch.local' }}
@@ -35,6 +42,32 @@ jobs:
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
+      
+      - name: Set node config
+        id: node_config
+        run: |
+          if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
+            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
+            echo "compose_filepath=portainer/portainer-compose.yml" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
+            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "compose_filepath=portainer/portainer-agent-compose.yml" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
+            echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
+            echo "compose_filepath=portainer/portainer-agent-compose.yml" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          fi
 
       - name: Write WireGuard config
         run: |
@@ -52,14 +85,14 @@ jobs:
 
       - name: Render Portainer compose
         run: |
-          envsubst < portainer-compose.yml > portainer-compose-rendered.yml
+          envsubst < ${{ steps.node_config.outputs.compose_filepath }} > portainer-compose-rendered.yml
           
       - name: Copy rendered compose
         uses: appleboy/scp-action@master
         with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
           source: portainer-compose-rendered.yml
           target: ~/stacks/portainer/
           overwrite: true
@@ -68,14 +101,15 @@ jobs:
         id: deploy_portainer
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ vars.RPI4_IP }}
-          username: ${{ vars.RPI4_USER }}
-          password: ${{ secrets.RPI4_PASSWORD }}
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             cd ~/stacks/portainer
             sudo docker compose -f portainer-compose-rendered.yml up -d
             
       - name: Create Admin Account if required
+        if: ${{ matrix.host_machine == 'rpi4-server' }}
         id: check_admin
         run: |
           echo "Waiting for Portainer API to be ready..."
@@ -108,6 +142,7 @@ jobs:
 
       - name: Authenticate with Portainer
         id: auth
+        if: ${{ steps.check_admin.outcome == 'success' }}
         run: |
           RESPONSE=$(curl -s -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
@@ -119,11 +154,14 @@ jobs:
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
           
       - name: Check Status
+        id: check_status
+        if: ${{ steps.auth.outcome == 'success' }}
         run: |
           curl -s -X get "${{ vars.RPI4_IP }}:83/api/status" \
            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" | jq .
            
       - name: Create Docker Environment if required
+        if: ${{ steps.check_status.outcome == 'success' }}
         id: check_env
         run: |
           ENDPOINTS=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
@@ -145,31 +183,8 @@ jobs:
             echo "endpoint_id=$ID" >> $GITHUB_OUTPUT
           fi
           
-
-#      - name: Create nginx_network if required
-#        run: |
-#          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
-#            "http://${{ vars.PI_HOST_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/nginx_network" \
-#            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-#            -H "Content-Type: application/json")
-#      
-#          if [ "$RESPONSE" -ne 200 ]; then
-#            echo "nginx_network not found, creating..."
-#            curl -s -X POST "http://${{ vars.PI_HOST_IP }}:83/api/endpoints/${{ steps.endpoint.outputs.endpoint_id }}/docker/networks/create" \
-#              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-#              -H "Content-Type: application/json" \
-#              -d '{
-#                "Name": "nginx_network",
-#                "Driver": "bridge",
-#                "Labels": {
-#                  "com.docker.compose.network": "nginx_network",
-#                  "com.docker.compose.project": "nginx"
-#                }
-#              }'
-#          else
-#            echo "nginx_network already exists."
-#          fi
       - name: Bring down VPN
+        if: always()
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show   

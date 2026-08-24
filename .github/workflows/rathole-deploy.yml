@@ -1,4 +1,4 @@
-name: Redeploy OCI Cert Updater via Portainer GitOps
+name: Redeploy Rathole via Portainer GitOps
 on:
   push:
     branches:
@@ -90,7 +90,7 @@ jobs:
       - name: Render Rathole config
         run: |
           export RATHOLE_AUTH_SECRET="${{ secrets.RATHOLE_AUTH_SECRET }}"
-          envsubst < keepalived/rathole-server.toml.template > keepalived/rathole-server.toml 
+          envsubst < rathole/rathole-server.toml.template > rathole/rathole-server.toml 
 
       - name: Bring up VPN
         run: |
@@ -248,8 +248,10 @@ jobs:
       cancel-in-progress: false
       queue: max   
     strategy:
+      max-parallel: 1
       matrix:
         host_machine: [rpi4-server, e7270-server]
+        
     steps:
 
       - name: Checkout repo

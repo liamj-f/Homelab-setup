@@ -124,7 +124,7 @@ jobs:
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
           PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, ${{ secrets.IP_LJFCLOUD_ARM }}/32
+          AllowedIPs = 192.168.0.0/24, ${{ vars.IP_LJFCLOUD_ARM }}/32
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF

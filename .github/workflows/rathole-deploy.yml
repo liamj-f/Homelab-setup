@@ -148,6 +148,7 @@ jobs:
           target: /opt/stacks/rathole
           strip_components: 1
           overwrite: true
+          rm: true
           
       - name: Authenticate to Portainer
         id: auth

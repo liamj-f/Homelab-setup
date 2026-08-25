@@ -986,7 +986,7 @@ jobs:
               --arg rootdomain "$rootdomain" \
               '{
                 domain_names: [$domain],
-                forward_host: "rathole-server",
+                forward_host: "127.0.0.1",
                 forward_port: 81,
                 forward_scheme: "http",
                 certificate_id: ($cert_id|tonumber),

@@ -39,6 +39,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+    concurrency:
+      group: homelab-deployments
+      cancel-in-progress: false
+      queue: max
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6

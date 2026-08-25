@@ -15,6 +15,7 @@ on:
       domain:
         required: true
         type: string
+        default: 'oci.james-fagg.uk' 
   workflow_call:
     inputs:
       host_machine:
@@ -23,6 +24,8 @@ on:
       domain:
         required: true
         type: string
+        default: 'oci.james-fagg.uk' 
+
 env:
   domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
   host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}

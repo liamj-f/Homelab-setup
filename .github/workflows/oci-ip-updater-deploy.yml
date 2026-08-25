@@ -106,12 +106,6 @@ jobs:
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           fi
      
-
-      - name: Write SSH key to file
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-
       - name: Write WireGuard config
         run: |
           cat > wg0.conf << EOF

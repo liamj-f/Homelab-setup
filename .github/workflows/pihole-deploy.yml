@@ -39,7 +39,6 @@ jobs:
       group: homelab-deployments
       cancel-in-progress: false
       queue: max
-
     strategy:
       matrix:
         host_machine: [rpi4-server, e7270-server]

@@ -37,6 +37,8 @@ jobs:
       max-parallel: 1
       matrix:
         host_machine: [rpi4-server, e7270-server, ljfcloud-arm]
+    env:
+      host_machine: ${{ matrix.host_machine }}
     steps:
 
       - name: Checkout repo
@@ -141,6 +143,7 @@ jobs:
           key: ${{ steps.node_config.outputs.ssh_key }}
           source: ${{ steps.render_rathole.outputs.rendered_file }}
           target: /opt/stacks/rathole
+          strip_components: 1
           overwrite: true
           
       - name: Authenticate to Portainer
@@ -157,8 +160,6 @@ jobs:
 
       - name: Get Portainer EndpointId
         id: endpoint
-        env:
-          host_machine: ${{ env.host_machine || 'ljfcloud-arm' }}
         run: |
           echo "Looking for endpoint with name: $host_machine"
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \

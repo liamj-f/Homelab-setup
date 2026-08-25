@@ -11,17 +11,29 @@ on:
     paths:
       - 'fail2ban/**'
       - '.github/workflows/fail2ban-redeploy.yml'
-  workflow_call:
-    inputs:
-      host_machine:
-        required: true
-        type: string 
   workflow_dispatch:
     inputs:
       host_machine:
-        required: true
+        required: false
         type: string 
- 
+        default: 'e7270-server'
+      domain:
+        required: false
+        type: string
+        default: '14monarch.james-fagg.uk'
+  workflow_call:
+    inputs:
+      host_machine:
+        required: false
+        type: string 
+        default: 'e7270-server'
+      domain:
+        required: false
+        type: string  
+        default: '14monarch.james-fagg.uk' 
+env:
+  domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
+  host_machine: ${{ inputs.host_machine || 'e7270-server' }}
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -31,10 +43,28 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v6
 
-      - name: Write SSH key to file
+      - name: Set node config
+        id: node_config
         run: |
-          echo "${{ secrets.SSH_KEY_E7270 }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
+          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
+            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
+            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ env.host_machine }}" = "ljfcloud-arm" ]; then
+            echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          fi
 
       - name: Install WireGuard
         run: |
@@ -88,35 +118,41 @@ jobs:
                   > fail2ban/data/action.d/oci-waf.local
 
       - name: Create fail2ban directories on host
-        run: |
-          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
-              ${{ vars.E7270_USER }}@${{ vars.E7270_IP }} \
-              "mkdir -p /opt/stacks/fail2ban/data/action.d \
-                        /opt/stacks/fail2ban/data/filter.d \
-                        /opt/stacks/fail2ban/data/jail.d \
-                        /opt/stacks/fail2ban/data/scripts \
-                        /opt/stacks/fail2ban/custom-cont-init.d; \
-               sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/"          
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            mkdir -p /opt/stacks/fail2ban/data/action.d \
+                      /opt/stacks/fail2ban/data/filter.d \
+                      /opt/stacks/fail2ban/data/jail.d \
+                      /opt/stacks/fail2ban/data/scripts \
+                      /opt/stacks/fail2ban/custom-cont-init.d
+            sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/fail2ban/data/
 
       - name: Copy config files to host
-        run: |
-          rsync -avz --checksum \
-            -e "ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key" \
-            fail2ban/data/ \
-            ${{ vars.E7270_USER }}@${{ vars.E7270_IP }}:/opt/stacks/fail2ban/data/
-          rsync -avz --checksum \
-            -e "ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key" \
-            fail2ban/custom-cont-init.d/ \
-            ${{ vars.E7270_USER }}@${{ vars.E7270_IP }}:/opt/stacks/fail2ban/custom-cont-init.d/
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          source: "fail2ban/data,fail2ban/custom-cont-init.d"
+          target: /opt/stacks/fail2ban
+          strip_components: 1
+          overwrite: true
 
       - name: Set permissions on scripts
-        run: |
-          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
-              ${{ vars.E7270_USER }}@${{ vars.E7270_IP }} \
-              "sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/; \
-                sudo chmod -R a+rX /opt/stacks/fail2ban/data/; \
-                chmod -R +x /opt/stacks/fail2ban/custom-cont-init.d/; \
-                chmod -R +x /opt/stacks/fail2ban/data/scripts/"
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/
+            sudo chmod -R a+rX /opt/stacks/fail2ban/data/
+            chmod -R +x /opt/stacks/fail2ban/custom-cont-init.d/
+            chmod -R +x /opt/stacks/fail2ban/data/scripts/
 
       - name: Authenticate to Portainer
         id: auth
@@ -165,7 +201,7 @@ jobs:
           WEBHOOK_TOKEN=$(curl -s \
             --max-time 10 \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             | jq -r '.AutoUpdate.Webhook')
 
           echo "Webhook token: $WEBHOOK_TOKEN"
@@ -221,7 +257,7 @@ jobs:
         run: |
             OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
 
-            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
@@ -244,13 +280,6 @@ jobs:
 
               echo "API Response: $RESPONSE" 
 
-      - name: Redeploy Stack using webhook
-        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-        run: |
-          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
-
-          echo "API Response: $RESPONSE"
    
       - name: Bring down VPN
         if: always()

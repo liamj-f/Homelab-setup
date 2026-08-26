@@ -122,7 +122,7 @@ jobs:
                   > fail2ban/data/action.d/oci-waf.local
 
       - name: Create fail2ban directories on host
-        uses: appleboy/ssh-action@v0.1.7
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
@@ -147,7 +147,7 @@ jobs:
           overwrite: true
 
       - name: Set permissions on scripts
-        uses: appleboy/ssh-action@v0.1.7
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}

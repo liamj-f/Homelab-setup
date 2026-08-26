@@ -350,11 +350,11 @@ jobs:
               --arg domain "${{ env.domain }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
-                domain_names: $domain,
+                domain_names: [$domain],
                 forward_host: "dovetrek-pwa",
                 forward_port: 80,
                 forward_scheme: "http",
-                certificate_id: $cert_id,
+                certificate_id: ($cert_id|tonumber),
                 allow_websocket_upgrade: 1,
                 ssl_forced: false,
                 enabled: true,

@@ -59,11 +59,15 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push dynamic-ip-updater
         uses: docker/build-push-action@v6
         with:
           context: ./dynamic-ip-updater
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
@@ -255,7 +259,7 @@ jobs:
         run: |
             OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
 
-            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
@@ -264,7 +268,7 @@ jobs:
                           "forceUpdate": true,
                           "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
                           },
-                  "PullImage": false,
+                  "PullImage": true,
                   "RepositoryReferenceName": "${{ github.ref }}",
                   "repositoryAuthentication": false,
                               "Env": [

@@ -268,7 +268,7 @@ jobs:
                           "forceUpdate": true,
                           "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
                           },
-                  "PullImage": false,
+                  "PullImage": true,
                   "RepositoryReferenceName": "${{ github.ref }}",
                   "repositoryAuthentication": false,
                               "Env": [

@@ -1,78 +1,114 @@
-name: Redeploy Fail2Ban via Portainer GitOps
-#ToDo:
-# create the mount points and automount
-# then rescan files if the database isn't intact.
-
+name: Redeploy OCI Cert Updater via Portainer GitOps
 on:
   push:
     branches:
       - main
       - '**'
     paths:
-      - 'fail2ban/**'
-      - '.github/workflows/fail2ban-redeploy.yml'
+      - 'oci-cert-updater/oci-cert-updater-compose.yml'
+      - '.github/workflows/oci-cert-updater-deploy.yml'
+      - 'oci-cert-updater/**'
   workflow_dispatch:
     inputs:
       host_machine:
-        required: false
+        required: true
         type: string 
-        default: 'e7270-server'
+        default: 'ljfcloud-arm'
       domain:
-        required: false
+        required: true
         type: string
-        default: '14monarch.james-fagg.uk'
+        default: 'oci.james-fagg.uk'
+
   workflow_call:
     inputs:
       host_machine:
-        required: false
+        required: true
         type: string 
-        default: 'e7270-server'
+        default: 'ljfcloud-arm'
       domain:
-        required: false
-        type: string  
-        default: '14monarch.james-fagg.uk' 
+        required: true
+        type: string
+        default: 'oci.james-fagg.uk'
 env:
-  domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
-  host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+  domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
+  host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
 jobs:
-  deploy:
+  build-image-and-push:
+    name: Build and push images to ghcr.io
     runs-on: ubuntu-latest
-    env:
-      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata oci-cert-updater
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/liamj-f/oci-cert-updater
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push oci-cert-updater
+        uses: docker/build-push-action@v6
+        with:
+          context: ./oci-cert-updater
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: build-image-and-push
+    runs-on: ubuntu-latest
     concurrency:
       group: homelab-deployments
       cancel-in-progress: false
-      queue: max
+      queue: max   
     steps:
+
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
+
+      - name: Install WireGuard
+        run: |
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
 
       - name: Set node config
         id: node_config
         run: |
-          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
+          if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
             echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
+          elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ env.host_machine }}" = "ljfcloud-arm" ]; then
+          elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
             echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           fi
-
-      - name: Install WireGuard
-        run: |
-          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
 
       - name: Write WireGuard config
         run: |
@@ -108,74 +144,25 @@ jobs:
             sleep 10
           done
           sudo wg show
-
-      - name: Render fail2ban action template
-        run: |
-          OCI_KEY_CONTENT_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
-          export OCI_USER="${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"
-          export OCI_FINGERPRINT="${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"
-          export OCI_TENANCY="${{ vars.OCID_TENANT }}"
-          export OCI_REGION="uk-london-1"
-          export OCI_KEY_CONTENT_BASE64
-          export OCID_WAF_BLOCKLIST="${{ vars.OCID_WAF_BLOCKLIST }}"
-          envsubst < fail2ban/data/action.d/oci-waf.local.template \
-                  > fail2ban/data/action.d/oci-waf.local
-
-      - name: Create fail2ban directories on host
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
-          script: |
-            mkdir -p /opt/stacks/fail2ban/data/action.d \
-                      /opt/stacks/fail2ban/data/filter.d \
-                      /opt/stacks/fail2ban/data/jail.d \
-                      /opt/stacks/fail2ban/data/scripts \
-                      /opt/stacks/fail2ban/custom-cont-init.d
-            sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/fail2ban/data/
-
-      - name: Copy config files to host
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
-          source: "fail2ban/data,fail2ban/custom-cont-init.d"
-          target: /opt/stacks/fail2ban
-          strip_components: 1
-          overwrite: true
-
-      - name: Set permissions on scripts
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
-          script: |
-            sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/
-            sudo chmod -R a+rX /opt/stacks/fail2ban/data/
-            chmod -R +x /opt/stacks/fail2ban/custom-cont-init.d/
-            chmod -R +x /opt/stacks/fail2ban/data/scripts/
-
+          
       - name: Authenticate to Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
+          RESPONSE=$(curl -X POST "http://${{ vars.RPI4_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
             -d '{
-                 "Username":"${{ vars.APP_USER }}", 
+                 "Username":"${{ vars.APP_USER }}",
                  "Password":"${{ secrets.APP_PASSWORD }}"
-                }')
+                 }')
           TOKEN=$(echo "$RESPONSE" | jq -r '.jwt')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Get Portainer EndpointId
         id: endpoint
         env:
-          HOST_MACHINE: ${{ inputs.host_machine || 'e7270-server' }}
+          host_machine: ${{ env.host_machine || 'ljfcloud-arm' }}
         run: |
-          echo "Looking for endpoint with name: $HOST_MACHINE"
+          echo "Looking for endpoint with name: $host_machine"
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')
@@ -186,15 +173,18 @@ jobs:
         run: |
           STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
-
+ 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="fail2ban" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
-          
+          STACK_ID=$(echo "$STACKS" | jq -r \
+            --arg name "oci-cert-updater" \
+            --argjson endpoint_id "${{ steps.endpoint.outputs.endpoint_id }}" \
+            '.[] | select(.Name==$name and .EndpointId==$endpoint_id) | .Id')
+
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
             echo "stack_id=0" >> $GITHUB_OUTPUT
           else
-            echo "Stack found with ID: $STACK_ID" 
+            echo "Stack found with ID: $STACK_ID"
             echo "stack_id=$STACK_ID" >> $GITHUB_OUTPUT
           fi
 
@@ -205,11 +195,11 @@ jobs:
           WEBHOOK_TOKEN=$(curl -s \
             --max-time 10 \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             | jq -r '.AutoUpdate.Webhook')
 
           echo "Webhook token: $WEBHOOK_TOKEN"
-          echo "webhook_token=$WEBHOOK_TOKEN" >> $GITHUB_OUTPUT          
+          echo "webhook_token=$WEBHOOK_TOKEN" >> $GITHUB_OUTPUT
 
       - name: Generate UUID
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
@@ -220,7 +210,6 @@ jobs:
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
-
           OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
 
           echo "Creating stack from GitHub..."
@@ -228,40 +217,37 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "fail2ban",
+               "Name": "oci-cert-updater",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "fail2ban/fail2ban-compose.yml",
+               "ComposeFile": "oci-cert-updater/oci-cert-updater-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "${{ steps.uuid.outputs.uuid }}"
+                              "Webhook": "${{ steps.uuid.outputs.uuid }}"                           
                              },
-               "Env": [
+                              "Env": [
                                     {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
                                     {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
                                     {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
-                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
-                                    {
-                                    "name":"WAF_BLOCKLIST_ID",
-                                    "value":"${{ vars.OCID_WAF_BLOCKLIST }}"
-                                    }
-                       ],
+                                    {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
+                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"}
+                                    ],
                "Prune": true,
                "StackFileVersion": "3"
-              }')
+              }'
+                    )
 
             echo "API Response: $RESPONSE"
             echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
 
- 
       - name: Update Stack Environment Variables
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
             OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
 
-            RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{
@@ -270,23 +256,24 @@ jobs:
                           "forceUpdate": true,
                           "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
                           },
-                  "PullImage": false,
+                  "PullImage": true,
                   "RepositoryReferenceName": "${{ github.ref }}",
                   "repositoryAuthentication": false,
                               "Env": [
                                     {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
                                     {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
                                     {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
+                                    {"name":"OCI_CERT_ID",      "value":"${{ vars.OCID_SSL_CERT }}"},
                                     {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"}
-                                      ],
-                  "Prune": true
-                  }'  )
+                                    ],
+                  "Prune": false
+                }'  )
 
               echo "API Response: $RESPONSE" 
 
-   
+
       - name: Bring down VPN
         if: always()
         run: |
           sudo wg-quick down ./wg0.conf
-          sudo wg show   
+          sudo wg show

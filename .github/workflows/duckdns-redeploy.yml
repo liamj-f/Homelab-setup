@@ -43,14 +43,14 @@ jobs:
           cat > wg0.conf << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 10.5.5.5/32
-          DNS = 10.5.5.1
+          Address = 192.168.2.2/30
+          DNS = ${{ vars.Keepalived_IP }}
           MTU = 1250
 
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
           PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, 145.241.244.229/32
+          AllowedIPs = 192.168.0.0/24, ${{ vars.IP_LJFCLOUD_ARM }}/32
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF
@@ -68,7 +68,7 @@ jobs:
       - name: Add host key to known_hosts of runner
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ vars.LJFCLOUD_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ vars.IP_LJFCLOUD_ARM }} >> ~/.ssh/known_hosts
 
       - name: Extract Subdomain
         id: subdomain
@@ -170,7 +170,7 @@ jobs:
       - name: Update Stack Environment Variables
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |          
-          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
@@ -195,13 +195,12 @@ jobs:
                "Prune": true
               }'
 
-      - name: Redeploy Stack using webhook
-        if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-        run: |
-          RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
-
-          echo "API Response: $RESPONSE"
+      #- name: Redeploy Stack using webhook
+      #  if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
+      #  run: |
+      #    RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
+      #    -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
+      #    echo "API Response: $RESPONSE"
 
       - name: Bring down VPN
         if: always()

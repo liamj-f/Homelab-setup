@@ -22,7 +22,7 @@ services:
       - /opt/stacks/fail2ban/data:/config/fail2ban
       - /opt/stacks/fail2ban/custom-cont-init.d:/custom-cont-init.d:ro
       - /var/log:/var/log:ro
-      - /opt/stacks/grampsweb/logs:/remotelogs/grampsweb:ro
+      - /opt/f2b-logs:/remotelogs:ro
     networks:
       - nginx_network
 

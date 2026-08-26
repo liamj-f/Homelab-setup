@@ -1,15 +1,6 @@
-name: Redeploy Nextloud via Portainer GitOps
-#ToDo:
-# create the mount points and automount
-# then rescan files if the database isn't intact.
+name: Redeploy Pihole via Portainer GitOps
+
 on:
-  push:
-    branches:
-      - main
-      - '**'
-    paths:
-      - 'nextcloud-compose.yml'
-      - '.github/workflows/nextcloud-redeploy.yml'
   workflow_dispatch:
     inputs:
       host_machine:
@@ -19,7 +10,7 @@ on:
       domain:
         required: false
         type: string
-        default: 'nextcloud.14monarch.james-fagg.uk'
+        default: 'pihole.14monarch.james-fagg.uk'
   workflow_call:
     inputs:
       host_machine:
@@ -29,148 +20,67 @@ on:
       domain:
         required: false
         type: string  
-        default: 'nextcloud.14monarch.james-fagg.uk'
+        default: 'pihole.14monarch.james-fagg.uk' 
+  push:
+    branches:
+      - main
+      - '**'
+    paths:
+      - '.github/workflows/pihole-deploy.yml'
+      - 'pihole/**'
 env:
-  host_machine: ${{ inputs.host_machine || 'e7270-server' }}
-  domain: ${{ inputs.domain || 'nextcloud.14monarch.james-fagg.uk' }} 
+  domain: ${{ inputs.domain || 'pihole.14monarch.james-fagg.uk' }}
+  host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+
 jobs:
-  database_create:
-    runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
-      queue: max
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v6.0.2
-      
-      - name: Set node config
-        id: node_config
-        run: |
-          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
-            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
-            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
-            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
-            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
-          fi
-     
-      - name: Write SSH key to file
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-
-      - name: Install WireGuard
-        run: |
-          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
-
-      - name: Write WireGuard config
-        run: |
-          cat > wg0.conf << EOF
-          [Interface]
-          PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 192.168.2.2/30
-          DNS = ${{ vars.Keepalived_IP }}
-          MTU = 1250
-
-          [Peer]
-          PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
-          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, ${{ vars.IP_LJFCLOUD_ARM }}/32
-          Endpoint = ${{ vars.WG_ENDPOINT }}:51820
-          PersistentKeepalive = 25
-          EOF
-
-      - name: Bring up VPN on runner
-        run: |
-          success=false
-          for i in 1 2 3 4 5; do
-            if sudo wg-quick up ./wg0.conf; then
-              success=true
-              break
-            fi
-            echo "wg-quick up failed (attempt $i/5). Retrying in 5s..."
-            sleep 5
-          done
-          if [ "$success" != true ]; then
-            echo "::error::wg-quick up failed after 5 attempts"
-            exit 1
-          fi
-
-          for i in 1 2 3 4 5; do
-            if sudo wg show wg0 latest-handshakes | grep -qv '^\s*[a-zA-Z0-9+/=]*\s*0$'; then
-              break
-            fi
-            echo "No WireGuard handshake yet (attempt $i/5). Waiting 2s..."
-            sleep 2
-          done
-          sudo wg show
-
-      - name: Override system DNS resolver on runner
-        run: |
-          sudo rm /etc/resolv.conf
-          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
-
-      - name: Check postgres is up
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
-          script: |
-            sudo docker exec postgres pg_isready -U svc_gitopsdeploy
-
-      - name: Create database and user if not exists
-        uses: appleboy/ssh-action@v1.2.5
-        env:
-          POSTGRES_DEPLOYMENT_USER: svc_gitopsdeploy
-          POSTGRES_DEPLOYMENT_USER_PASSWORD: ${{ secrets.svc_gitopsdeploy_password }}
-          POSTGRES_APP_DB_NAME: nextcloud
-          POSTGRES_APP_USER: svc_nextcloud
-          POSTGRES_APP_PASSWORD: ${{ secrets.svc_nextcloud_password }}
-        with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
-          envs: POSTGRES_APP_USER,POSTGRES_APP_PASSWORD,POSTGRES_APP_DB_NAME
-          script: |
-            docker exec -i postgres psql -U svc_gitopsdeploy -d postgres_db -v ON_ERROR_STOP=1 \
-              -v dbuser="$POSTGRES_APP_USER" \
-              -v dbpass="$POSTGRES_APP_PASSWORD" \
-              -v dbname="$POSTGRES_APP_DB_NAME" <<'SQL'
-            SET createrole_self_grant = 'set,inherit';
-
-            SELECT 'CREATE ROLE ' || quote_ident(:'dbuser') || ' WITH LOGIN PASSWORD ' || quote_literal(:'dbpass')
-            WHERE NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = :'dbuser')
-            \gexec
-            GRANT :"dbuser" TO CURRENT_USER WITH SET TRUE;
-            
-            SELECT 'CREATE DATABASE ' || quote_ident(:'dbname') || ' OWNER ' || quote_ident(:'dbuser')
-            WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'dbname')
-            \gexec
-            SQL
-
-      - name: Bring down VPN
-        if: always()
-        run: |
-          sudo wg-quick down ./wg0.conf
-          sudo wg show
   deploy:
     runs-on: ubuntu-latest
     concurrency:
       group: homelab-deployments
       cancel-in-progress: false
-      queue: max   
-    needs: database_create
+      queue: max
+    strategy:
+      matrix:
+        host_machine: [rpi4-server, e7270-server]
+      max-parallel: 1
+    env:
+      host_machine: ${{ matrix.host_machine }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6.0.2
+
+      - name: Set node config
+        id: node_config
+        run: |
+          if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
+            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "other_ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "dhcp_active"=true >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
+            echo "dhcp_active"=false >> $GITHUB_OUTPUT
+            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "other_ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
+            echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Write SSH key to file
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
@@ -209,16 +119,16 @@ jobs:
             sleep 10
           done
           sudo wg show
-          
+
       - name: Override system DNS resolver
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
-            
+
       - name: Authenticate to Portainer
         id: auth
         run: |
-          RESPONSE=$(curl -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
+          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "${{ vars.RPI4_IP }}:83/api/auth" \
             -H "Content-Type: application/json" \
             -d '{
                  "Username":"${{ vars.APP_USER }}", 
@@ -230,7 +140,7 @@ jobs:
       - name: Get Portainer EndpointId
         id: endpoint
         run: |
-          echo "Looking for endpoint with name: $HOST_MACHINE"
+          echo "Looking for endpoint with name: $host_machine"
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
           ENDPOINT_ID=$(echo "$RESPONSE" | jq -r --arg host_machine "$host_machine" '.[] | select(.Name==$host_machine) | .Id')
@@ -243,7 +153,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="nextcloud" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="pihole" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
@@ -264,8 +174,8 @@ jobs:
             | jq -r '.AutoUpdate.Webhook')
 
           echo "Webhook token: $WEBHOOK_TOKEN"
-          echo "webhook_token=$WEBHOOK_TOKEN" >> $GITHUB_OUTPUT 
-                 
+          echo "webhook_token=$WEBHOOK_TOKEN" >> $GITHUB_OUTPUT
+
       - name: Generate UUID
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         id: uuid
@@ -276,119 +186,274 @@ jobs:
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
           echo "Creating stack from GitHub..."
-          RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+          
+          CREATE_STACK_PAYLOAD=$(jq -n \
+            --arg ref "${{ github.ref }}" \
+            --arg webhook "${{ steps.uuid.outputs.uuid }}" \
+            --arg app_password "${{ secrets.APP_PASSWORD }}" \
+            --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
+            --arg secondary_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
+            --arg hostname "${{ matrix.host_machine }}" \
+            '{
+            Name: "pihole",
+            RepositoryURL: "https://github.com/liamj-f/homelab-setup",
+            RepositoryReferenceName: $ref,
+            ComposeFile: "pihole/pihole-compose.yml",
+            RepositoryAuthentication: false,
+            RepullImageAndRedeploy: true,
+            AutoUpdate: {
+                          "forcePullImage": true,
+                          "forceUpdate": true,
+                          "Webhook": $webhook
+                          },
+              Env: [
+                {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
+                {name: "PRIMARY_IP",          value: $primary_ip},
+                {name: "SECONDARY_IP",        value: $secondary_ip},
+                {name: "HOSTNAME",            value: $hostname}
+              ],
+            Prune: true,
+            StackFileVersion: "3"
+          }')
+          
+
+          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
-          -d '{
-               "Name": "nextcloud",
-               "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
-               "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "nextcloud/nextcloud-compose.yml",
-               "RepositoryAuthentication": false,
-               "AutoUpdate": {
-                              "forcePullImage": true,
-                              "forceUpdate": true,
-                              "Webhook": "${{ steps.uuid.outputs.uuid }}"
-                             },
-               "Env": [
-                       {
-                       "name":"POSTGRES_HOST",
-                       "value":"postgres"
-                       },
-                       {
-                       "name":"POSTGRES_DATABASE",
-                       "value":"nextcloud"
-                       },
-                       {
-                       "name":"POSTGRES_USER",
-                       "value":"svc_nextcloud"
-                       },
-                       {
-                        "name":"POSTGRES_PASSWORD",
-                        "value":"${{ secrets.SVC_NEXTCLOUD_PASSWORD }}"
-                        },
-                       {
-                        "name":"NEXTCLOUD_ADMIN_USER",
-                        "value":"${{ vars.APP_USER }}"
-                       },
-                       {
-                        "name":"NEXTCLOUD_ADMIN_PASSWORD",
-                        "value":"${{ secrets.APP_PASSWORD }}"
-                       }
-                       ],  
-               "Prune": true,
-               "StackFileVersion": "3"
-              }')
+          -d "$CREATE_STACK_PAYLOAD")
 
-            echo "API Response: $RESPONSE"
-            echo "stack_response=$RESPONSE" >> $GITHUB_OUTPUT
+          echo "API Response: $RESPONSE"
 
-      - name: Update Stack Env Variables
+      - name: Update Stack Environment Variables
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-          curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
-          -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-          -H "Content-Type: application/json" \
-          -d '{
-               "PullImage": true,
-               "RepositoryReferenceName": "${{ github.ref }}",
-               "repositoryAuthentication": false,
-               "AutoUpdate": {
-                              "forcePullImage": true,
-                              "forceUpdate": true,
-                              "Webhook": "${{ steps.get_webhook.outputs.webhook_token }}"
-                             },
-               "Env": [
-                       {
-                       "name":"POSTGRES_HOST",
-                       "value":"postgres"
-                       },
-                       {
-                       "name":"POSTGRES_DATABASE",
-                       "value":"nextcloud"
-                       },
-                       {
-                       "name":"POSTGRES_USER",
-                       "value":"svc_nextcloud"
-                       },
-                       {
-                        "name":"POSTGRES_PASSWORD",
-                        "value":"${{ secrets.SVC_NEXTCLOUD_PASSWORD }}"
-                        },
-                       {
-                        "name":"NEXTCLOUD_ADMIN_USER",
-                        "value":"${{ vars.APP_USER }}"
-                       },
-                       {
-                        "name":"NEXTCLOUD_ADMIN_PASSWORD",
-                        "value":"${{ secrets.APP_PASSWORD }}"
-                       }
-                       ],
-               "Prune": true
-              }'          
-    
-      #- name: Redeploy Stack using webhook
-      #  if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
-      #  run: |
-      #    RESPONSE=$(curl -s -i -v --max-time 300 -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/webhooks/${{ steps.get_webhook.outputs.webhook_token }}?pullimage=true" \
-      #    -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" )
-      #    echo "API Response: $RESPONSE"
+            UPDATE_STACK_PAYLOAD=$(jq -n \
+            --arg ref "${{ github.ref }}" \
+            --arg webhook "${{ steps.uuid.outputs.uuid }}" \
+            --arg app_password "${{ secrets.APP_PASSWORD }}" \
+            --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
+            --arg secondary_ip "${{ steps.node_config.outputs.rsync_target_host }}" \
+            --arg hostname "${{ matrix.host_machine }}" \
+            '{
+              AutoUpdate: {
+                    ForcePullImage: true,
+                    ForceUpdate: true,
+                    Webhook: $webhook
+                    },
+              PullImage: true,
+              RepositoryReferenceName: $ref,
+              repositoryAuthentication: false,
+              Env: [
+                {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
+                {name: "PRIMARY_IP",          value: $primary_ip},
+                {name: "SECONDARY_IP",        value: $secondary_ip},
+                {name: "HOSTNAME",            value: $hostname},
+              ],
+              Prune: true
+              }')
 
-      - name: Rescan files in external drive
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-          host: ${{ vars.E7270_IP }}
-          username: ${{ vars.E7270_USER }}
-          password: ${{ secrets.E7270_PASSWORD }}
-          script: |
-            sudo docker exec -u www-data nextcloud php occ files:scan --all
+            RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d "$UPDATE_STACK_PAYLOAD")
 
-      - name: Bring down VPN
+            echo "API Response: $RESPONSE" 
+
+      - name: Pihole Api Auth
+        id: pihole_auth
         run: |
-          sudo wg-quick down ./wg0.conf
-          sudo wg show   
+          sleep 20
+          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \
+              -H "Content-Type: application/json" \
+              -d '{
+                  "password": "${{ secrets.APP_PASSWORD }}"
+                  }' )
+
+          CSRF=$(echo "$RESPONSE" | jq -r '.session.csrf')
+          SID=$(echo "$RESPONSE" | jq -r '.session.sid')
+          echo "sid=$SID" >> $GITHUB_OUTPUT
+          echo "csrf=$CSRF" >> $GITHUB_OUTPUT         
+          
+      - name: Add DNS records to Pihole via API
+        # should add wg0 back in as interface here "eth0,wg0
+        # removed "active": true, from the dhcp part as keepalived will handle on transistion to master
+        run: |
+          cat <<EOF > pihole_config.json
+          {
+              "config":{
+                  "dns":{
+                      "piholePTR":"Hostname",
+                      "domain": {
+                                  "name": "",
+                                  "local": true
+                                },
+                      "upstreams": [
+                                    "1.1.1.1",
+                                    "8.8.8.8"
+                                    ],
+                      "interface": "eth0", 
+                      "listeningMode": "single",
+                      "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
+                      "hosts":[
+                              "${{ vars.KEEPALIVED_IP }} tplink.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} pihole.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} pihole1.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} pihole2.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} nginx.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} nginx1.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} nginx2.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} portainer.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} nextcloud.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} adminer.14monarch.james-fagg.uk",
+                              "${{ vars.KEEPALIVED_IP }} whoami.14monarch.james-fagg.uk"
+                              ]
+                           },                          
+                  "dhcp": {
+                        "active": ${{ steps.node_config.outputs.dhcp_active }}
+                        "start": "192.168.0.10",
+                        "end": "192.168.0.254",
+                        "router": "192.168.0.1",
+                        "netmask": "",
+                        "leaseTime": "2h",
+                        "ipv6": false,
+                        "rapidCommit": false,
+                        "multiDNS": false,
+                        "logging": false,
+                        "ignoreUnknownClients": false,
+                        "hosts": [
+                                "dc:a6:32:c8:bb:41,${{ vars.RPI4_IP }},rpi4-server,infinite",
+                                "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},rpi0-server,infinite",
+                                "3c:6a:a7:87:f4:0b,${{ vars.E7270_IP }},e7270-server,infinite"
+                                 ]
+                          },
+                  "misc": {
+                          "dnsmasq_lines": ["dhcp-option=6,${{ vars.KEEPALIVED_IP }}"]
+                          }  
+                    }
+                }
+          EOF
+                                    
+          curl --retry 3 --retry-delay 5 --retry-all-errors -X PATCH "http://${{ steps.node_config.outputs.ssh_host }}:82/api/config" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d "@pihole_config.json"
+
+    #  - name: Wait for Pi-hole DB ready
+    #    run: |
+    #      for i in $(seq 1 12); do
+    #        RESPONSE=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+    #          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+    #          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+    #          -H 'accept: application/json' || true)
+    #        echo "Attempt $i/12: $RESPONSE"
+    #        if echo "$RESPONSE" | jq -e '.groups' > /dev/null 2>&1; then
+    #          echo "Pi-hole gravity DB is ready"
+    #          exit 0
+    #        fi
+    #        echo "DB not ready, waiting 10s..."
+    #        sleep 10
+    #      done
+    #      echo "Pi-hole gravity DB not ready after 2 minutes"
+    #      exit 1
+
+      - name: Add Blocklists to Pihole via API
+        run: |
+          curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/lists?type=block" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d '{
+              "address": [
+                          "https://v.firebog.net/hosts/Easylist.txt",
+                          "https://media.githubusercontent.com/media/zachlagden/Pi-hole-Optimized-Blocklists/refs/heads/main/lists/advertising.txt",
+                          "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts"
+                          ],
+              "comment": "Added via API",
+              "groups": [0],
+              "enabled": true
+              }'
+
+      - name: Update Gravity via API
+        run: |
+          curl --retry 3 --retry-delay 5 --retry-all-errors  -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/action/gravity" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: text/plain' \
+          -H 'content-type: application/json' \
+
+      - name: Get Bypass Group ID
+        id: bypass_group
+        run: |
+          RAW=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+            -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+            -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+            -H 'accept: application/json')
+          echo "Raw response: $RAW"
+          GROUP_ID=$(echo "$RAW" | jq -r '(.groups // [])[] | select(.name == "bypass") | .id')
+          echo "group_id=$GROUP_ID" >> $GITHUB_ENV
+
+      - name: Create Bypass Group in Pihole
+        if: steps.bypass_group.outputs.group_id == ''
+        run: |
+            RESPONSE=$(curl -s --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+              -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+              -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+              -H 'accept: application/json' \
+              -H 'content-type: application/json' \
+              -d '{"name":"bypass","comment":"Bypass group - no blocklists","enabled":true}')
+            echo "Response: $RESPONSE"
+          
+            RAW=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+            -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+            -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+            -H 'accept: application/json')
+             echo "Raw response: $RAW"
+            GROUP_ID=$(echo "$RAW" | jq -r '(.groups // [])[] | select(.name == "bypass") | .id')
+            echo "group_id=$GROUP_ID" >> $GITHUB_ENV
+
+      - name: Add Phone to Bypass Group
+        run: |
+          PAYLOAD=$(jq -n --argjson group_id "$group_id" '{
+              client: "B8:A8:25:5E:17:7A",
+              comment: "HJ-F phone - bypass group",
+              groups: [$group_id]
+              }')
+          curl --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/clients" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+          -H 'accept: application/json' \
+          -H 'content-type: application/json' \
+          -d "$PAYLOAD"
+          
+
+
+
+      - name: End Pihole API Session
+        run: |
+          curl --retry 3 --retry-delay 5 --retry-all-errors -X DELETE "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \
+          -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+          -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+
+      - name: Authenticate as nginx user
+        id: token
+        run: |
+          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/tokens" \
+            -H "Content-Type: application/json" \
+            -d '{
+                 "identity":"${{ vars.NGINX_EMAIL }}",
+                 "secret":"${{ secrets.APP_PASSWORD }}"
+                 }')
+        
+          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
   proxy_setup_onprem:
+    # This step add pihole1, pihole2 and pihole.14monarch.james-fagg to each node
     runs-on: ubuntu-latest
+    needs: deploy
     concurrency:
       group: homelab-deployments
       cancel-in-progress: false
@@ -413,30 +478,19 @@ jobs:
           if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
             echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
+            echo "pihole_number=1" >> $GITHUB_OUTPUT
+            echo "other_ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "other_pihole_number=2" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "pihole_number=2" >> $GITHUB_OUTPUT
+            echo "other_ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "other_pihole_number=1" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Set node config
-        id: env_host_config
-        run: |
-          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
-            echo "env_ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
-            echo "env_ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "env_ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
-            echo "env_ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
-            echo "env_ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "env_ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           fi
@@ -554,7 +608,7 @@ jobs:
             echo "cert_id=$cert_id" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create or update proxy host
+      - name: Create or update proxy host (KA)
         if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
         run: |
           echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
@@ -564,12 +618,12 @@ jobs:
 
           BODY=$(jq -n \
               --arg domain "${{ env.domain }}" \
-              --arg host_ip "${{ steps.env_host_config.outputs.env_ssh_host }}" \
+              --arg host_ip "${{ vars.KEEPALIVED_IP }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               '{
                 domain_names: [$domain],
                 forward_host: $host_ip,
-                forward_port: 85,
+                forward_port: 82,
                 forward_scheme: "http",
                 certificate_id: ($cert_id|tonumber),
                 allow_websocket_upgrade: 1,
@@ -595,15 +649,101 @@ jobs:
                 -d "$BODY" | jq -r '.id // "error"'
             fi
 
+      - name: Create or update pihole${{ steps.node_config.outputs.pihole_number }}.$rootdomain proxy host
+        if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
+        run: |
+          echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
+          node_domain="pihole${{ steps.node_config.outputs.pihole_number }}.$rootdomain"          
+          Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$node_domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
+
+          BODY=$(jq -n \
+              --arg domain "$node_domain" \
+              --arg host_ip "${{ steps.node_config.outputs.ssh_host }}" \
+              --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
+              '{
+                domain_names: [$domain],
+                forward_host: $host_ip,
+                forward_port: 82,
+                forward_scheme: "http",
+                certificate_id: ($cert_id|tonumber),
+                allow_websocket_upgrade: 1,
+                ssl_forced: false,
+                enabled: true,
+                block_exploits: true,
+                meta: { letsencrypt_agree: false, dns_challenge: false }
+              }')            
+
+            if [ -n "$Proxy_ID" ] && [ "$Proxy_ID" != "null" ]; then
+              echo "Updating existing proxy host with ID: $Proxy_ID"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$Proxy_ID" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            else
+              echo "Creating new proxy host for domain: ${{ env.domain }}"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            fi
+
+      - name: Create or update pihole${{ steps.node_config.outputs.other_pihole_number }}.$rootdomain proxy host
+        if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
+        run: |
+          echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
+          node_domain="nginx${{ steps.node_config.outputs.other_pihole_number }}.$rootdomain"                    
+          Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$node_domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
+          node_domain="nginx${{ steps.node_config.outputs.other_pihole_number }}.$rootdomain"
+          BODY=$(jq -n \
+              --arg domain "$node_domain" \
+              --arg host_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
+              --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
+              '{
+                domain_names: [$domain],
+                forward_host: $host_ip,
+                forward_port: 82,
+                forward_scheme: "http",
+                certificate_id: ($cert_id|tonumber),
+                allow_websocket_upgrade: 1,
+                ssl_forced: false,
+                enabled: true,
+                block_exploits: true,
+                meta: { letsencrypt_agree: false, dns_challenge: false }
+              }')            
+
+            if [ -n "$Proxy_ID" ] && [ "$Proxy_ID" != "null" ]; then
+              echo "Updating existing proxy host with ID: $Proxy_ID"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$Proxy_ID" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            else
+              echo "Creating new proxy host for domain: ${{ env.domain }}"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            fi
+
+              echo $RESPONSE
+
       - name: Bring down VPN
         if: always()
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show
   proxy_setup_oci:
+    # This step adds pihole1, pihole2 and pihole.14monarch.james-fagg.uk to the OCI nginx.
     env:
       host_machine: 'ljfcloud-arm'
     runs-on: ubuntu-latest
+    needs: deploy
     concurrency:
       group: homelab-deployments
       cancel-in-progress: false
@@ -752,9 +892,11 @@ jobs:
 
           BODY=$(jq -n \
               --arg domain "${{ env.domain }}" \
+              --arg host_ip "${{ steps.node_config.outputs.ssh_host }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
+              --arg rootdomain "$rootdomain" \
               '{
-                domain_names: [$domain],
+                domain_names: [$domain,"pihole1." + $rootdomain,"pihole2." + $rootdomain],
                 forward_host: "rathole-server",
                 forward_port: 3000,
                 forward_scheme: "http",

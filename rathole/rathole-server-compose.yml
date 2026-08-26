@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  rathole-server:
+    image: ghcr.io/rathole-org/rathole:dev
+    container_name: rathole-server
+    restart: unless-stopped
+    ports:
+      - "2333:2333"
+      - "3000:3000"
+    volumes:
+      - /opt/stacks/rathole/rathole-server.toml:/app/config.toml
+    command: --server /app/config.toml
+    networks:
+      - nginx_network
+
+networks:
+  nginx_network:
+    external: true 

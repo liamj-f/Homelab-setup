@@ -3,8 +3,9 @@ name: Install Docker on RPI4
 on:
   push:
     branches:
-      - main
-      - '**'
+      #- main
+      #- '**'
+      - FakeBranchForTesting
     paths:
       - '.github/workflows/install-docker-RPI4.yml'
   workflow_dispatch:
@@ -42,14 +43,14 @@ jobs:
           cat > wg0.conf << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 10.5.5.5/32
-          DNS = 10.5.5.1
+          Address = 192.168.2.2/30
+          DNS = ${{ vars.Keepalived_IP }}
           MTU = 1250
 
           [Peer]
           PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
           PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, 145.241.244.229/32
+          AllowedIPs = 192.168.0.0/24, ${{ vars.IP_LJFCLOUD_ARM }}/32
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF

@@ -53,7 +53,7 @@ services:
       - gramps_db:/root/.gramps/grampsdb  # persist tree registry (name/backend markers, not the data itself)
       - gramps_media:/app/media  # persist media files
       - gramps_tmp:/tmp
-      - /opt/stacks/grampsweb/logs:/app/logs
+      - /opt/f2b-logs/grampsweb:/app/logs
 
   grampsweb_celery:
     <<: *grampsweb  # YAML merge key copying the entire grampsweb service config

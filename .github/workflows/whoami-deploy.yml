@@ -35,6 +35,11 @@ env:
   domain: ${{ inputs.domain || 'whoami.james-fagg.uk' }}
 jobs:
   deploy:
+    concurrency:
+      group: homelab-deployments
+      cancel-in-progress: false
+      queue: max   
+
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo

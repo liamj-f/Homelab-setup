@@ -42,7 +42,7 @@ jobs:
       queue: max
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
       
       - name: Set node config
         id: node_config
@@ -170,7 +170,7 @@ jobs:
     needs: database_create
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
@@ -399,7 +399,7 @@ jobs:
         host_machine: [rpi4-server, e7270-server]
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
 
       - name: Calculate base domain
         shell: bash
@@ -610,7 +610,7 @@ jobs:
       queue: max
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
 
       - name: Calculate base domain
         shell: bash

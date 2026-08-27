@@ -44,7 +44,7 @@ jobs:
       max-parallel: 1
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
 
       - name: Set node config
         id: node_config
@@ -402,7 +402,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
 
       - name: Calculate base domain
         shell: bash
@@ -613,7 +613,7 @@ jobs:
       queue: max
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
 
       - name: Calculate base domain
         shell: bash

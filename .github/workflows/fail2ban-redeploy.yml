@@ -45,7 +45,7 @@ jobs:
       queue: max
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set node config
         id: node_config

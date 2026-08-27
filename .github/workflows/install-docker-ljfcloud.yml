@@ -122,7 +122,7 @@ jobs:
       domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@v7
 
       - name: Set node config
         id: node_config

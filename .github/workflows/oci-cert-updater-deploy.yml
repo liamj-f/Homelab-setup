@@ -52,7 +52,7 @@ jobs:
 
       - name: Extract metadata oci-cert-updater
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/liamj-f/oci-cert-updater
           tags: |

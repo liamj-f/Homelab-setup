@@ -1,12 +1,12 @@
 name: Redeploy MySQL via Portainer GitOps
 on:
-  push:
-    branches:
-      - main
-      - '**'
-    paths:
-      - 'mysql-compose.yml'
-      - '.github/workflows/mysql-redeploy.yml'
+  #push:
+  #  branches:
+  #    - main
+  #    - '**'
+  #  paths:
+  #    - 'mysql-compose.yml'
+  #    - '.github/workflows/mysql-redeploy.yml'
   workflow_call:
     inputs:
       host_machine:

@@ -32,7 +32,7 @@ jobs:
       subdomain: ${{ inputs.subdomain || '14monarch.local' }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  

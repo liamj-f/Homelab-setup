@@ -41,7 +41,7 @@ jobs:
       queue: max
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install WireGuard
         run: |
@@ -206,7 +206,7 @@ jobs:
       queue: max
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
 
       - name: Calculate base domain
         shell: bash

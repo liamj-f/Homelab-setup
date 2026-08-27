@@ -34,7 +34,7 @@ jobs:
         host_machine: [ rpi4-server, e7270-server, ljfcloud-arm ]
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
       
       - name: Set node config
         id: node_config
@@ -281,7 +281,7 @@ jobs:
             target: "/tmp/"
 
       - name: Wait for NPM to be healthy
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
@@ -303,7 +303,7 @@ jobs:
             exit 1
               
       - name: Load config into NPM container and reload
-        uses: appleboy/ssh-action@v0.1.7
+        uses: appleboy/ssh-action@v1.2.5
         with:
             host: ${{ steps.node_config.outputs.ssh_host }}
             username: ${{ steps.node_config.outputs.ssh_user }}
@@ -361,7 +361,7 @@ jobs:
         host_machine: [rpi4-server, e7270-server]
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
 
       - name: Calculate base domain
         shell: bash
@@ -647,7 +647,7 @@ jobs:
       queue: max
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
 
       - name: Calculate base domain
         shell: bash
@@ -839,7 +839,7 @@ jobs:
       queue: max
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
 
       - name: Calculate base domain
         shell: bash

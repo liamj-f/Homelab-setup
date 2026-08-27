@@ -271,7 +271,7 @@ jobs:
             echo "API Response: $RESPONSE" 
      
       - name: Copy NGINX XFF config to host
-        uses: appleboy/scp-action@v1
+        uses: appleboy/scp-action@v1.0.0
         with:
             host: ${{ steps.node_config.outputs.ssh_host }}
             username: ${{ steps.node_config.outputs.ssh_user }}

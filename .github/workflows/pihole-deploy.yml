@@ -504,6 +504,19 @@ jobs:
               sh -c "pip install --quiet requests pycryptodome && python /tplink_dhcp_toggle.py off"
             rm -f /tmp/tplink_dhcp_toggle.py
 
+      - name: TEST - retry router login directly from runner (read-only, non-blocking)
+        # Temporary: check whether the login retry logic alone fixes the
+        # runner-over-tunnel path too, now that a live/stale session isn't
+        # the confounder it was in earlier testing. status only - no writes -
+        # and continue-on-error so this can't affect the real deploy result.
+        if: ${{ steps.dhcp_state.outputs.dhcp_active == 'true' }}
+        continue-on-error: true
+        run: |
+          pip install --quiet requests pycryptodome
+          python3 pihole/tplink_dhcp_toggle.py status
+        env:
+          ROUTER_PASSWORD: ${{ secrets.APP_PASSWORD }}
+
   proxy_setup_onprem:
     # This step add pihole1, pihole2 and pihole.14monarch.james-fagg to each node
     runs-on: ubuntu-latest

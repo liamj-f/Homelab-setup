@@ -10,7 +10,7 @@ on:
       domain:
         required: false
         type: string
-        default: 'auth.james-fagg.uk'
+        default: 'auth.14monarch.james-fagg.uk'
   workflow_call:
     inputs:
       host_machine:
@@ -20,7 +20,7 @@ on:
       domain:
         required: false
         type: string
-        default: 'auth.james-fagg.uk'
+        default: 'auth.14monarch.james-fagg.uk'
   push:
     branches:
       - main
@@ -30,7 +30,7 @@ on:
       - 'authelia/**'
 env:
   host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
-  domain: ${{ inputs.domain || 'auth.james-fagg.uk' }}
+  domain: ${{ inputs.domain || 'auth.14monarch.james-fagg.uk' }}
 
 jobs:
   deploy:

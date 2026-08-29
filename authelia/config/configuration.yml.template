@@ -29,7 +29,7 @@ session:
   cookies:
     - name: 'authelia_session'
       domain: 'james-fagg.uk'
-      authelia_url: 'https://auth.james-fagg.uk'
+      authelia_url: 'https://auth.14monarch.james-fagg.uk'
       same_site: 'lax'
       expiration: '1 hour'
       inactivity: '5 minutes'

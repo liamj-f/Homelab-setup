@@ -168,11 +168,32 @@ class Session:
         self._adopt_effective_host(resp)
         return resp.json()
 
+    def _poke(self, path: str) -> None:
+        """Fire-and-forget GET-style call the real browser makes but we
+        don't need the result of -- best-effort, never raises. Matches
+        the router's own frontend request sequence (captured from a real
+        login) in case its dispatcher expects this ordering/state before
+        it'll register the 'login' callback."""
+        try:
+            resp = requests.post(
+                f"{self.host}/cgi-bin/luci/;stok=/{path}",
+                params={"operation": "read"},
+                timeout=15,
+                verify=False,
+            )
+            self._adopt_effective_host(resp)
+        except Exception as e:
+            log(f"[warn] {path} poke failed (continuing): {e}")
+
     def fetch_password_key(self) -> tuple[str, str]:
         data = self._get("login?form=keys")["data"]["password"]
         return data[0], data[1]
 
     def fetch_signing_key_and_seq(self) -> None:
+        # Matches the real browser's own request order (captured via a live
+        # login) between fetching the password key and the signing key.
+        self._poke("login?form=sysmode")
+        self._poke("domain_login?form=dlogin")
         data = self._get("login?form=auth")["data"]
         self.seq = data["seq"]
         self.nn, self.ee = data["key"][0], data["key"][1]

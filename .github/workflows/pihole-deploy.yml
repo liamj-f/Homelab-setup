@@ -470,15 +470,37 @@ jobs:
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
 
-      - name: Disable TP-Link router DHCP (Pi-hole is authoritative)
+      - name: Copy DHCP toggle script to DHCP-active node
         # Only on the node Pi-hole's own dhcp.active was set true for above,
         # so this doesn't fight the router over a login session twice per run.
         if: ${{ steps.dhcp_state.outputs.dhcp_active == 'true' }}
-        run: |
-          pip install --quiet requests pycryptodome
-          python3 pihole/tplink_dhcp_toggle.py off
-        env:
-          ROUTER_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          source: "pihole/tplink_dhcp_toggle.py"
+          target: "/tmp/"
+          strip_components: 1
+
+      - name: Disable TP-Link router DHCP (Pi-hole is authoritative)
+        # Must run from the same LAN as the router, not from this
+        # GitHub-hosted runner: the router redirects tunnel-sourced traffic
+        # to a restricted https admin profile that never registers the
+        # login callback, so the request always fails over the WireGuard
+        # tunnel regardless of request shape. Running it over SSH on the
+        # DHCP-active node itself avoids the tunnel entirely.
+        if: ${{ steps.dhcp_state.outputs.dhcp_active == 'true' }}
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            pip3 install --quiet --break-system-packages requests pycryptodome 2>/dev/null \
+              || pip3 install --quiet --user requests pycryptodome
+            ROUTER_PASSWORD='${{ secrets.APP_PASSWORD }}' python3 /tmp/tplink_dhcp_toggle.py off
+            rm -f /tmp/tplink_dhcp_toggle.py
 
   proxy_setup_onprem:
     # This step add pihole1, pihole2 and pihole.14monarch.james-fagg to each node

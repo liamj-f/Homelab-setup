@@ -37,8 +37,12 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        host_machine: [rpi4-server, e7270-server]
     env:
-      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+      host_machine: ${{ matrix.host_machine }}
     concurrency:
       group: homelab-deployments
       cancel-in-progress: false
@@ -50,19 +54,19 @@ jobs:
       - name: Set node config
         id: node_config
         run: |
-          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
+          if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
             echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
+          elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ env.host_machine }}" = "ljfcloud-arm" ]; then
+          elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
             echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
@@ -153,7 +157,7 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/
+            sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/fail2ban/data/
             sudo chmod -R a+rX /opt/stacks/fail2ban/data/
             chmod -R +x /opt/stacks/fail2ban/custom-cont-init.d/
             chmod -R +x /opt/stacks/fail2ban/data/scripts/

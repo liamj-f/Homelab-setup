@@ -25,9 +25,9 @@ Both were found by pulling apart the router's own JS (login route ->
 directly against the live router.
 
 Usage:
-    python dhcp_toggle.py status
-    python dhcp_toggle.py on
-    python dhcp_toggle.py off
+    python tplink_dhcp_toggle.py status
+    python tplink_dhcp_toggle.py on
+    python tplink_dhcp_toggle.py off
 
 Credentials are read from environment variables (never hardcode them):
     ROUTER_HOST       default: http://192.168.0.1

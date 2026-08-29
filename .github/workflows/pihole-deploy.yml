@@ -55,13 +55,14 @@ jobs:
           if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
             echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "other_ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
-            echo "dhcp_active"=true >> $GITHUB_OUTPUT
+            # Used only as a fallback if keepalived's live state can't be read (see "Determine DHCP-active node" step)
+            echo "default_dhcp_active=true" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
-            echo "dhcp_active"=false >> $GITHUB_OUTPUT
+            echo "default_dhcp_active=false" >> $GITHUB_OUTPUT
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "other_ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
@@ -75,11 +76,6 @@ jobs:
             echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           fi
-
-      - name: Write SSH key to file
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
 
       - name: Install WireGuard
         run: |
@@ -119,6 +115,46 @@ jobs:
             sleep 10
           done
           sudo wg show
+
+      - name: Determine DHCP-active node from keepalived state
+        # The MASTER (the node currently holding the keepalived VIP) is the
+        # one that should have DHCP active - matching what keepalived's own
+        # notify.sh already does on a live failover (see keepalived/notify.sh.template).
+        # If keepalived isn't deployed/running on this node yet, fall back to
+        # the static default from "Set node config" (rpi4-server=true, e7270-server=false).
+        id: dhcp_state
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > ssh_key.pem
+          chmod 600 ssh_key.pem
+
+          STATE=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -i ssh_key.pem "${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}" '
+              if docker ps --filter "name=^/keepalived$" --filter "status=running" --format "{{.Names}}" | grep -q keepalived; then
+                if ip addr show | grep -q "${{ vars.KEEPALIVED_IP }}"; then
+                  echo MASTER
+                else
+                  echo BACKUP
+                fi
+              else
+                echo NOT_RUNNING
+              fi
+            ' 2>/dev/null || echo NOT_RUNNING)
+
+          rm -f ssh_key.pem
+          echo "Keepalived state on ${{ matrix.host_machine }} (${{ steps.node_config.outputs.ssh_host }}): $STATE"
+
+          case "$STATE" in
+            MASTER)
+              echo "dhcp_active=true" >> $GITHUB_OUTPUT
+              ;;
+            BACKUP)
+              echo "dhcp_active=false" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "keepalived not found/running on this node, falling back to default_dhcp_active=${{ steps.node_config.outputs.default_dhcp_active }}"
+              echo "dhcp_active=${{ steps.node_config.outputs.default_dhcp_active }}" >> $GITHUB_OUTPUT
+              ;;
+          esac
 
       - name: Override system DNS resolver
         run: |
@@ -309,7 +345,7 @@ jobs:
                               ]
                            },                          
                   "dhcp": {
-                        "active": ${{ steps.node_config.outputs.dhcp_active }}
+                        "active": ${{ steps.dhcp_state.outputs.dhcp_active }},
                         "start": "192.168.0.10",
                         "end": "192.168.0.254",
                         "router": "192.168.0.1",
@@ -427,28 +463,22 @@ jobs:
           -H 'accept: application/json' \
           -H 'content-type: application/json' \
           -d "$PAYLOAD"
-          
-
-
-
+        
       - name: End Pihole API Session
         run: |
           curl --retry 3 --retry-delay 5 --retry-all-errors -X DELETE "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
 
-      - name: Authenticate as nginx user
-        id: token
+      - name: Disable TP-Link router DHCP (Pi-hole is authoritative)
+        # Only on the node Pi-hole's own dhcp.active was set true for above,
+        # so this doesn't fight the router over a login session twice per run.
+        if: ${{ steps.dhcp_state.outputs.dhcp_active == 'true' }}
         run: |
-          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/tokens" \
-            -H "Content-Type: application/json" \
-            -d '{
-                 "identity":"${{ vars.NGINX_EMAIL }}",
-                 "secret":"${{ secrets.APP_PASSWORD }}"
-                 }')
-        
-          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          pip install --quiet requests pycryptodome
+          python3 pihole/tplink_dhcp_toggle.py off
+        env:
+          ROUTER_PASSWORD: ${{ secrets.APP_PASSWORD }}
 
   proxy_setup_onprem:
     # This step add pihole1, pihole2 and pihole.14monarch.james-fagg to each node
@@ -498,11 +528,6 @@ jobs:
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
-
-      - name: Write SSH key to file
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
 
       - name: Write WireGuard config
         run: |
@@ -772,11 +797,6 @@ jobs:
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)            
-
-      - name: Write SSH key to file
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
 
       - name: Write WireGuard config
         run: |

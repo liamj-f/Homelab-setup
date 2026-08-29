@@ -119,7 +119,7 @@ jobs:
           AUTHELIA_SESSION_SECRET: ${{ secrets.AUTHELIA_SESSION_SECRET }}
           AUTHELIA_STORAGE_ENCRYPTION_KEY: ${{ secrets.AUTHELIA_STORAGE_ENCRYPTION_KEY }}
           AUTHELIA_JWT_SECRET: ${{ secrets.AUTHELIA_JWT_SECRET }}
-          gmail_address: ${{ secrets.gmail_address }}
+          gmail_address: ${{ vars.homelab_email }}
           gmail_app_password: ${{ secrets.gmail_app_password }}
         run: |
           envsubst < authelia/config/configuration.yml.template > authelia/config/configuration.yml
@@ -128,7 +128,7 @@ jobs:
         env:
           AUTHELIA_ADMIN_USERNAME: ${{ vars.APP_USER }}
           AUTHELIA_ADMIN_EMAIL: ${{ vars.HOMELAB_EMAIL }}
-          AUTHELIA_ADMIN_PASSWORD_HASH: ${{ secrets.AUTHELIA_ADMIN_PASSWORD_HASH }}
+          AUTHELIA_ADMIN_PASSWORD_HASH: ${{ secrets.APP_PASSWORD }}
         run: |
           envsubst < authelia/config/users_database.yml.template > authelia/config/users_database.yml
 

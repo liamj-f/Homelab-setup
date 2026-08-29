@@ -1,0 +1,42 @@
+# configuration.yml / users_database.yml are rendered from authelia/config/*.template
+# (secrets baked in via envsubst) and copied by the deploy pipeline to
+# /opt/stacks/authelia/config on the host - see .github/workflows/authelia-deploy.yml.
+services:
+  authelia:
+    container_name: authelia
+    image: authelia/authelia:latest
+    restart: unless-stopped
+    environment:
+      TZ: Europe/London
+    ports:
+      - "90:9091"
+    healthcheck:
+      test: ["CMD", "authelia", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    volumes:
+      - /opt/stacks/authelia/config:/config
+      - /opt/f2b-logs/authelia:/config/log
+    depends_on:
+      authelia_valkey:
+        condition: service_healthy
+    networks:
+      - nginx_network
+
+  authelia_valkey:
+    container_name: authelia_valkey
+    image: ghcr.io/valkey-io/valkey:9.1.0-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - nginx_network
+
+networks:
+  nginx_network:
+    external: true

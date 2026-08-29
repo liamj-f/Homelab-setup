@@ -1,0 +1,9 @@
+---
+users:
+  ${AUTHELIA_ADMIN_USERNAME}:
+    disabled: false
+    displayname: 'Admin'
+    password: '${AUTHELIA_ADMIN_PASSWORD_HASH}'
+    email: '${AUTHELIA_ADMIN_EMAIL}'
+    groups:
+      - 'admins'

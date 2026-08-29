@@ -1,0 +1,8 @@
+[authelia]
+enabled   = true
+filter    = authelia
+action    = oci-waf
+logpath   = /remotelogs/authelia/authelia.log
+maxretry  = 3
+findtime  = 600
+bantime   = 86400

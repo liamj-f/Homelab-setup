@@ -48,11 +48,18 @@ import re
 import sys
 
 import requests
+import urllib3
 from Crypto.Cipher import PKCS1_OAEP, PKCS1_v1_5
 from Crypto.PublicKey.RSA import construct
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES
 from binascii import b2a_hex
+
+# The router may redirect plain-http requests to its self-signed https
+# admin UI depending on how the client reaches it (e.g. same-subnet vs.
+# over a VPN tunnel) -- we already authenticate with the real router
+# password, so skip cert verification rather than fail on that redirect.
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 HOST = os.getenv("ROUTER_HOST", "http://192.168.0.1")
 PASSWORD = os.getenv("ROUTER_PASSWORD")
@@ -139,6 +146,7 @@ class Session:
             f"{self.host}/cgi-bin/luci/;stok=/{path}",
             params={"operation": "read"},
             timeout=15,
+            verify=False,
         )
         resp.raise_for_status()
         return resp.json()
@@ -169,6 +177,7 @@ class Session:
             data={"sign": sign, "data": enc_body},
             headers=HEADERS,
             timeout=15,
+            verify=False,
         )
         if resp.status_code != 200:
             raise RuntimeError(f"Login failed: HTTP {resp.status_code}")
@@ -197,6 +206,7 @@ class Session:
             headers=HEADERS,
             cookies={"sysauth": self.sysauth},
             timeout=15,
+            verify=False,
         )
         if resp.status_code != 200:
             raise RuntimeError(f"{path} -> HTTP {resp.status_code}")

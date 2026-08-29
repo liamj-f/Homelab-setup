@@ -182,7 +182,14 @@ class Session:
         if resp.status_code != 200:
             raise RuntimeError(f"Login failed: HTTP {resp.status_code}")
 
-        payload = json.loads(self.aes_decrypt(resp.json()["data"]))
+        raw = resp.json()
+        if "data" not in raw:
+            # Some error responses (e.g. account temporarily locked, too
+            # many attempts) come back as plain, unencrypted JSON with no
+            # "data" envelope at all.
+            raise RuntimeError(f"Login rejected (unencrypted response): {raw}")
+
+        payload = json.loads(self.aes_decrypt(raw["data"]))
         if not payload.get("success"):
             raise RuntimeError(f"Login rejected: {payload}")
 

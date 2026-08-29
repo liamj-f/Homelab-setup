@@ -67,11 +67,14 @@ DEFAULT_POOL_START = os.getenv("ROUTER_DHCP_POOL_START", "192.168.0.100")
 DEFAULT_POOL_END = os.getenv("ROUTER_DHCP_POOL_END", "192.168.0.199")
 
 SIGNATURE_CHUNK = 53
-HEADERS = {
-    "Referer": f"{HOST}/webpages/index.html",
-    "Origin": HOST,
-    "Content-Type": "application/x-www-form-urlencoded",
-}
+
+
+def _headers_for(host: str) -> dict:
+    return {
+        "Referer": f"{host}/webpages/index.html",
+        "Origin": host,
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
 
 
 def log(msg: str) -> None:
@@ -116,6 +119,7 @@ class Session:
 
     def __init__(self, host: str):
         self.host = host
+        self.headers = _headers_for(host)
         self._aes_key = b2a_hex(get_random_bytes(8))  # 16 hex chars
         self._aes_iv = b2a_hex(get_random_bytes(8))
         self.nn = ""  # signature RSA key (from /login?form=auth)
@@ -141,6 +145,18 @@ class Session:
     def aes_key_string(self) -> str:
         return f"k={self._aes_key.decode()}&i={self._aes_iv.decode()}"
 
+    def _adopt_effective_host(self, resp: requests.Response) -> None:
+        """If the router redirected us to a different scheme/host (e.g.
+        http -> its self-signed https admin UI), keep using that -- and
+        rebuild Referer/Origin to match, since a stale http Referer sent
+        to the https backend gets rejected with a bare 'no such callback'
+        error rather than a helpful one."""
+        final = f"{resp.url.split('/cgi-bin/')[0]}"
+        if final and final != self.host:
+            log(f"[info] router redirected {self.host} -> {final}, following")
+            self.host = final
+            self.headers = _headers_for(final)
+
     def _get(self, path: str) -> dict:
         resp = requests.post(
             f"{self.host}/cgi-bin/luci/;stok=/{path}",
@@ -149,6 +165,7 @@ class Session:
             verify=False,
         )
         resp.raise_for_status()
+        self._adopt_effective_host(resp)
         return resp.json()
 
     def fetch_password_key(self) -> tuple[str, str]:
@@ -175,7 +192,7 @@ class Session:
         resp = requests.post(
             f"{self.host}/cgi-bin/luci/;stok=/login?form=login",
             data={"sign": sign, "data": enc_body},
-            headers=HEADERS,
+            headers=self.headers,
             timeout=15,
             verify=False,
         )
@@ -210,7 +227,7 @@ class Session:
         resp = requests.post(
             f"{self.host}/cgi-bin/luci/;stok={self.stok}/{path}",
             data={"sign": sign, "data": enc_body},
-            headers=HEADERS,
+            headers=self.headers,
             cookies={"sysauth": self.sysauth},
             timeout=15,
             verify=False,

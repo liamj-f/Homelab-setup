@@ -497,9 +497,11 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            pip3 install --quiet --break-system-packages requests pycryptodome 2>/dev/null \
-              || pip3 install --quiet --user requests pycryptodome
-            ROUTER_PASSWORD='${{ secrets.APP_PASSWORD }}' python3 /tmp/tplink_dhcp_toggle.py off
+            docker run --rm --network host \
+              -e ROUTER_PASSWORD='${{ secrets.APP_PASSWORD }}' \
+              -v /tmp/tplink_dhcp_toggle.py:/tplink_dhcp_toggle.py:ro \
+              python:3.12-slim \
+              sh -c "pip install --quiet requests pycryptodome && python /tplink_dhcp_toggle.py off"
             rm -f /tmp/tplink_dhcp_toggle.py
 
   proxy_setup_onprem:

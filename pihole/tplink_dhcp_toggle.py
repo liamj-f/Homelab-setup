@@ -198,7 +198,31 @@ class Session:
         self.seq = data["seq"]
         self.nn, self.ee = data["key"][0], data["key"][1]
 
-    def login(self, password: str) -> None:
+    def login(self, password: str, max_attempts: int = 2) -> None:
+        """Log in, retrying with completely fresh key/seq material if a
+        stale session is already logged in on the router.
+
+        `confirm=true` in the login body is meant to force any existing
+        session off, but in practice a single request with it isn't
+        enough to reliably clear one -- the real web UI's own login button
+        effectively does two full request cycles when it hits the "only
+        one device can log in at a time" conflict (once to surface the
+        conflict, once more - with fresh nonces - to actually force it
+        off). Mirror that here instead of requiring a manual browser
+        login/logout to clear a stuck session."""
+        last_error: Exception | None = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                self._login_once(password)
+                return
+            except RuntimeError as e:
+                last_error = e
+                if attempt < max_attempts:
+                    log(f"[warn] login attempt {attempt}/{max_attempts} failed ({e}); "
+                        f"retrying with a fresh session to force off any stale one")
+        raise last_error
+
+    def _login_once(self, password: str) -> None:
         pwd_nn, pwd_ee = self.fetch_password_key()
         self.fetch_signing_key_and_seq()
 

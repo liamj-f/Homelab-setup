@@ -9,7 +9,7 @@ services:
     environment:
       TZ: Europe/London
     ports:
-      - "90:9091"
+      - "91:9091"
     healthcheck:
       test: ["CMD", "authelia", "healthcheck"]
       interval: 10s

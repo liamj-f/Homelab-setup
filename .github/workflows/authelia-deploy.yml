@@ -449,16 +449,18 @@ jobs:
               --arg domain "${{ env.domain }}" \
               --arg host_ip "${{ steps.env_host_config.outputs.env_ssh_host }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
+              --arg advanced_config "proxy_set_header X-Forwarded-Host \$host;" \
               '{
                 domain_names: [$domain],
                 forward_host: $host_ip,
-                forward_port: 90,
+                forward_port: 91,
                 forward_scheme: "http",
                 certificate_id: ($cert_id|tonumber),
                 allow_websocket_upgrade: 1,
                 ssl_forced: false,
                 enabled: true,
                 block_exploits: true,
+                advanced_config: $advanced_config,
                 meta: { letsencrypt_agree: false, dns_challenge: false }
               }')
 
@@ -637,6 +639,7 @@ jobs:
           BODY=$(jq -n \
               --arg domain "${{ env.domain }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
+              --arg advanced_config "proxy_set_header X-Forwarded-Host \$host;" \
               '{
                 domain_names: [$domain],
                 forward_host: "rathole-server",
@@ -647,6 +650,7 @@ jobs:
                 ssl_forced: false,
                 enabled: true,
                 block_exploits: true,
+                advanced_config: $advanced_config,
                 meta: { letsencrypt_agree: false, dns_challenge: false }
               }')
 

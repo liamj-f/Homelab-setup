@@ -471,11 +471,31 @@ jobs:
           Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
 
+          # NPM (this build) inserts "Advanced" config at the server block level,
+          # *before* location / - and location / defines its own proxy_set_header
+          # directives (via `include conf.d/include/proxy.conf;`), so per nginx's
+          # inheritance rule (a location that sets any proxy_set_header inherits
+          # NONE from its parent) a bare header line here is silently ignored.
+          # Authelia's own NPM integration docs account for this: supply a full
+          # replacement `location / {}` block instead, which NPM detects and uses
+          # in place of its auto-generated one.
+          ADVANCED_CONFIG=$(cat <<'EOF'
+          location / {
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $http_connection;
+            proxy_http_version 1.1;
+            include conf.d/include/proxy.conf;
+            proxy_pass $forward_scheme://$server:$port;
+          }
+          EOF
+          )
+
           BODY=$(jq -n \
               --arg domain "${{ env.domain }}" \
               --arg host_ip "${{ steps.env_host_config.outputs.env_ssh_host }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              --arg advanced_config "proxy_set_header X-Forwarded-Host \$host;" \
+              --arg advanced_config "$ADVANCED_CONFIG" \
               '{
                 domain_names: [$domain],
                 forward_host: $host_ip,
@@ -657,10 +677,25 @@ jobs:
           Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
 
+          # See the matching comment in proxy_setup_onprem - NPM inserts "Advanced"
+          # config at server scope, not inside location /, so a bare header line
+          # is silently discarded. Full replacement location block instead.
+          ADVANCED_CONFIG=$(cat <<'EOF'
+          location / {
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $http_connection;
+            proxy_http_version 1.1;
+            include conf.d/include/proxy.conf;
+            proxy_pass $forward_scheme://$server:$port;
+          }
+          EOF
+          )
+
           BODY=$(jq -n \
               --arg domain "${{ env.domain }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              --arg advanced_config "proxy_set_header X-Forwarded-Host \$host;" \
+              --arg advanced_config "$ADVANCED_CONFIG" \
               '{
                 domain_names: [$domain],
                 forward_host: "rathole-server",

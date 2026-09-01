@@ -16,6 +16,8 @@ totp:
 authentication_backend:
   file:
     path: '/config/users_database.yml'
+    search:
+      case_insensitive: true
     password:
       algorithm: 'argon2'
 

@@ -56,7 +56,7 @@ notifier:
     address: 'submissions://smtp.gmail.com:465'
     username: '${gmail_address}'
     password: '${gmail_app_password}'
-    sender: 'Authelia <${gmail_address}>'
+    sender: 'Authelia <${AUTHELIA_SMTP_SENDER}>'
 
 identity_validation:
   reset_password:

@@ -114,6 +114,24 @@ jobs:
             sudo mkdir -p /opt/stacks/authelia/config
             sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/authelia/config
 
+      - name: Look up host user id/group id
+        id: user_ids
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          capture_stdout: true
+          script: |
+            echo "PUID_PGID=$(id -u):$(id -g)"
+
+      - name: Parse host user id/group id
+        id: host_ids
+        run: |
+          LINE=$(echo "${{ steps.user_ids.outputs.stdout }}" | grep '^PUID_PGID=')
+          echo "puid=$(echo "$LINE" | cut -d= -f2 | cut -d: -f1)" >> $GITHUB_OUTPUT
+          echo "pgid=$(echo "$LINE" | cut -d= -f2 | cut -d: -f2)" >> $GITHUB_OUTPUT
+
       - name: Render configuration.yml
         env:
           AUTHELIA_SESSION_SECRET: ${{ secrets.AUTHELIA_SESSION_SECRET }}
@@ -236,7 +254,10 @@ jobs:
                               "forceUpdate": true,
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
-               "Env": [],
+               "Env": [
+                      {"name":"PUID", "value":"${{ steps.host_ids.outputs.puid }}"},
+                      {"name":"PGID", "value":"${{ steps.host_ids.outputs.pgid }}"}
+                      ],
                "Prune": true,
                "StackFileVersion": "3"
               }'
@@ -260,7 +281,10 @@ jobs:
                   "PullImage": true,
                   "RepositoryReferenceName": "${{ github.ref }}",
                   "repositoryAuthentication": false,
-                  "Env": [],
+                  "Env": [
+                         {"name":"PUID", "value":"${{ steps.host_ids.outputs.puid }}"},
+                         {"name":"PGID", "value":"${{ steps.host_ids.outputs.pgid }}"}
+                         ],
                   "Prune": false
                 }'  )
 

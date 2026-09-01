@@ -8,6 +8,13 @@ services:
     restart: unless-stopped
     environment:
       TZ: Europe/London
+      # Pinned to the deploy SSH user's uid/gid (looked up and injected by the
+      # pipeline) so Authelia's own entrypoint.sh - which runs
+      # `chown -R "$PUID:$PGID" /config` on every container start, defaulting
+      # to root - never fights the pipeline for ownership of /config after a
+      # crash-loop restart. See .github/workflows/authelia-deploy.yml.
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
     ports:
       - "91:9091"
     healthcheck:

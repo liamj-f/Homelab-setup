@@ -22,7 +22,7 @@ authentication_backend:
 access_control:
   # No backends are wired up to Authelia's forward-auth yet - this just protects
   # the portal itself. Add rules here when other services start using it.
-  default_policy: 'deny'
+  default_policy: 'two_factor'
 
 session:
   secret: '${AUTHELIA_SESSION_SECRET}'

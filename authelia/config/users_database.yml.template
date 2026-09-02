@@ -2,7 +2,7 @@
 users:
   ${AUTHELIA_ADMIN_USERNAME}:
     disabled: false
-    displayname: 'Admin'
+    displayname: '${AUTHELIA_ADMIN_USERNAME}'
     password: '${AUTHELIA_ADMIN_PASSWORD_HASH}'
     email: '${AUTHELIA_ADMIN_EMAIL}'
     groups:

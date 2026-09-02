@@ -60,11 +60,6 @@ jobs:
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           fi
 
-      - name: Write SSH key to file
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)
@@ -162,8 +157,9 @@ jobs:
           AUTHELIA_ADMIN_EMAIL: ${{ vars.HOMELAB_EMAIL }}
           AUTHELIA_ADMIN_PASSWORD_HASH: ${{ steps.hash_password.outputs.hash }}
         run: |
+          export AUTHELIA_ADMIN_USERNAME="$(echo "$AUTHELIA_ADMIN_USERNAME" | tr '[:upper:]' '[:lower:]')"
           envsubst < authelia/config/users_database.yml.template > authelia/config/users_database.yml
-
+          
       - name: Copy rendered config to host
         uses: appleboy/scp-action@v1.0.0
         with:

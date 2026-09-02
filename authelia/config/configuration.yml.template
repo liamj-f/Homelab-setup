@@ -30,7 +30,7 @@ session:
   secret: '${AUTHELIA_SESSION_SECRET}'
   cookies:
     - name: 'authelia_session'
-      domain: 'james-fagg.uk'
+      domain: '14monarch.james-fagg.uk'
       authelia_url: 'https://auth.14monarch.james-fagg.uk'
       same_site: 'lax'
       expiration: '1 hour'

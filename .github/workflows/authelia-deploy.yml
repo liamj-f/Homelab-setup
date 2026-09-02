@@ -30,7 +30,7 @@ on:
       - 'authelia/**'
 env:
   host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
-  domain: ${{ inputs.domain || 'auth.14monarch.james-fagg.uk' }}
+  domain: ${{ inputs.domain }}
 
 jobs:
   deploy:
@@ -159,7 +159,7 @@ jobs:
         run: |
           export AUTHELIA_ADMIN_USERNAME="$(echo "$AUTHELIA_ADMIN_USERNAME" | tr '[:upper:]' '[:lower:]')"
           envsubst < authelia/config/users_database.yml.template > authelia/config/users_database.yml
-          
+
       - name: Copy rendered config to host
         uses: appleboy/scp-action@v1.0.0
         with:

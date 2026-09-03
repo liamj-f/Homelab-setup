@@ -127,6 +127,19 @@ jobs:
           echo "puid=$(echo "$LINE" | cut -d= -f2 | cut -d: -f1)" >> $GITHUB_OUTPUT
           echo "pgid=$(echo "$LINE" | cut -d= -f2 | cut -d: -f2)" >> $GITHUB_OUTPUT
 
+      - name: Hash Portainer OIDC client secret
+        id: hash_oidc_secret
+        env:
+          PORTAINER_OIDC_CLIENT_SECRET: ${{ secrets.PORTAINER_OIDC_CLIENT_SECRET }}
+        run: |
+          HASH=$(docker run --rm authelia/authelia:latest authelia crypto hash generate pbkdf2 --variant sha512 --password "$PORTAINER_OIDC_CLIENT_SECRET" | sed -n 's/^Digest: //p')
+          if [ -z "$HASH" ]; then
+            echo "::error::Failed to generate Portainer OIDC client secret hash"
+            exit 1
+          fi
+          echo "::add-mask::$HASH"
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+
       - name: Render configuration.yml
         env:
           AUTHELIA_SESSION_SECRET: ${{ secrets.AUTHELIA_SESSION_SECRET }}
@@ -135,6 +148,9 @@ jobs:
           gmail_address: ${{ vars.GMAIL_ADDRESS }}
           gmail_app_password: ${{ secrets.AUTHELIA_GMAIL_APP_PASSWORD }}
           AUTHELIA_SMTP_SENDER: ${{ vars.HOMELAB_EMAIL }}
+          AUTHELIA_OIDC_HMAC_SECRET: ${{ secrets.AUTHELIA_OIDC_HMAC_SECRET }}
+          AUTHELIA_OIDC_ISSUER_PRIVATE_KEY: ${{ secrets.AUTHELIA_OIDC_ISSUER_PRIVATE_KEY }}
+          AUTHELIA_OIDC_PORTAINER_CLIENT_SECRET_HASH: ${{ steps.hash_oidc_secret.outputs.hash }}
         run: |
           envsubst < authelia/config/configuration.yml.template > authelia/config/configuration.yml
 

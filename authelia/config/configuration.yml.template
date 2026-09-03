@@ -21,6 +21,36 @@ authentication_backend:
     password:
       algorithm: 'argon2'
 
+identity_providers:
+  oidc:
+    hmac_secret: '${AUTHELIA_OIDC_HMAC_SECRET}'
+    jwks:
+      - key_id: 'main'
+        algorithm: 'RS256'
+        key: "${AUTHELIA_OIDC_ISSUER_PRIVATE_KEY}"
+    clients:
+      - client_id: 'portainer'
+        client_name: 'Portainer'
+        client_secret: '${AUTHELIA_OIDC_PORTAINER_CLIENT_SECRET_HASH}'
+        public: false
+        authorization_policy: 'two_factor'
+        require_pkce: false
+        pkce_challenge_method: ''
+        redirect_uris:
+          - 'https://portainer.14monarch.james-fagg.uk'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'groups'
+          - 'email'
+        response_types:
+          - 'code'
+        grant_types:
+          - 'authorization_code'
+        access_token_signed_response_alg: 'none'
+        userinfo_signed_response_alg: 'none'
+        token_endpoint_auth_method: 'client_secret_post'
+
 access_control:
   # No backends are wired up to Authelia's forward-auth yet - this just protects
   # the portal itself. Add rules here when other services start using it.

@@ -478,11 +478,15 @@ jobs:
           ADVANCED_CONFIG=$(cat <<'EOF'
           location / {
             proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection $http_connection;
             proxy_http_version 1.1;
             include conf.d/include/proxy.conf;
             proxy_pass $forward_scheme://$server:$port;
+            proxy_pass_request_headers on;
           }
           EOF
           )
@@ -491,7 +495,7 @@ jobs:
               --arg domain "${{ env.domain }}" \
               --arg host_ip "${{ steps.env_host_config.outputs.env_ssh_host }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-          #    --arg advanced_config "$ADVANCED_CONFIG" \
+              --arg advanced_config "$ADVANCED_CONFIG" \
               '{
                 domain_names: [$domain],
                 forward_host: $host_ip,
@@ -679,11 +683,15 @@ jobs:
           ADVANCED_CONFIG=$(cat <<'EOF'
           location / {
             proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection $http_connection;
             proxy_http_version 1.1;
             include conf.d/include/proxy.conf;
             proxy_pass $forward_scheme://$server:$port;
+            proxy_pass_request_headers on;
           }
           EOF
           )
@@ -691,7 +699,7 @@ jobs:
           BODY=$(jq -n \
               --arg domain "${{ env.domain }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-            #  --arg advanced_config "$ADVANCED_CONFIG" \
+              --arg advanced_config "$ADVANCED_CONFIG" \
               '{
                 domain_names: [$domain],
                 forward_host: "rathole-server",

@@ -213,11 +213,83 @@ jobs:
             echo "endpoint_id=$ID" >> $GITHUB_OUTPUT
           fi
           
+      - name: Check Authelia health across Portainer endpoints
+        id: check_authelia
+        if: ${{ matrix.host_machine == 'rpi4-server' && steps.auth.outcome == 'success' }}
+        run: |
+          FOUND="false"
+          ENDPOINT_IDS=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" | jq -r '.[].Id')
+
+          for id in $ENDPOINT_IDS; do
+            HEALTHY=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints/$id/docker/containers/json?all=1" \
+              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+              | jq -r '[.[]? | select((.Names[]? == "/authelia") and .State == "running" and .Health.Status == "healthy")] | length > 0')
+            if [ "$HEALTHY" = "true" ]; then
+              echo "Found healthy authelia container on endpoint $id"
+              FOUND="true"
+              break
+            fi
+          done
+
+          echo "authelia_healthy=$FOUND" >> $GITHUB_OUTPUT
+
+      # Reads the current settings, changes only AuthenticationMethod/OAuthSettings,
+      # and PUTs the whole object back - /api/settings has no partial-update
+      # semantics for OAuthSettings (it replaces that struct wholesale), so
+      # touching only the fields we care about via jq on the fetched object,
+      # rather than constructing a payload from scratch, is what keeps every
+      # other setting (LDAP, snapshot interval, DefaultTeamID, etc.) intact.
+      - name: Enable OAuth for Portainer via API
+        if: ${{ matrix.host_machine == 'rpi4-server' && steps.check_authelia.outputs.authelia_healthy == 'true' }}
+        env:
+          PORTAINER_OIDC_CLIENT_SECRET: ${{ secrets.PORTAINER_OIDC_CLIENT_SECRET }}
+        run: |
+          CURRENT=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/settings" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+
+          BODY=$(echo "$CURRENT" | jq \
+            --arg client_secret "$PORTAINER_OIDC_CLIENT_SECRET" \
+            --arg auth_uri "https://auth.14monarch.james-fagg.uk/api/oidc/authorization" \
+            --arg token_uri "https://auth.14monarch.james-fagg.uk/api/oidc/token" \
+            --arg resource_uri "https://auth.14monarch.james-fagg.uk/api/oidc/userinfo" \
+            --arg redirect_uri "https://${{ env.domain }}" \
+            '.AuthenticationMethod = 3
+             | .OAuthSettings.ClientID = "portainer"
+             | .OAuthSettings.ClientSecret = $client_secret
+             | .OAuthSettings.AuthorizationURI = $auth_uri
+             | .OAuthSettings.AccessTokenURI = $token_uri
+             | .OAuthSettings.ResourceURI = $resource_uri
+             | .OAuthSettings.RedirectURI = $redirect_uri
+             | .OAuthSettings.UserIdentifier = "preferred_username"
+             | .OAuthSettings.Scopes = "openid profile groups email"
+             | .OAuthSettings.OAuthAutoCreateUsers = true
+             | .OAuthSettings.SSO = true
+             | .OAuthSettings.AuthStyle = 1')
+
+          RESPONSE=$(curl -s -X PUT "http://${{ vars.RPI4_IP }}:83/api/settings" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" \
+            -w "\n%{http_code}")
+
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+          RESP_BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP status: $HTTP_STATUS"
+          if [[ "$HTTP_STATUS" =~ ^2 ]]; then
+            echo "OAuth settings updated successfully."
+          else
+            echo "::error::Failed to update Portainer OAuth settings"
+            echo "$RESP_BODY"
+            exit 1
+          fi
+
       - name: Bring down VPN
         if: always()
         run: |
           sudo wg-quick down ./wg0.conf
-          sudo wg show 
+          sudo wg show
 
   proxy_setup_onprem:
     # This step add nginx1, nginx2 and nginx.14monarch.james-fagg to each node

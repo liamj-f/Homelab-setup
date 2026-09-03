@@ -482,9 +482,11 @@ jobs:
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection $http_connection;
             proxy_http_version 1.1;
-            include conf.d/include/proxy.conf;
-            proxy_pass $forward_scheme://$server:$port;
             proxy_pass_request_headers on;
+            # conf.d/include/proxy.conf already ends with its own proxy_pass -
+            # do not add another one here, nginx rejects duplicate proxy_pass
+            # directives in the same location block.
+            include conf.d/include/proxy.conf;
           }
           EOF
           )
@@ -687,9 +689,11 @@ jobs:
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection $http_connection;
             proxy_http_version 1.1;
-            include conf.d/include/proxy.conf;
-            proxy_pass $forward_scheme://$server:$port;
             proxy_pass_request_headers on;
+            # conf.d/include/proxy.conf already ends with its own proxy_pass -
+            # do not add another one here, nginx rejects duplicate proxy_pass
+            # directives in the same location block.
+            include conf.d/include/proxy.conf;
           }
           EOF
           )

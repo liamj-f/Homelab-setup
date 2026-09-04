@@ -5,7 +5,7 @@ on:
       - main
       - '**'
     paths:
-      - 'portainer-compose.yml'
+      - 'portainer/**'
       - '.github/workflows/portainer-deploy.yml'
   workflow_dispatch:
     inputs:

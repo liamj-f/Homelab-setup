@@ -52,15 +52,31 @@ identity_providers:
         token_endpoint_auth_method: 'client_secret_post'
 
 access_control:
-  # No backends are wired up to Authelia's forward-auth yet - this just protects
-  # the portal itself. Add rules here when other services start using it.
-  default_policy: 'two_factor'
+  # default_policy only needs to be 'deny' once there's at least one rule below
+  # (Authelia rejects 'deny' with an empty rules list) - Portainer's OIDC login
+  # doesn't go through this at all (see the client's own authorization_policy
+  # above), this only governs domains actually wired to NPM's auth_request.
+  # *.14monarch.james-fagg.uk / *.oci.james-fagg.uk match any number of
+  # subdomain levels but not the bare root - see
+  # https://www.authelia.com/configuration/security/access-control/
+  default_policy: 'deny'
+  rules:
+    - domain:
+        - '*.14monarch.james-fagg.uk'
+        - '*.oci.james-fagg.uk'
+        - '*.james-fagg.uk'
+      policy: 'two_factor'
 
 session:
   secret: '${AUTHELIA_SESSION_SECRET}'
   cookies:
+    # Widened from '14monarch.james-fagg.uk' to the common ancestor so the
+    # same session cookie is valid across both the 14monarch.* and oci.*
+    # subtrees - a sibling-domain cookie wouldn't be sent to either. Still a
+    # domain the auth.14monarch.james-fagg.uk host is a member of, so it's a
+    # valid Domain attribute to set per RFC 6265.
     - name: 'authelia_session'
-      domain: '14monarch.james-fagg.uk'
+      domain: 'james-fagg.uk'
       authelia_url: 'https://auth.14monarch.james-fagg.uk'
       same_site: 'lax'
       expiration: '1 hour'

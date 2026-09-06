@@ -36,6 +36,9 @@ env:
 jobs:
   database_create:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     concurrency:
       group: homelab-deployments
       cancel-in-progress: false
@@ -43,7 +46,7 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v7
-      
+
       - name: Set node config
         id: node_config
         run: |
@@ -116,6 +119,37 @@ jobs:
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+
+      - name: Check postgres container exists
+        id: check_postgres
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          capture_stdout: true
+          script: |
+            if docker inspect postgres >/dev/null 2>&1; then
+              echo "POSTGRES_EXISTS=true"
+            else
+              echo "POSTGRES_EXISTS=false"
+            fi
+
+      # First-run bootstrap: if postgres has never been deployed to this host,
+      # the steps below (pg_isready, psql database/user creation) would fail
+      # against a container that doesn't exist yet. Trigger postgres-redeploy.yml
+      # and wait for it before continuing.
+      - name: Trigger postgres-redeploy if missing
+        if: ${{ !contains(steps.check_postgres.outputs.stdout, 'POSTGRES_EXISTS=true') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "postgres container not found on ${{ env.host_machine }} - triggering postgres-redeploy.yml"
+          gh workflow run postgres-redeploy.yml --ref ${{ github.ref_name }}
+          sleep 10
+          RUN_ID=$(gh run list --workflow=postgres-redeploy.yml --branch ${{ github.ref_name }} --limit 1 --json databaseId -q '.[0].databaseId')
+          echo "Waiting for postgres-redeploy run $RUN_ID to complete..."
+          gh run watch "$RUN_ID" --exit-status
 
       - name: Check postgres is up
         uses: appleboy/ssh-action@v1.2.5

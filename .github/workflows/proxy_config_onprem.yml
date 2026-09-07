@@ -287,6 +287,15 @@ jobs:
 
       - name: Create or update proxy host
         if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
+        env:
+          # Piped in via env instead of inlined as "${{ ... }}" below: that
+          # text contains literal nginx $variables (e.g. $host,
+          # $request_method), and inlining it directly into a double-quoted
+          # bash string would make bash re-expand those as (undefined, so
+          # blank) shell variables before jq ever saw them. Referencing
+          # "$ADVANCED_CONFIG" instead is a single, non-recursive expansion -
+          # the $vars inside its value are never re-parsed by bash.
+          ADVANCED_CONFIG: ${{ inputs.advanced_config != '' && inputs.advanced_config || steps.authelia_config.outputs.config }}
         run: |
           echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
 
@@ -299,7 +308,7 @@ jobs:
               --arg forward_port "${{ inputs.forward_port }}" \
               --arg forward_scheme "${{ inputs.forward_scheme }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              --arg advanced_config "${{ inputs.advanced_config != '' && inputs.advanced_config || steps.authelia_config.outputs.config }}" \
+              --arg advanced_config "$ADVANCED_CONFIG" \
               '{
                 domain_names: [$domain],
                 forward_host: $host_ip,
@@ -332,6 +341,10 @@ jobs:
 
       - name: Create or update mesh_prefix{node_number}.$rootdomain proxy host
         if: ${{ inputs.mesh_prefix != '' && (steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '') }}
+        env:
+          # See the "Create or update proxy host" step above for why this is
+          # piped in via env rather than inlined as "${{ ... }}" below.
+          ADVANCED_CONFIG: ${{ inputs.advanced_config != '' && inputs.advanced_config || steps.authelia_config.outputs.config }}
         run: |
           echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
           node_domain="${{ inputs.mesh_prefix }}${{ steps.node_config.outputs.node_number }}.$rootdomain"
@@ -345,7 +358,7 @@ jobs:
               --arg forward_port "${{ inputs.forward_port }}" \
               --arg forward_scheme "${{ inputs.forward_scheme }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              --arg advanced_config "${{ inputs.advanced_config != '' && inputs.advanced_config || steps.authelia_config.outputs.config }}" \
+              --arg advanced_config "$ADVANCED_CONFIG" \
               '{
                 domain_names: [$domain],
                 forward_host: $host_ip,
@@ -378,6 +391,10 @@ jobs:
 
       - name: Create or update mesh_prefix{other_node_number}.$rootdomain proxy host
         if: ${{ inputs.mesh_prefix != '' && (steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '') }}
+        env:
+          # See the "Create or update proxy host" step above for why this is
+          # piped in via env rather than inlined as "${{ ... }}" below.
+          ADVANCED_CONFIG: ${{ inputs.advanced_config != '' && inputs.advanced_config || steps.authelia_config.outputs.config }}
         run: |
           echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
           node_domain="${{ inputs.mesh_prefix }}${{ steps.node_config.outputs.other_node_number }}.$rootdomain"
@@ -391,7 +408,7 @@ jobs:
               --arg forward_port "${{ inputs.forward_port }}" \
               --arg forward_scheme "${{ inputs.forward_scheme }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              --arg advanced_config "${{ inputs.advanced_config != '' && inputs.advanced_config || steps.authelia_config.outputs.config }}" \
+              --arg advanced_config "$ADVANCED_CONFIG" \
               '{
                 domain_names: [$domain],
                 forward_host: $host_ip,

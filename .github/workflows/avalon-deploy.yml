@@ -10,7 +10,7 @@ on:
       domain:
         required: false
         type: string
-        default: 'avalon.14monarch.james-fagg.uk'
+        default: 'avalon.james-fagg.uk'
   workflow_call:
     inputs:
       host_machine:
@@ -20,7 +20,7 @@ on:
       domain:
         required: false
         type: string  
-        default: 'avalon.14monarch.james-fagg.uk'    
+        default: 'avalon.james-fagg.uk'    
   push:
     branches:
       - main
@@ -401,14 +401,14 @@ jobs:
     uses: ./.github/workflows/proxy_config_onprem.yml
     secrets: inherit
     with:
-      domain: ${{ inputs.domain || 'avalon.14monarch.james-fagg.uk' }}
+      domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
       app_host_machine: ${{ inputs.host_machine || 'e7270-server' }}
       forward_port: 92
   proxy_setup_oci:
     uses: ./.github/workflows/proxy_config_oci.yml
     secrets: inherit
     with:
-      domain: ${{ inputs.domain || 'avalon.14monarch.james-fagg.uk' }}
+      domain: ${{ inputs.domain || 'avalon.james-fagg.uk' }}
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
 
   f2b:

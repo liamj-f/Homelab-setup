@@ -302,6 +302,15 @@ jobs:
 
       - name: Create or update proxy host
         if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
+        env:
+          # Piped in via env instead of inlined as "${{ ... }}" below: that
+          # text contains literal nginx $variables (e.g. $host,
+          # $request_method), and inlining it directly into a double-quoted
+          # bash string would make bash re-expand those as (undefined, so
+          # blank) shell variables before jq ever saw them. Referencing
+          # "$ADVANCED_CONFIG" instead is a single, non-recursive expansion -
+          # the $vars inside its value are never re-parsed by bash.
+          ADVANCED_CONFIG: ${{ inputs.advanced_config != '' && inputs.advanced_config || steps.authelia_config.outputs.config }}
         run: |
           echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
 
@@ -314,7 +323,7 @@ jobs:
               --arg forward_port "$forward_port" \
               --arg forward_scheme "${{ inputs.forward_scheme }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              --arg advanced_config "${{ inputs.advanced_config != '' && inputs.advanced_config || steps.authelia_config.outputs.config }}" \
+              --arg advanced_config "$ADVANCED_CONFIG" \
               '{
                 domain_names: $domain_names,
                 forward_host: $forward_host,

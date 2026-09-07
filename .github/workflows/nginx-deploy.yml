@@ -348,304 +348,36 @@ jobs:
           sudo wg show   
           
   proxy_setup_onprem:
-    # This step add nginx1, nginx2 and nginx.14monarch.james-fagg to each node
-    runs-on: ubuntu-latest
     needs: deploy
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
-      queue: max
-    strategy:
-      max-parallel: 1
-      matrix:
-        host_machine: [rpi4-server, e7270-server]
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v7
-
-      - name: Calculate base domain
-        shell: bash
-        run: |
-          rootdomain="${domain#*.}"
-          echo "rootdomain=$rootdomain" >> "$GITHUB_ENV"
-
-      - name: Set node config
-        id: node_config
-        run: |
-          if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
-            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
-            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "nginx_number=1" >> $GITHUB_OUTPUT
-            echo "other_ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
-            echo "other_nginx_number=2" >> $GITHUB_OUTPUT
-            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
-            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
-            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "nginx_number=2" >> $GITHUB_OUTPUT
-            echo "other_ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
-            echo "other_nginx_number=1" >> $GITHUB_OUTPUT
-            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Install WireGuard
-        run: |
-          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
-
-      - name: Write WireGuard config
-        run: |
-          cat > wg0.conf << EOF
-          [Interface]
-          PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 192.168.2.2/30
-          DNS = ${{ vars.Keepalived_IP }}
-          MTU = 1250
-
-          [Peer]
-          PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
-          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, ${{ vars.IP_LJFCLOUD_ARM }}/32
-          Endpoint = ${{ vars.WG_ENDPOINT }}:51820
-          PersistentKeepalive = 25
-          EOF
-
-      - name: Bring up VPN
-        run: |
-          for i in $(seq 1 5); do
-            echo "Attempt $i/5: bringing up WireGuard..."
-            if sudo wg-quick up ./wg0.conf; then
-              echo "WireGuard up successfully"
-              break
-            fi
-            if [ $i -eq 5 ]; then
-              echo "WireGuard failed after 5 attempts"
-              exit 1
-            fi
-            echo "Failed, waiting 10s before retry..."
-            sudo ip link delete dev wg0 2>/dev/null || true
-            sleep 10
-          done
-          sudo wg show
-
-      - name: Authenticate as nginx user
-        id: token
-        run: |
-          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/tokens" \
-            -H "Content-Type: application/json" \
-            -d '{
-                 "identity":"${{ vars.NGINX_EMAIL }}",
-                 "secret":"${{ secrets.APP_PASSWORD }}"
-                 }')
-        
-          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-        
-      - name: Resolve SSL Certificate ID
-        id: cert
-        run: |
-          cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-            -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
-            jq -r --arg d "*.$rootdomain" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
-
-          if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
-            echo "Found existing cert: $cert_id"
-            echo "cert_id=$cert_id" >> $GITHUB_OUTPUT
-          else
-            echo "No existing cert found."
-            echo "cert_id=" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create Certificate
-        id: create_cert
-        if: ${{ steps.cert.outputs.cert_id == ''}}
-        continue-on-error: true
-        run: |
-          PAYLOAD=$(jq -n \
-            --arg rootdomain "$rootdomain" \
-            --arg key "${{ secrets.PORKBUN_API_KEY }}" \
-            --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
-            '{
-              provider: "letsencrypt",
-              domain_names: ["*." + $rootdomain, $rootdomain],
-              meta: {
-                dns_challenge: true,
-                dns_provider: "porkbun",
-                dns_provider_credentials: ("dns_porkbun_key=" + $key + "\ndns_porkbun_secret=" + $secret),
-                propagation_seconds: 120
-              }
-            }')
-
-          echo "Creating certificate for domains: *.${rootdomain}, ${rootdomain}"
-
-          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -sS \
-            -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-            -d "$PAYLOAD" \
-            -w "\n%{http_code}" || true)
-
-          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-
-          echo "HTTP status: $HTTP_STATUS"
-          echo "$BODY" | sed -E 's/(dns_porkbun_key=)[^ "]+/\1*****/g; s/(dns_porkbun_secret=)[^ "]+/\1*****/g'
-
-          if [[ "$HTTP_STATUS" =~ ^2 ]]; then
-            cert_id=$(echo "$BODY" | jq -r '.id // empty')
-            echo "cert_id=$cert_id" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create or update proxy host (KA)
-        if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
-        run: |
-          echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
-          
-          Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
-
-          BODY=$(jq -n \
-              --arg domain "${{ env.domain }}" \
-              --arg host_ip "${{ vars.KEEPALIVED_IP }}" \
-              --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              '{
-                domain_names: [$domain],
-                forward_host: $host_ip,
-                forward_port: 81,
-                forward_scheme: "http",
-                certificate_id: ($cert_id|tonumber),
-                allow_websocket_upgrade: 1,
-                ssl_forced: false,
-                enabled: true,
-                block_exploits: true,
-                meta: { letsencrypt_agree: false, dns_challenge: false }
-              }')            
-
-            if [ -n "$Proxy_ID" ] && [ "$Proxy_ID" != "null" ]; then
-              echo "Updating existing proxy host with ID: $Proxy_ID"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$Proxy_ID" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            else
-              echo "Creating new proxy host for domain: ${{ env.domain }}"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            fi
-
-      - name: Create or update nginx${{ steps.node_config.outputs.nginx_number }}.$rootdomain proxy host
-        if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
-        run: |
-          echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
-          node_domain="nginx${{ steps.node_config.outputs.nginx_number }}.$rootdomain"          
-          Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$node_domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
-
-          BODY=$(jq -n \
-              --arg domain "$node_domain" \
-              --arg host_ip "${{ steps.node_config.outputs.ssh_host }}" \
-              --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              '{
-                domain_names: [$domain],
-                forward_host: $host_ip,
-                forward_port: 81,
-                forward_scheme: "http",
-                certificate_id: ($cert_id|tonumber),
-                allow_websocket_upgrade: 1,
-                ssl_forced: false,
-                enabled: true,
-                block_exploits: true,
-                meta: { letsencrypt_agree: false, dns_challenge: false }
-              }')            
-
-            if [ -n "$Proxy_ID" ] && [ "$Proxy_ID" != "null" ]; then
-              echo "Updating existing proxy host with ID: $Proxy_ID"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$Proxy_ID" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            else
-              echo "Creating new proxy host for domain: ${{ env.domain }}"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            fi
-
-      - name: Create or update nginx${{ steps.node_config.outputs.other_nginx_number }}.$rootdomain proxy host
-        if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
-        run: |
-          echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
-          node_domain="nginx${{ steps.node_config.outputs.other_nginx_number }}.$rootdomain"                    
-          Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$node_domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
-          node_domain="nginx${{ steps.node_config.outputs.other_nginx_number }}.$rootdomain"
-          BODY=$(jq -n \
-              --arg domain "$node_domain" \
-              --arg host_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
-              --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              '{
-                domain_names: [$domain],
-                forward_host: $host_ip,
-                forward_port: 81,
-                forward_scheme: "http",
-                certificate_id: ($cert_id|tonumber),
-                allow_websocket_upgrade: 1,
-                ssl_forced: false,
-                enabled: true,
-                block_exploits: true,
-                meta: { letsencrypt_agree: false, dns_challenge: false }
-              }')            
-
-            if [ -n "$Proxy_ID" ] && [ "$Proxy_ID" != "null" ]; then
-              echo "Updating existing proxy host with ID: $Proxy_ID"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$Proxy_ID" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            else
-              echo "Creating new proxy host for domain: ${{ env.domain }}"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            fi
-
-              echo $RESPONSE
-
-      - name: Bring down VPN
-        if: always()
-        run: |
-          sudo wg-quick down ./wg0.conf
-          sudo wg show
+    uses: ./.github/workflows/proxy_config_onprem.yml
+    secrets: inherit
+    with:
+      domain: ${{ inputs.domain || 'nginx.14monarch.james-fagg.uk' }}
+      forward_host: ${{ vars.KEEPALIVED_IP }}
+      forward_port: 81
+      mesh_prefix: 'nginx'
   proxy_setup_oci:
     # This step adds nginx1, nginx2 and nginx.14monarch.james-fagg.uk to the OCI nginx.
     needs: deploy
-    uses: ./.github/workflows/oci-proxy-setup.yml
+    uses: ./.github/workflows/proxy_config_oci.yml
     secrets: inherit
     with:
       domain: ${{ inputs.domain || 'nginx.14monarch.james-fagg.uk' }}
       extra_domain_prefixes: 'nginx1,nginx2'
+      # nginx1/nginx2 are the on-prem NPM instances (rpi4/e7270), always
+      # reached over the rathole tunnel - this pipeline has no host_machine
+      # input of its own, so 'rpi4-server' here is just an on-prem sentinel.
+      host_machine: 'rpi4-server'
 
   proxy_setup_oci_2:
     # This step adds nginx.oci.james-fagg.uk to the OCI Nginx.
     needs: deploy
-    uses: ./.github/workflows/oci-proxy-setup.yml
+    uses: ./.github/workflows/proxy_config_oci.yml
     secrets: inherit
     with:
       domain: 'nginx.oci.james-fagg.uk'
+      # This is ljfcloud-arm's own NPM default site, not an on-prem service.
+      host_machine: 'ljfcloud-arm'
       forward_host: '127.0.0.1'
       forward_port: 81
 

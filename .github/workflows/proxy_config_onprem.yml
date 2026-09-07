@@ -1,15 +1,15 @@
-name: Ensure OCI Proxy Host
+name: Ensure On-Prem Proxy Host
 
-# Shared by every *-deploy.yml pipeline's OCI leg. Centralises two things
-# that used to be duplicated (and drifting) per-pipeline:
-#   1. The OCI nginx-proxy-manager (on ljfcloud-arm) gets exactly ONE
-#      certificate, covering every SAN oci-cert-updater needs to push into
-#      the OCI certificate store. Previously each pipeline resolved/created
-#      its own narrow "*.<its own rootdomain>" cert, so the OCI store ended
-#      up with whichever narrow cert happened to CN-match - never the
-#      multi-SAN cert every OCI-routed service actually needs.
-#   2. The proxy-host create/update logic (incl. optional Authelia
-#      forward-auth wiring), previously copy-pasted into every workflow.
+# Shared by every *-deploy.yml pipeline's on-prem leg. Runs once per on-prem
+# NPM instance (rpi4-server AND e7270-server, matrixed) so both nodes carry
+# an identical proxy host for `domain` - necessary because keepalived can
+# float the active node at any time, and OCI's rathole tunnel always lands
+# on whichever on-prem NPM instance is reachable.
+#
+# forward_host for that shared proxy host is resolved from `app_host_machine`
+# (the node the app itself actually runs on): rpi4-server -> vars.RPI4_IP,
+# e7270-server -> vars.E7270_IP. Pass forward_host explicitly instead when the
+# target isn't a single on-prem node (e.g. the shared keepalived VIP).
 on:
   workflow_call:
     inputs:
@@ -17,27 +17,30 @@ on:
         description: 'Primary domain name for this proxy host (e.g. pihole.14monarch.james-fagg.uk)'
         required: true
         type: string
-      extra_domain_prefixes:
-        description: 'Comma-separated, no spaces, list of extra label prefixes on the same rootdomain as `domain` (e.g. "nginx1,nginx2" -> nginx1.<rootdomain>, nginx2.<rootdomain>)'
+      app_host_machine:
+        description: 'The host_machine the parent pipeline actually deploys this service to (rpi4-server or e7270-server). Used only to auto-select forward_host when it is not supplied explicitly.'
         required: false
         type: string
         default: ''
       forward_host:
-        description: 'Explicit forward host. Leave empty to auto-select "rathole-server" for domains containing "14monarch" - required for any other domain.'
+        description: 'Explicit forward host (e.g. vars.KEEPALIVED_IP for a floating-VIP service). Leave empty to auto-select from `app_host_machine` instead.'
         required: false
         type: string
         default: ''
       forward_port:
-        description: 'Forward port. Leave empty/0 to auto-select 3000 alongside the rathole-server default.'
-        required: false
+        required: true
         type: number
-        default: 0
       forward_scheme:
         required: false
         type: string
         default: 'http'
+      mesh_prefix:
+        description: 'If set (e.g. "nginx", "pihole"), also creates <mesh_prefix>1.<rootdomain> -> this pipelines own on-prem node (rpi4) and <mesh_prefix>2.<rootdomain> -> the other one (e7270), each on forward_port - for services (like the on-prem NPM instances themselves) that run on BOTH on-prem nodes and need to be reachable by either directly, not just via the shared domain.'
+        required: false
+        type: string
+        default: ''
       protect_with_authelia:
-        description: 'Wire an Authelia forward-auth (auth_request) block into this proxy host. Ignored if `advanced_config` is set.'
+        description: 'Wire an Authelia forward-auth (auth_request) block into this proxy host (and any mesh_prefix ones). Authelia is reached directly by IP here (no rathole hop needed on-prem). Ignored if `advanced_config` is set.'
         required: false
         type: boolean
         default: false
@@ -48,15 +51,18 @@ on:
         default: ''
 
 jobs:
-  proxy_setup_oci:
+  proxy_setup_onprem:
     env:
-      host_machine: 'ljfcloud-arm'
       domain: ${{ inputs.domain }}
     runs-on: ubuntu-latest
     concurrency:
       group: homelab-deployments
       cancel-in-progress: false
       queue: max
+    strategy:
+      max-parallel: 1
+      matrix:
+        host_machine: [rpi4-server, e7270-server]
     steps:
       - name: Checkout repo
         uses: actions/checkout@v7
@@ -68,42 +74,40 @@ jobs:
           echo "rootdomain=$rootdomain" >> "$GITHUB_ENV"
 
           forward_host="${{ inputs.forward_host }}"
-          forward_port="${{ inputs.forward_port }}"
           if [ -z "$forward_host" ]; then
-            case "$domain" in
-              *14monarch*)
-                forward_host="rathole-server"
-                forward_port="3000"
-                ;;
+            case "${{ inputs.app_host_machine }}" in
+              rpi4-server)  forward_host="${{ vars.RPI4_IP }}" ;;
+              e7270-server) forward_host="${{ vars.E7270_IP }}" ;;
               *)
-                echo "::error::forward_host (and forward_port) must be supplied explicitly for domains that don't contain '14monarch' (got: $domain)"
+                echo "::error::forward_host must be supplied explicitly when app_host_machine is '${{ inputs.app_host_machine }}' (only rpi4-server/e7270-server auto-resolve)"
                 exit 1
                 ;;
             esac
           fi
           echo "forward_host=$forward_host" >> "$GITHUB_ENV"
-          echo "forward_port=$forward_port" >> "$GITHUB_ENV"
-
-      - name: Build proxy host domain_names
-        id: domains
-        shell: bash
-        run: |
-          domain_names_json=$(jq -n \
-            --arg d "$domain" \
-            --arg root "$rootdomain" \
-            --arg prefixes "${{ inputs.extra_domain_prefixes }}" \
-            '($prefixes | split(",") | map(select(length>0)) | map(. + "." + $root)) as $extras
-             | [$d] + $extras')
-          echo "domain_names_json=$domain_names_json" >> "$GITHUB_OUTPUT"
 
       - name: Set node config
         id: node_config
         run: |
-          echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
-          echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
-          echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-          echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
-          echo "EOF_KEY" >> $GITHUB_OUTPUT
+          if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
+            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
+            echo "node_number=1" >> $GITHUB_OUTPUT
+            echo "other_ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "other_node_number=2" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
+            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
+            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "node_number=2" >> $GITHUB_OUTPUT
+            echo "other_ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
+            echo "other_node_number=1" >> $GITHUB_OUTPUT
+            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+          fi
 
       - name: Install WireGuard
         run: |
@@ -166,10 +170,9 @@ jobs:
               echo "AUTHELIA_EXISTS=false"
             fi
 
-      # This NPM instance (ljfcloud-arm) has no LAN route to rpi4 - it has to
-      # go back through the rathole tunnel to reach Authelia, the same path
-      # every other OCI-tunneled service already uses, with the Host header
-      # overridden so on-prem NPM's own host-based routing lands on Authelia.
+      # Reached directly by IP:port here - unlike the OCI leg, there's no
+      # rathole hop needed since this NPM instance is already on-prem, on
+      # the same LAN as Authelia.
       - name: Build Authelia advanced_config
         id: authelia_config
         if: ${{ inputs.advanced_config == '' }}
@@ -179,8 +182,7 @@ jobs:
             ADVANCED_CONFIG=$(cat <<'EOF'
           location /internal/authelia/authz {
             internal;
-            proxy_pass http://rathole-server:3000/api/authz/auth-request;
-            proxy_set_header Host auth.14monarch.james-fagg.uk;
+            proxy_pass http://${{ vars.RPI4_IP }}:91/api/authz/auth-request;
             proxy_set_header X-Original-Method $request_method;
             proxy_set_header X-Original-URL https://$host$request_uri;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -227,47 +229,34 @@ jobs:
           TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      # There is exactly ONE certificate on this NPM instance covering every
-      # SAN oci-cert-updater is expected to push into the OCI certificate
-      # store. It's identified by the bare "james-fagg.uk" entry (present in
-      # every one of these pipelines' calls, regardless of which service's
-      # domain triggered the check), not by any one pipeline's own
-      # rootdomain - that's what used to cause a fresh narrow cert per
-      # pipeline.
-      - name: Resolve shared OCI SSL Certificate ID
+      - name: Resolve SSL Certificate ID
         id: cert
         run: |
           cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s \
             -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
-            jq -r '.[] | select(.domain_names[]? == "james-fagg.uk") | .id' | head -n 1)
+            jq -r --arg d "*.$rootdomain" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
 
           if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
-            echo "Found existing shared cert: $cert_id"
+            echo "Found existing cert: $cert_id"
             echo "cert_id=$cert_id" >> $GITHUB_OUTPUT
           else
-            echo "No existing shared cert found."
+            echo "No existing cert found."
             echo "cert_id=" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create shared OCI Certificate
+      - name: Create Certificate
         id: create_cert
         if: ${{ steps.cert.outputs.cert_id == '' }}
         continue-on-error: true
         run: |
           PAYLOAD=$(jq -n \
+            --arg rootdomain "$rootdomain" \
             --arg key "${{ secrets.PORKBUN_API_KEY }}" \
             --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
             '{
               provider: "letsencrypt",
-              domain_names: [
-                "*.14monarch.james-fagg.uk",
-                "*.hannah.james-fagg.uk",
-                "*.james-fagg.uk",
-                "*.liam.james-fagg.uk",
-                "*.oci.james-fagg.uk",
-                "james-fagg.uk"
-              ],
+              domain_names: ["*." + $rootdomain, $rootdomain],
               meta: {
                 dns_challenge: true,
                 dns_provider: "porkbun",
@@ -276,7 +265,7 @@ jobs:
               }
             }')
 
-          echo "Creating shared OCI certificate."
+          echo "Creating certificate for domains: *.${rootdomain}, ${rootdomain}"
 
           RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -sS \
             -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
@@ -305,15 +294,15 @@ jobs:
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
 
           BODY=$(jq -n \
-              --argjson domain_names '${{ steps.domains.outputs.domain_names_json }}' \
-              --arg forward_host "$forward_host" \
-              --arg forward_port "$forward_port" \
+              --arg domain "${{ env.domain }}" \
+              --arg host_ip "$forward_host" \
+              --arg forward_port "${{ inputs.forward_port }}" \
               --arg forward_scheme "${{ inputs.forward_scheme }}" \
               --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
               --arg advanced_config "${{ inputs.advanced_config != '' && inputs.advanced_config || steps.authelia_config.outputs.config }}" \
               '{
-                domain_names: $domain_names,
-                forward_host: $forward_host,
+                domain_names: [$domain],
+                forward_host: $host_ip,
                 forward_port: ($forward_port|tonumber),
                 forward_scheme: $forward_scheme,
                 certificate_id: ($cert_id|tonumber),
@@ -334,6 +323,98 @@ jobs:
                 -d "$BODY" | jq -r '.id // "error"'
             else
               echo "Creating new proxy host for domain: $domain"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            fi
+
+      - name: Create or update mesh_prefix{node_number}.$rootdomain proxy host
+        if: ${{ inputs.mesh_prefix != '' && (steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '') }}
+        run: |
+          echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
+          node_domain="${{ inputs.mesh_prefix }}${{ steps.node_config.outputs.node_number }}.$rootdomain"
+
+          Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$node_domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
+
+          BODY=$(jq -n \
+              --arg domain "$node_domain" \
+              --arg host_ip "${{ steps.node_config.outputs.ssh_host }}" \
+              --arg forward_port "${{ inputs.forward_port }}" \
+              --arg forward_scheme "${{ inputs.forward_scheme }}" \
+              --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
+              --arg advanced_config "${{ inputs.advanced_config != '' && inputs.advanced_config || steps.authelia_config.outputs.config }}" \
+              '{
+                domain_names: [$domain],
+                forward_host: $host_ip,
+                forward_port: ($forward_port|tonumber),
+                forward_scheme: $forward_scheme,
+                certificate_id: ($cert_id|tonumber),
+                allow_websocket_upgrade: 1,
+                ssl_forced: false,
+                enabled: true,
+                block_exploits: true,
+                advanced_config: $advanced_config,
+                meta: { letsencrypt_agree: false, dns_challenge: false }
+              }')
+
+            if [ -n "$Proxy_ID" ] && [ "$Proxy_ID" != "null" ]; then
+              echo "Updating existing proxy host with ID: $Proxy_ID"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$Proxy_ID" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            else
+              echo "Creating new proxy host for domain: $node_domain"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            fi
+
+      - name: Create or update mesh_prefix{other_node_number}.$rootdomain proxy host
+        if: ${{ inputs.mesh_prefix != '' && (steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '') }}
+        run: |
+          echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
+          node_domain="${{ inputs.mesh_prefix }}${{ steps.node_config.outputs.other_node_number }}.$rootdomain"
+
+          Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$node_domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
+
+          BODY=$(jq -n \
+              --arg domain "$node_domain" \
+              --arg host_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
+              --arg forward_port "${{ inputs.forward_port }}" \
+              --arg forward_scheme "${{ inputs.forward_scheme }}" \
+              --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
+              --arg advanced_config "${{ inputs.advanced_config != '' && inputs.advanced_config || steps.authelia_config.outputs.config }}" \
+              '{
+                domain_names: [$domain],
+                forward_host: $host_ip,
+                forward_port: ($forward_port|tonumber),
+                forward_scheme: $forward_scheme,
+                certificate_id: ($cert_id|tonumber),
+                allow_websocket_upgrade: 1,
+                ssl_forced: false,
+                enabled: true,
+                block_exploits: true,
+                advanced_config: $advanced_config,
+                meta: { letsencrypt_agree: false, dns_challenge: false }
+              }')
+
+            if [ -n "$Proxy_ID" ] && [ "$Proxy_ID" != "null" ]; then
+              echo "Updating existing proxy host with ID: $Proxy_ID"
+              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
+                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$Proxy_ID" \
+                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+                -H "Content-Type: application/json" \
+                -d "$BODY" | jq -r '.id // "error"'
+            else
+              echo "Creating new proxy host for domain: $node_domain"
               curl --retry 3 --retry-delay 5 --retry-all-errors -s \
                 -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
                 -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \

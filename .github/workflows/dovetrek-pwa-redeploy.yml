@@ -197,9 +197,13 @@ jobs:
           sudo wg show   
 
   proxy_setup_oci:
-    uses: ./.github/workflows/oci-proxy-setup.yml
+    uses: ./.github/workflows/proxy_config_oci.yml
     secrets: inherit
     with:
       domain: ${{ inputs.domain || 'dovetrek.james-fagg.uk' }}
+      host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
+      # dovetrek-pwa runs directly on ljfcloud-arm (not on-prem), so the
+      # host_machine auto-detect doesn't apply - forward straight to the
+      # container name/port from dovetrek-pwa-compose.yml.
       forward_host: 'dovetrek-pwa'
       forward_port: 80

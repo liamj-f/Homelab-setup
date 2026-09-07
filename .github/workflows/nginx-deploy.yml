@@ -26,7 +26,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     concurrency:
-      group: 'homelab-setup'
+      group: homelab-deployments
       cancel-in-progress: false
       queue: max
     strategy:

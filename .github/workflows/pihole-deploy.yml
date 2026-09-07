@@ -283,7 +283,7 @@ jobs:
                 {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
                 {name: "PRIMARY_IP",          value: $primary_ip},
                 {name: "SECONDARY_IP",        value: $secondary_ip},
-                {name: "HOSTNAME",            value: $hostname},
+                {name: "HOSTNAME",            value: $hostname}
               ],
               Prune: true
               }')

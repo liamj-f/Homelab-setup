@@ -113,7 +113,7 @@ jobs:
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
-      - name: Ensure ${{ inputs.stack_name }} config dir is writable
+      - name: Ensure ${{ env.stack_name }} config dir is writable
         uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
@@ -125,7 +125,7 @@ jobs:
 
       - name: Render config.yml
         run: |
-          envsubst < ${{ inputs.stack_name }}/config.yml.template > ${{ env.stack_name }}/config.yml
+          envsubst < ${{ env.stack_name }}/config.yml.template > ${{ env.stack_name }}/config.yml
 
       - name: Copy rendered config to host
         uses: appleboy/scp-action@v1.0.0
@@ -166,7 +166,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           STACK_ID=$(echo "$STACKS" | jq -r \
-            --arg name "${{ inputs.stack_name }}" \
+            --arg name "${{ env.stack_name }}" \
             --argjson endpoint_id "${{ steps.endpoint.outputs.endpoint_id }}" \
             '.[] | select(.Name==$name and .EndpointId==$endpoint_id) | .Id')
 
@@ -205,7 +205,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "${{ inputs.stack_name }}",
+               "Name": "${{ env.stack_name }}",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "${{ env.stack_name }}/${{ env.stack_name }}-compose.yml",
@@ -411,16 +411,14 @@ jobs:
 
       - name: make log directory
         uses: appleboy/ssh-action@v1.2.5
-        env:
-            STACK_NAME: ${{ inputs.stack_name }}
         with:
             host: ${{ steps.node_config.outputs.ssh_host }}
             username: ${{ steps.node_config.outputs.ssh_user }}
             key: ${{ steps.node_config.outputs.ssh_key }}
             script: |
-              sudo mkdir -p /opt/f2b-logs/${{ inputs.stack_name }}
-              sudo touch /opt/f2b-logs/${{ inputs.stack_name }}/${{ inputs.stack_name }}.log
-              sudo chmod 666 /opt/f2b-logs/${{ inputs.stack_name }}/${{ inputs.stack_name }}.log
+              sudo mkdir -p /opt/f2b-logs/${{ env.stack_name }}
+              sudo touch /opt/f2b-logs/${{ env.stack_name }}/${{ env.stack_name }}.log
+              sudo chmod 666 /opt/f2b-logs/${{ env.stack_name }}/${{ env.stack_name }}.log
 
       - name: Ensure fail2ban config dirs are writable
         uses: appleboy/ssh-action@v1.2.5
@@ -438,7 +436,7 @@ jobs:
             host: ${{ steps.node_config.outputs.ssh_host }}
             username: ${{ steps.node_config.outputs.ssh_user }}
             key: ${{ steps.node_config.outputs.ssh_key }}
-            source: "${{ inputs.stack_name }}/filter.d/${{ inputs.stack_name }}.local"
+            source: "${{ env.stack_name }}/filter.d/${{ env.stack_name }}.local"
             target: "/opt/stacks/fail2ban/data/filter.d/"
             strip_components: 2
 
@@ -448,7 +446,7 @@ jobs:
             host: ${{ steps.node_config.outputs.ssh_host }}
             username: ${{ steps.node_config.outputs.ssh_user }}
             key: ${{ steps.node_config.outputs.ssh_key }}
-            source: "${{ inputs.stack_name }}/jail.d/${{ inputs.stack_name }}.local"
+            source: "${{ env.stack_name }}/jail.d/${{ env.stack_name }}.local"
             target: "/opt/stacks/fail2ban/data/jail.d/"
             strip_components: 2
 

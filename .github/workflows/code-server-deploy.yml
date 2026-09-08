@@ -39,6 +39,7 @@ on:
 env:
   host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
   domain: ${{ inputs.domain || 'code.14monarch.james-fagg.uk' }}
+  stack_name: ${{ inputs.stack_name || 'code-server' }}
 
 jobs:
   deploy:
@@ -410,6 +411,8 @@ jobs:
 
       - name: make log directory
         uses: appleboy/ssh-action@v1.2.5
+        env:
+            STACK_NAME: ${{ inputs.stack_name }}
         with:
             host: ${{ steps.node_config.outputs.ssh_host }}
             username: ${{ steps.node_config.outputs.ssh_user }}

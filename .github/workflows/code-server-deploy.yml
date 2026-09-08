@@ -260,24 +260,12 @@ jobs:
       domain: ${{ inputs.domain || 'code.14monarch.james-fagg.uk' }}
       app_host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
       forward_port: 99
-      # NPM inserts "Advanced" config at server scope, not inside location /,
-      # so a bare header line is silently discarded - full replacement
-      # location block instead. Hardcoded https, not $scheme: on this on-prem
-      # hop NPM sees genuinely plain HTTP even though the domain is
-      # HTTPS-only end-to-end from every real client's perspective - $scheme
-      # here would report "http" and Authelia rejects any non-https value.
-      advanced_config: |
-        location / {
-          proxy_set_header X-Forwarded-Host $host;
-          proxy_set_header X-Real-IP $remote_addr;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-          proxy_set_header X-Forwarded-Proto https;
-          proxy_set_header Upgrade $http_upgrade;
-          proxy_set_header Connection $http_connection;
-          proxy_http_version 1.1;
-          proxy_pass_request_headers on;
-          include conf.d/include/proxy.conf;
-        }
+      # Unlike auth.14monarch.james-fagg.uk (which must bypass Authelia to
+      # avoid gating its own login page), code-server is a normal protected
+      # service - protect_with_authelia wires in the auth_request/authz
+      # block automatically. Do NOT set advanced_config here as well:
+      # supplying it disables that auto-generated block entirely.
+      protect_with_authelia: true
 
   proxy_setup_oci:
     uses: ./.github/workflows/proxy_config_oci.yml
@@ -285,29 +273,8 @@ jobs:
     with:
       domain: ${{ inputs.domain || 'code.14monarch.james-fagg.uk' }}
       host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
-      # NPM inserts "Advanced" config at server scope, not inside location /,
-      # so a bare header line is silently discarded - full replacement
-      # location block instead.
-      # Hardcoded https, not $scheme: this domain is HTTPS-only end-to-end
-      # from every real client's perspective, but traffic arriving via the
-      # OCI tunnel is genuinely plain HTTP on this specific hop into on-prem
-      # NPM (TLS was already terminated at the OCI edge) - $scheme here would
-      # report "http" and Authelia rejects any non-https value.
-      advanced_config: |
-        location / {
-          proxy_set_header X-Forwarded-Host $host;
-          proxy_set_header X-Real-IP $remote_addr;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-          proxy_set_header X-Forwarded-Proto https;
-          proxy_set_header Upgrade $http_upgrade;
-          proxy_set_header Connection $http_connection;
-          proxy_http_version 1.1;
-          proxy_pass_request_headers on;
-          # conf.d/include/proxy.conf already ends with its own proxy_pass -
-          # do not add another one here, nginx rejects duplicate proxy_pass
-          # directives in the same location block.
-          include conf.d/include/proxy.conf;
-        }
+      # See proxy_setup_onprem above.
+      protect_with_authelia: true
 
   f2b:
     runs-on: ubuntu-latest

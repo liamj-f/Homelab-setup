@@ -12,25 +12,34 @@ on:
     inputs:
       host_machine:
         required: false
-        type: string 
+        type: string
         default: 'e7270-server'
       domain:
         required: false
         type: string
         default: '14monarch.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'keepalived'
   workflow_call:
     inputs:
       host_machine:
         required: false
-        type: string 
+        type: string
         default: 'e7270-server'
       domain:
         required: false
-        type: string  
-        default: '14monarch.james-fagg.uk' 
+        type: string
+        default: '14monarch.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'keepalived'
 env:
   domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
   host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+  stack_name: ${{ inputs.stack_name || 'keepalived' }}
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -91,13 +100,13 @@ jobs:
           export KEEPALIVED_INTERFACE="${{ steps.node_config.outputs.keepalived_interface }}"
           export SECONDARY_IP="${{ steps.node_config.outputs.rsync_target_host }}"
           export PRIMARY_IP="${{ steps.node_config.outputs.ssh_host }}"
-          envsubst < keepalived/keepalived.conf.template > keepalived/keepalived.conf
+          envsubst < ${{ env.stack_name }}/keepalived.conf.template > ${{ env.stack_name }}/keepalived.conf
 
       - name: Render notify.sh
         run: |
           export PRIMARY_IP="${{ steps.node_config.outputs.ssh_host }}"
           export PIHOLE_WEBPASSWORD="${{ secrets.APP_PASSWORD }}"
-          envsubst < keepalived/notify.sh.template > keepalived/notify.sh
+          envsubst < ${{ env.stack_name }}/notify.sh.template > ${{ env.stack_name }}/notify.sh
 
       - name: Install WireGuard
         run: |
@@ -150,7 +159,7 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            sudo mkdir -p /opt/stacks/keepalived
+            sudo mkdir -p /opt/stacks/${{ env.stack_name }}
             sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks
 
       - name: Copy configs into keepalived directory
@@ -159,8 +168,8 @@ jobs:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
-          source: "keepalived /keepalived.conf,keepalived/notify.sh"
-          target: /opt/stacks/keepalived/
+          source: "${{ env.stack_name }}/keepalived.conf,${{ env.stack_name }}/notify.sh"
+          target: /opt/stacks/${{ env.stack_name }}/
 
       - name: Set permissions
         uses: appleboy/ssh-action@v1.2.5
@@ -169,8 +178,8 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            chmod a+rx /opt/stacks/keepalived/notify.sh
-            ls -la /opt/stacks/keepalived/
+            chmod a+rx /opt/stacks/${{ env.stack_name }}/notify.sh
+            ls -la /opt/stacks/${{ env.stack_name }}/
 
       - name: Authenticate to Portainer
         id: auth
@@ -200,7 +209,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="keepalived" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="${{ env.stack_name }}" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
@@ -246,11 +255,12 @@ jobs:
             --arg keepalived_state "${{ steps.node_config.outputs.keepalived_state }}" \
             --arg keepalived_password "${{ secrets.KEEPALIVED_AUTH_SECRET }}" \
             --arg keepalived_unicast_peers "#PYTHON2BASH:['${{ steps.node_config.outputs.other_ssh_host }}']" \
+            --arg stack_name "${{ env.stack_name }}" \
             '{
-            Name: "keepalived",
+            Name: $stack_name,
             RepositoryURL: "https://github.com/liamj-f/homelab-setup",
             RepositoryReferenceName: $ref,
-            ComposeFile: "keepalived/keepalived-compose.yml",
+            ComposeFile: ($stack_name + "/" + $stack_name + "-compose.yml"),
             RepositoryAuthentication: false,
             RepullImageAndRedeploy: true,
             AutoUpdate: {
@@ -341,7 +351,7 @@ jobs:
           script: |
             CURRENT_STATE=$(cat /tmp/keepalived_state 2>/dev/null || echo 'BACKUP')
             echo "Current state: $CURRENT_STATE"
-            sudo /opt/stacks/keepalived/notify.sh INSTANCE VI_1 "$CURRENT_STATE"
+            sudo /opt/stacks/${{ env.stack_name }}/notify.sh INSTANCE VI_1 "$CURRENT_STATE"
 
       - name: Bring down VPN
         if: always()

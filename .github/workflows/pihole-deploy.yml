@@ -5,22 +5,30 @@ on:
     inputs:
       host_machine:
         required: false
-        type: string 
+        type: string
         default: 'e7270-server'
       domain:
         required: false
         type: string
         default: 'pihole.14monarch.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'pihole'
   workflow_call:
     inputs:
       host_machine:
         required: false
-        type: string 
+        type: string
         default: 'e7270-server'
       domain:
         required: false
-        type: string  
-        default: 'pihole.14monarch.james-fagg.uk' 
+        type: string
+        default: 'pihole.14monarch.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'pihole'
   push:
     branches:
       - main
@@ -31,6 +39,7 @@ on:
 env:
   domain: ${{ inputs.domain || 'pihole.14monarch.james-fagg.uk' }}
   host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+  stack_name: ${{ inputs.stack_name || 'pihole' }}
 
 jobs:
   deploy:
@@ -189,7 +198,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="pihole" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="${{ env.stack_name }}" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
@@ -206,7 +215,7 @@ jobs:
           WEBHOOK_TOKEN=$(curl -s \
             --max-time 10 \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-            "http://192.168.0.2:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
+            "${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             | jq -r '.AutoUpdate.Webhook')
 
           echo "Webhook token: $WEBHOOK_TOKEN"
@@ -230,11 +239,12 @@ jobs:
             --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
             --arg secondary_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
             --arg hostname "${{ matrix.host_machine }}" \
+            --arg stack_name "${{ env.stack_name }}" \
             '{
-            Name: "pihole",
+            Name: $stack_name,
             RepositoryURL: "https://github.com/liamj-f/homelab-setup",
             RepositoryReferenceName: $ref,
-            ComposeFile: "pihole/pihole-compose.yml",
+            ComposeFile: ($stack_name + "/" + $stack_name + "-compose.yml"),
             RepositoryAuthentication: false,
             RepullImageAndRedeploy: true,
             AutoUpdate: {
@@ -268,7 +278,7 @@ jobs:
             --arg webhook "${{ steps.uuid.outputs.uuid }}" \
             --arg app_password "${{ secrets.APP_PASSWORD }}" \
             --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
-            --arg secondary_ip "${{ steps.node_config.outputs.rsync_target_host }}" \
+            --arg secondary_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
             --arg hostname "${{ matrix.host_machine }}" \
             '{
               AutoUpdate: {
@@ -479,7 +489,7 @@ jobs:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
-          source: "pihole/tplink_dhcp_toggle.py"
+          source: "${{ env.stack_name }}/tplink_dhcp_toggle.py"
           target: "/tmp/"
           strip_components: 1
 

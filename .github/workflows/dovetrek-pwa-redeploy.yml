@@ -6,32 +6,41 @@ on:
     inputs:
       host_machine:
         required: false
-        type: string 
+        type: string
         default: 'ljfcloud-arm'
       domain:
         required: false
         type: string
         default: 'dovetrek.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'dovetrek-pwa'
   workflow_call:
     inputs:
       host_machine:
         required: false
-        type: string 
+        type: string
         default: 'ljfcloud-arm'
       domain:
         required: false
-        type: string  
-        default: 'dovetrek.james-fagg.uk'     
+        type: string
+        default: 'dovetrek.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'dovetrek-pwa'
   push:
     branches:
       - main
       - '**'
     paths:
-      - '.github/workflows/dovetrek-pwa-redeploy.yml'    
+      - '.github/workflows/dovetrek-pwa-redeploy.yml'
       - 'dovetrek-pwa-compose.yml'
 env:
   host_machine: ${{ inputs.host_machine || 'e7270-server' }}
-  domain: ${{ inputs.domain || 'dovetrek.james-fagg.uk' }}    
+  domain: ${{ inputs.domain || 'dovetrek.james-fagg.uk' }}
+  stack_name: ${{ inputs.stack_name || 'dovetrek-pwa' }}
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -106,7 +115,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="dovetrek-pwa" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="${{ env.stack_name }}" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
@@ -143,10 +152,10 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "dovetrek-pwa",
+               "Name": "${{ env.stack_name }}",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "dovetrek-pwa-compose.yml",
+               "ComposeFile": "${{ env.stack_name }}-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,

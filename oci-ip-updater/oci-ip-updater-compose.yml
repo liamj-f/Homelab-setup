@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  OCI-Dynamic-IP-Updater:
+  oci-ip-updater:
     image: ghcr.io/liamj-f/oci-dynamic-ip-updater:latest
-    container_name: oci-dynamic-ip-updater
+    container_name: oci-ip-updater
     restart: unless-stopped
     environment:
       # Comma-separated list of host:port or host:port_start-port_end entries.

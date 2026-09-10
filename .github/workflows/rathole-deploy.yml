@@ -11,24 +11,33 @@ on:
     inputs:
       host_machine:
         required: true
-        type: string 
+        type: string
       domain:
         required: true
         type: string
-        default: 'oci.james-fagg.uk' 
+        default: 'oci.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'rathole'
   workflow_call:
     inputs:
       host_machine:
         required: true
-        type: string 
+        type: string
       domain:
         required: true
         type: string
-        default: 'oci.james-fagg.uk' 
+        default: 'oci.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'rathole'
 
 env:
   domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
   host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
+  stack_name: ${{ inputs.stack_name || 'rathole' }}
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -57,24 +66,24 @@ jobs:
           if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
             echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "rathole_file=rathole/rathole-client.toml.template" >> $GITHUB_OUTPUT
-            echo "rathole_compose=rathole/rathole-client-compose.yml" >> $GITHUB_OUTPUT
+            echo "rathole_file=${{ env.stack_name }}/rathole-client.toml.template" >> $GITHUB_OUTPUT
+            echo "rathole_compose=${{ env.stack_name }}/rathole-client-compose.yml" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "rathole_file=rathole/rathole-client.toml.template" >> $GITHUB_OUTPUT
-            echo "rathole_compose=rathole/rathole-client-compose.yml" >> $GITHUB_OUTPUT            
+            echo "rathole_file=${{ env.stack_name }}/rathole-client.toml.template" >> $GITHUB_OUTPUT
+            echo "rathole_compose=${{ env.stack_name }}/rathole-client-compose.yml" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
             echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
-            echo "rathole_file=rathole/rathole-server.toml.template" >> $GITHUB_OUTPUT
-            echo "rathole_compose=rathole/rathole-server-compose.yml" >> $GITHUB_OUTPUT
+            echo "rathole_file=${{ env.stack_name }}/rathole-server.toml.template" >> $GITHUB_OUTPUT
+            echo "rathole_compose=${{ env.stack_name }}/rathole-server-compose.yml" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
@@ -135,7 +144,7 @@ jobs:
             username: ${{ steps.node_config.outputs.ssh_user }}
             key: ${{ steps.node_config.outputs.ssh_key }}
             script: |
-              sudo mkdir -p /opt/stacks/rathole 
+              sudo mkdir -p /opt/stacks/${{ env.stack_name }}
               sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks
 
       - name: Copy config to directory
@@ -145,7 +154,7 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           source: ${{ steps.render_rathole.outputs.rendered_file }}
-          target: /opt/stacks/rathole
+          target: /opt/stacks/${{ env.stack_name }}
           strip_components: 1
           overwrite: true
           rm: true
@@ -179,7 +188,7 @@ jobs:
  
           # Filter by both Name AND EndpointId
           STACK_ID=$(echo "$STACKS" | jq -r \
-            --arg name "rathole" \
+            --arg name "${{ env.stack_name }}" \
             --argjson endpoint_id "${{ steps.endpoint.outputs.endpoint_id }}" \
             '.[] | select(.Name==$name and .EndpointId==$endpoint_id) | .Id')
 
@@ -220,7 +229,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "rathole",
+               "Name": "${{ env.stack_name }}",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "${{ steps.node_config.outputs.rathole_compose }}",

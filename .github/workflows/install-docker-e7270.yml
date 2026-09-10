@@ -211,6 +211,12 @@ jobs:
   deploy_nextcloud:
     uses: ./.github/workflows/nextcloud-redeploy.yml
     needs: install_docker_and_add_to_portainer
+    # nextcloud-redeploy.yml's own job requests actions:write (to trigger
+    # postgres-redeploy.yml on first-run bootstrap) - must be granted
+    # explicitly here or the call is rejected regardless of repo defaults.
+    permissions:
+      actions: write
+      contents: read
     secrets: inherit
     with:
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}

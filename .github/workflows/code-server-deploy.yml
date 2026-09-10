@@ -299,6 +299,12 @@ jobs:
   f2b:
     needs: deploy
     uses: ./.github/workflows/fail2ban-jail-deploy.yml
+    # fail2ban-jail-deploy.yml's own job requests actions:write (to trigger
+    # fail2ban-redeploy.yml on first-run bootstrap) - must be granted
+    # explicitly here or the call is rejected regardless of repo defaults.
+    permissions:
+      actions: write
+      contents: read
     secrets: inherit
     with:
       host_machine: ${{ inputs.host_machine || 'rpi4-server' }}

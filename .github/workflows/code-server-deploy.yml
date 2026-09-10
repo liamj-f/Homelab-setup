@@ -120,7 +120,7 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            sudo mkdir -p /opt/stacks/${{ env.stack_name }}/
+            sudo mkdir -p /opt/stacks/${{ env.stack_name }}/config /opt/stacks/${{ env.stack_name }}/custom-cont-init.d
             sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/${{ env.stack_name }}/
 
       - name: Render config.yml
@@ -137,6 +137,26 @@ jobs:
           target: "/opt/stacks/${{ env.stack_name }}/config/"
           strip_components: 2
           overwrite: true
+
+      - name: Copy custom-cont-init.d scripts to host
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          source: "${{ env.stack_name }}/custom-cont-init.d"
+          target: "/opt/stacks/${{ env.stack_name }}/"
+          strip_components: 1
+          overwrite: true
+
+      - name: Set permissions on custom-cont-init.d scripts
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            chmod -R +x /opt/stacks/${{ env.stack_name }}/custom-cont-init.d/
 
       - name: Authenticate to Portainer
         id: auth

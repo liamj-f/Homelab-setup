@@ -9,6 +9,7 @@ services:
     - TZ=Etc/UTC
     volumes:
     - /opt/stacks/code-server/config:/config
+    - /opt/stacks/code-server/custom-cont-init.d:/custom-cont-init.d:ro
     ports:
     - 99:8443
     restart: unless-stopped

@@ -233,24 +233,41 @@ jobs:
 
       # There is exactly ONE certificate on this NPM instance covering every
       # SAN oci-cert-updater is expected to push into the OCI certificate
-      # store. It's identified by the bare "james-fagg.uk" entry (present in
-      # every one of these pipelines' calls, regardless of which service's
-      # domain triggered the check), not by any one pipeline's own
-      # rootdomain - that's what used to cause a fresh narrow cert per
-      # pipeline.
+      # store. Defined once here so the "does a shared cert already exist"
+      # check and the "create it" payload can't drift apart again.
+      - name: Define required shared cert domains
+        id: shared_domains
+        run: |
+          domains_json=$(jq -nc '[
+            "*.14monarch.james-fagg.uk",
+            "*.hannah.james-fagg.uk",
+            "*.james-fagg.uk",
+            "*.liam.james-fagg.uk",
+            "*.oci.james-fagg.uk",
+            "james-fagg.uk"
+          ]')
+          echo "domains_json=$domains_json" >> "$GITHUB_OUTPUT"
+
+      # Matched by being a SUPERSET of every required domain above, not just
+      # by containing the bare "james-fagg.uk" entry - a narrower pre-existing
+      # cert (e.g. just "*.james-fagg.uk" + "james-fagg.uk" from before this
+      # multi-SAN cert existed) also contains that bare entry and would
+      # otherwise get reused, silently missing the SANs oci-cert-updater and
+      # the OCI-routed services actually need.
       - name: Resolve shared OCI SSL Certificate ID
         id: cert
         run: |
           cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s \
             -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
-            jq -r '.[] | select(.domain_names[]? == "james-fagg.uk") | .id' | head -n 1)
+            jq -r --argjson want '${{ steps.shared_domains.outputs.domains_json }}' \
+              '.[] | select((($want - (.domain_names // [])) | length) == 0) | .id' | head -n 1)
 
           if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
             echo "Found existing shared cert: $cert_id"
             echo "cert_id=$cert_id" >> $GITHUB_OUTPUT
           else
-            echo "No existing shared cert found."
+            echo "No existing shared cert covers all required domains."
             echo "cert_id=" >> $GITHUB_OUTPUT
           fi
 
@@ -260,18 +277,12 @@ jobs:
         continue-on-error: true
         run: |
           PAYLOAD=$(jq -n \
+            --argjson domain_names '${{ steps.shared_domains.outputs.domains_json }}' \
             --arg key "${{ secrets.PORKBUN_API_KEY }}" \
             --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
             '{
               provider: "letsencrypt",
-              domain_names: [
-                "*.14monarch.james-fagg.uk",
-                "*.hannah.james-fagg.uk",
-                "*.james-fagg.uk",
-                "*.liam.james-fagg.uk",
-                "*.oci.james-fagg.uk",
-                "james-fagg.uk"
-              ],
+              domain_names: $domain_names,
               meta: {
                 dns_challenge: true,
                 dns_provider: "porkbun",

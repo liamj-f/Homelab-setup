@@ -137,6 +137,43 @@ jobs:
           done
           sudo wg show
 
+      - name: Determine keepalived state
+        # rathole-client only runs on the two on-prem HA nodes - the node
+        # holding the keepalived VIP (MASTER) is the one that should have
+        # its tunnel up, matching what keepalived's own notify.sh does on a
+        # live failover (see keepalived/notify.sh.template). ljfcloud-arm
+        # is the rathole server, not part of the HA pair, so it's skipped.
+        id: keepalived_state
+        if: ${{ matrix.host_machine == 'rpi4-server' || matrix.host_machine == 'e7270-server' }}
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > ssh_key.pem
+          chmod 600 ssh_key.pem
+
+          STATE=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -i ssh_key.pem "${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}" '
+              if docker ps --filter "name=^/keepalived$" --filter "status=running" --format "{{.Names}}" | grep -q keepalived; then
+                if ip addr show | grep -q "${{ vars.KEEPALIVED_IP }}"; then
+                  echo MASTER
+                else
+                  echo BACKUP
+                fi
+              else
+                echo NOT_RUNNING
+              fi
+            ' 2>/dev/null || echo NOT_RUNNING)
+
+          rm -f ssh_key.pem
+          echo "Keepalived state on ${{ matrix.host_machine }} (${{ steps.node_config.outputs.ssh_host }}): $STATE"
+
+          if [ "$STATE" = "BACKUP" ]; then
+            echo "is_master=false" >> $GITHUB_OUTPUT
+          else
+            # Treat MASTER and NOT_RUNNING (keepalived not deployed here
+            # yet) the same as MASTER - fail open so a first-time deploy
+            # doesn't stop rathole-client before keepalived even exists.
+            echo "is_master=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Make rathole directory
         uses: appleboy/ssh-action@v1.2.5
         with:
@@ -271,7 +308,21 @@ jobs:
                   "Prune": false
                 }'  )
 
-              echo "API Response: $RESPONSE" 
+              echo "API Response: $RESPONSE"
+
+      - name: Stop rathole-client if this node is not keepalived MASTER
+        # The Portainer stack redeploy above brings rathole-client back up
+        # regardless of state, which would undo notify.sh's BACKUP-transition
+        # stop. Re-assert it here so a redeploy can't leave rathole-client
+        # running on a node that isn't holding the VIP.
+        if: ${{ steps.keepalived_state.outputs.is_master == 'false' }}
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            docker stop rathole-client || true
 
       - name: Bring down VPN
         if: always()

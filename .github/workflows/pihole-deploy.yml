@@ -480,6 +480,21 @@ jobs:
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
 
+      - name: Stop nebula-sync if this node is not keepalived MASTER
+        # The Portainer stack redeploy above brings every service in the
+        # compose file back up regardless of state, which would undo
+        # notify.sh's BACKUP-transition stop (see keepalived/notify.sh.template).
+        # Re-assert it here so a redeploy can't leave nebula-sync running
+        # on a node that isn't holding the VIP.
+        if: ${{ steps.dhcp_state.outputs.dhcp_active == 'false' }}
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            docker stop nebula-sync || true
+
       - name: Copy DHCP toggle script to DHCP-active node
         # Only on the node Pi-hole's own dhcp.active was set true for above,
         # so this doesn't fight the router over a login session twice per run.

@@ -5,6 +5,24 @@ NAME=$2
 STATE=$3
 
 PIHOLE_URL="http://$PRIMARY_IP:82"
+DOCKER_SOCKET="/var/run/docker.sock"
+
+# The osixia/keepalived image has no `docker` CLI binary, only curl - so we
+# talk to the local Docker Engine API over its mounted unix socket instead.
+docker_action() {
+  local action=$1  # "start" or "stop"
+  local container=$2
+
+  local status
+  status=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+    --unix-socket "$DOCKER_SOCKET" \
+    "http://localhost/containers/${container}/${action}")
+
+  # 204 = success, 304 = already in the requested state - both are fine
+  if [ "$status" != "204" ] && [ "$status" != "304" ]; then
+    logger "keepalived notify: failed to ${action} ${container} (http $status)"
+  fi
+}
 
 pihole_set_dhcp() {
   local active=$1  # "true" or "false"
@@ -44,29 +62,29 @@ case $STATE in
       sleep 5
     done
     pihole_set_dhcp true
-#    docker start nginx-proxy-manager
-#    docker start rsync
-    docker start nebula-sync
-    docker start rathole-client
+#    docker_action start nginx-proxy-manager
+#    docker_action start rsync
+    docker_action start nebula-sync
+    docker_action start rathole-client
     # Stop containers on the other node via SSH
     ssh -o StrictHostKeyChecking=no \
         -o UserKnownHostsFile=/dev/null \
-        -i /home/${SSH_USER}/.ssh/rsync_id \
+        -i /etc/keepalived/ssh_key \
         ${SSH_USER}@${SECONDARY_IP} \
         "docker stop nebula-sync rathole-client" || true
     ;;
   "BACKUP"|"FAULT")
     sleep 5
     # Re-check state before stopping - if we're now MASTER, abort
-    CURRENT_STATE=$(ip addr show | grep -q "192.168.0.5" && echo "MASTER" || echo "BACKUP")
+    CURRENT_STATE=$(ip addr show | grep -q "inet ${KEEPALIVED_VIRTUAL_IP}/" && echo "MASTER" || echo "BACKUP")
     if [ "$CURRENT_STATE" = "MASTER" ]; then
       logger "keepalived notify: state changed to MASTER before stop completed, aborting"
       exit 0
     fi
-#    docker stop rsync
-    docker stop nebula-sync
-#    docker stop nginx-proxy-manager
-    docker stop rathole-client
+#    docker_action stop rsync
+    docker_action stop nebula-sync
+#    docker_action stop nginx-proxy-manager
+    docker_action stop rathole-client
     pihole_set_dhcp false
     ;;
   *)

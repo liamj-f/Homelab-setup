@@ -24,4 +24,6 @@ services:
     volumes:
       - /opt/stacks/keepalived/keepalived.conf:/etc/keepalived/keepalived.conf:ro
       - /opt/stacks/keepalived/notify.sh:/etc/keepalived/notify.sh:ro
+      - /opt/stacks/keepalived/rsync_id:/etc/keepalived/rsync_id:ro
+      - /opt/stacks/keepalived/install-ssh-client-startup.sh:/container/service/install-ssh-client/startup.sh:ro
       - /var/run/docker.sock:/var/run/docker.sock

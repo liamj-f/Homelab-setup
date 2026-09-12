@@ -98,7 +98,7 @@ jobs:
           export KEEPALIVED_PRIORITY="${{ steps.node_config.outputs.keepalived_priority }}"
           export MASTER_OR_BACKUP_STATE="${{ steps.node_config.outputs.keepalived_state }}"
           export KEEPALIVED_INTERFACE="${{ steps.node_config.outputs.keepalived_interface }}"
-          export SECONDARY_IP="${{ steps.node_config.outputs.rsync_target_host }}"
+          export SECONDARY_IP="${{ steps.node_config.outputs.other_ssh_host }}"
           export PRIMARY_IP="${{ steps.node_config.outputs.ssh_host }}"
           envsubst < ${{ env.stack_name }}/keepalived.conf.template > ${{ env.stack_name }}/keepalived.conf
 
@@ -106,7 +106,15 @@ jobs:
         run: |
           export PRIMARY_IP="${{ steps.node_config.outputs.ssh_host }}"
           export PIHOLE_WEBPASSWORD="${{ secrets.APP_PASSWORD }}"
+          export KEEPALIVED_VIRTUAL_IP="${{ vars.KEEPALIVED_IP }}"
+          export SECONDARY_IP="${{ steps.node_config.outputs.other_ssh_host }}"
+          export SSH_USER="${{ steps.node_config.outputs.other_ssh_user }}"
           envsubst < ${{ env.stack_name }}/notify.sh.template > ${{ env.stack_name }}/notify.sh
+
+      - name: Write Other node SSH key
+        run: |
+          printf '%s\n' "${{ steps.node_config.outputs.other_ssh_key }}" > ${{ env.stack_name }}/rsync_id
+          chmod 600 ${{ env.stack_name }}/ssh_key
 
       - name: Install WireGuard
         run: |
@@ -168,7 +176,7 @@ jobs:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
-          source: "${{ env.stack_name }}/keepalived.conf,${{ env.stack_name }}/notify.sh"
+          source: "${{ env.stack_name }}/keepalived.conf,${{ env.stack_name }}/notify.sh,${{ env.stack_name }}/rsync_id,${{ env.stack_name }}/install-ssh-client-startup.sh"
           target: /opt/stacks/${{ env.stack_name }}/
 
       - name: Set permissions
@@ -179,6 +187,8 @@ jobs:
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             chmod a+rx /opt/stacks/${{ env.stack_name }}/notify.sh
+            chmod a+rx /opt/stacks/${{ env.stack_name }}/install-ssh-client-startup.sh
+            chmod 600 /opt/stacks/${{ env.stack_name }}/ssh_key
             ls -la /opt/stacks/${{ env.stack_name }}/
 
       - name: Authenticate to Portainer
@@ -301,14 +311,14 @@ jobs:
             --arg ref "${{ github.ref }}" \
             --arg webhook "${{ steps.uuid.outputs.uuid }}" \
             --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
-            --arg secondary_ip "${{ steps.node_config.outputs.rsync_target_host }}" \
+            --arg secondary_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
             --arg hostname "${{ matrix.host_machine }}" \
             --arg keepalived_virtual_ip "${{ vars.KEEPALIVED_IP }}" \
             --arg keepalived_priority "${{ steps.node_config.outputs.keepalived_priority }}" \
             --arg keepalived_interface "${{ steps.node_config.outputs.keepalived_interface }}" \
             --arg keepalived_state "${{ steps.node_config.outputs.keepalived_state }}" \
             --arg keepalived_password "${{ secrets.KEEPALIVED_AUTH_SECRET }}" \
-            --arg keepalived_unicast_peers "#PYTHON2BASH:['${{ steps.node_config.outputs.rsync_target_host }}']" \
+            --arg keepalived_unicast_peers "#PYTHON2BASH:['${{ steps.node_config.outputs.other_ssh_host }}']" \
             '{
               AutoUpdate: {
                     ForcePullImage: true,
@@ -349,7 +359,12 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            CURRENT_STATE=$(cat /tmp/keepalived_state 2>/dev/null || echo 'BACKUP')
+            VIP="${{ vars.KEEPALIVED_IP }}"
+            if ip addr show | grep -q "inet ${VIP}/"; then
+              CURRENT_STATE=MASTER
+            else
+              CURRENT_STATE=BACKUP
+            fi
             echo "Current state: $CURRENT_STATE"
             sudo /opt/stacks/${{ env.stack_name }}/notify.sh INSTANCE VI_1 "$CURRENT_STATE"
 

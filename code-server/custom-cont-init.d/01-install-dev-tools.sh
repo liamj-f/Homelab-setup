@@ -36,10 +36,21 @@ fi
 # abc's login shell is /bin/false (linuxserver default), so plain
 # `su abc -c ...` execs /bin/false, silently ignoring -c and exiting 1 -
 # `-s /bin/bash` overrides the shell su uses to run the command.
-if ! su -s /bin/bash abc -c 'command -v claude' >/dev/null 2>&1; then
+# Checked by file, not `command -v claude` - a non-interactive `su -c`
+# shell doesn't source .bashrc, so it'd never see ~/.local/bin on PATH
+# even after the export below is in place, and would reinstall every start.
+if [ ! -x /config/.local/bin/claude ]; then
   echo "[01-install-dev-tools] installing Claude Code..."
   su -s /bin/bash abc -c 'curl -fsSL https://claude.ai/install.sh | bash'
   echo "[01-install-dev-tools] Claude Code install finished"
+fi
+
+# The installer puts claude in ~/.local/bin, which isn't on abc's PATH by
+# default - add it once so a code-server terminal (an interactive, non-login
+# shell - sources .bashrc) picks it up.
+if ! grep -q '.local/bin' /config/.bashrc 2>/dev/null; then
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> /config/.bashrc
+  chown abc:abc /config/.bashrc
 fi
 
 # Git identity for commits made from code-server, and a check that gh is

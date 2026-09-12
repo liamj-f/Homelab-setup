@@ -135,8 +135,8 @@ jobs:
             username: ${{ steps.node_config.outputs.ssh_user }}
             key: ${{ steps.node_config.outputs.ssh_key }}
             script: |
-              sudo mkdir -p /opt/stacks/rathole 
-              sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks
+              sudo mkdir -p /opt/stacks/rathole
+              sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/rathole
 
       - name: Copy config to directory
         uses: appleboy/scp-action@v1.0.0

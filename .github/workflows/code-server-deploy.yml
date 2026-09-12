@@ -145,9 +145,15 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           source: "${{ env.stack_name }}/custom-cont-init.d"
-          target: "/opt/stacks/${{ env.stack_name }}/"
-          strip_components: 1
+          target: "/opt/stacks/${{ env.stack_name }}/custom-cont-init.d/"
+          strip_components: 2
           overwrite: true
+          # Wipes just this target dir before extracting, so scripts removed
+          # from the repo (like the old 01-install-gh.sh/02-install-tools.sh
+          # split) don't linger on the host and keep re-running alongside
+          # their replacement. Scoped to custom-cont-init.d only - the
+          # sibling config/ dir (persistent /config volume) is untouched.
+          rm: true
 
       - name: Set permissions on custom-cont-init.d scripts
         uses: appleboy/ssh-action@v1.2.5

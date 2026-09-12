@@ -10,6 +10,7 @@ set -e
 # before apt can see it at all. Once that's done it's a normal apt package,
 # so it installs alongside tmux/git in the same apt-get install below.
 if ! command -v gh >/dev/null 2>&1; then
+  echo "[01-install-dev-tools] adding GitHub CLI apt repo..."
   curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /usr/share/keyrings/githubcli-archive-keyring.gpg
   chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
@@ -22,19 +23,25 @@ command -v tmux >/dev/null 2>&1 || MISSING_PKGS+=(tmux)
 command -v git  >/dev/null 2>&1 || MISSING_PKGS+=(git)
 
 if [ "${#MISSING_PKGS[@]}" -gt 0 ]; then
+  echo "[01-install-dev-tools] installing ${MISSING_PKGS[*]} via apt..."
   apt-get update -qq
   apt-get install -y --no-install-recommends "${MISSING_PKGS[@]}"
   rm -rf /var/lib/apt/lists/*
+  echo "[01-install-dev-tools] apt install finished"
 fi
 
 # Claude Code has no apt package, or a repo to add one - install it via
 # Anthropic's native installer, run as the abc user (PUID/PGID-mapped,
 # home /config) so the binary lands on that user's PATH instead of root's.
 if ! su abc -c 'command -v claude' >/dev/null 2>&1; then
+  echo "[01-install-dev-tools] installing Claude Code..."
   su abc -c 'curl -fsSL https://claude.ai/install.sh | bash'
+  echo "[01-install-dev-tools] Claude Code install finished"
 fi
 
 # Git identity for commits made from code-server, and a check that gh is
 # authenticated - both idempotent, safe to run every start.
+echo "[01-install-dev-tools] setting git identity..."
 su abc -c "git config --global user.name 'liamj-f'"
 su abc -c "git config --global user.email 'liamjamesfagg+github@gmail.com'"
+echo "[01-install-dev-tools] done"

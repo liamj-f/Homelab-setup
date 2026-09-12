@@ -113,7 +113,7 @@ jobs:
 
       - name: Write Other node SSH key
         run: |
-          printf '%s\n' "${{ steps.node_config.outputs.other_ssh_key }}" > ${{ env.stack_name }}/rsync_id
+          printf '%s\n' "${{ steps.node_config.outputs.other_ssh_key }}" > ${{ env.stack_name }}/ssh_key
           chmod 600 ${{ env.stack_name }}/ssh_key
 
       - name: Install WireGuard

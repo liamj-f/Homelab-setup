@@ -486,6 +486,12 @@ jobs:
         # notify.sh's BACKUP-transition stop (see keepalived/notify.sh.template).
         # Re-assert it here so a redeploy can't leave nebula-sync running
         # on a node that isn't holding the VIP.
+        #
+        # The redeploy API call above returns as soon as it's queued, not
+        # once Portainer actually finishes pulling/recreating the
+        # container - a one-shot stop can lose that race and get undone
+        # by the recreate finishing afterwards. Loop until it's been seen
+        # stopped twice in a row instead of stopping just once.
         if: ${{ steps.dhcp_state.outputs.dhcp_active == 'false' }}
         uses: appleboy/ssh-action@v1.2.5
         with:
@@ -493,7 +499,24 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            docker stop nebula-sync || true
+            stable=0
+            for i in $(seq 1 9); do
+              if [ "$(docker inspect -f '{{.State.Running}}' nebula-sync 2>/dev/null)" = "true" ]; then
+                echo "Attempt $i: nebula-sync is running, stopping it"
+                docker stop nebula-sync || true
+                stable=0
+              else
+                stable=$((stable + 1))
+                echo "Attempt $i: nebula-sync is stopped (stable=$stable)"
+                if [ "$stable" -ge 2 ]; then
+                  echo "nebula-sync confirmed stopped"
+                  exit 0
+                fi
+              fi
+              sleep 10
+            done
+            echo "nebula-sync did not stay stopped after 90s"
+            exit 1
 
       - name: Copy DHCP toggle script to DHCP-active node
         # Only on the node Pi-hole's own dhcp.active was set true for above,

@@ -315,6 +315,12 @@ jobs:
         # regardless of state, which would undo notify.sh's BACKUP-transition
         # stop. Re-assert it here so a redeploy can't leave rathole-client
         # running on a node that isn't holding the VIP.
+        #
+        # The redeploy API call above returns as soon as it's queued, not
+        # once Portainer actually finishes pulling/recreating the
+        # container - a one-shot stop can lose that race and get undone
+        # by the recreate finishing afterwards. Loop until it's been seen
+        # stopped twice in a row instead of stopping just once.
         if: ${{ steps.keepalived_state.outputs.is_master == 'false' }}
         uses: appleboy/ssh-action@v1.2.5
         with:
@@ -322,7 +328,24 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            docker stop rathole-client || true
+            stable=0
+            for i in $(seq 1 9); do
+              if [ "$(docker inspect -f '{{.State.Running}}' rathole-client 2>/dev/null)" = "true" ]; then
+                echo "Attempt $i: rathole-client is running, stopping it"
+                docker stop rathole-client || true
+                stable=0
+              else
+                stable=$((stable + 1))
+                echo "Attempt $i: rathole-client is stopped (stable=$stable)"
+                if [ "$stable" -ge 2 ]; then
+                  echo "rathole-client confirmed stopped"
+                  exit 0
+                fi
+              fi
+              sleep 10
+            done
+            echo "rathole-client did not stay stopped after 90s"
+            exit 1
 
       - name: Bring down VPN
         if: always()

@@ -210,6 +210,13 @@ jobs:
             proxy_http_version 1.1;
             proxy_pass_request_headers on;
             include conf.d/include/proxy.conf;
+            # NPM/nginx's default 60s idle timeout drops long-lived
+            # connections (e.g. code-server's WebSocket terminal) even
+            # while they're still active - stretch it out for every
+            # Authelia-protected host rather than just the one that
+            # surfaced it.
+            proxy_read_timeout 3600s;
+            proxy_send_timeout 3600s;
           }
           EOF
             )

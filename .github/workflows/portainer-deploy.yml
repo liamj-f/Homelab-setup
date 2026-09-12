@@ -241,7 +241,7 @@ jobs:
       # rather than constructing a payload from scratch, is what keeps every
       # other setting (LDAP, snapshot interval, DefaultTeamID, etc.) intact.
       - name: Enable OAuth for Portainer via API
-        if: ${{ matrix.host_machine == 'rpi4-server' && steps.check_authelia.outputs.authelia_healthy == 'true' }}
+        if: ${{ steps.node_config.outputs.compose_filepath == 'portainer/portainer-compose.yml' && steps.check_authelia.outputs.authelia_healthy == 'true' }}
         env:
           PORTAINER_OIDC_CLIENT_SECRET: ${{ secrets.PORTAINER_OIDC_CLIENT_SECRET }}
         run: |

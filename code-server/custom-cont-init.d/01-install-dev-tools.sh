@@ -33,15 +33,18 @@ fi
 # Claude Code has no apt package, or a repo to add one - install it via
 # Anthropic's native installer, run as the abc user (PUID/PGID-mapped,
 # home /config) so the binary lands on that user's PATH instead of root's.
-if ! su abc -c 'command -v claude' >/dev/null 2>&1; then
+# abc's login shell is /bin/false (linuxserver default), so plain
+# `su abc -c ...` execs /bin/false, silently ignoring -c and exiting 1 -
+# `-s /bin/bash` overrides the shell su uses to run the command.
+if ! su -s /bin/bash abc -c 'command -v claude' >/dev/null 2>&1; then
   echo "[01-install-dev-tools] installing Claude Code..."
-  su abc -c 'curl -fsSL https://claude.ai/install.sh | bash'
+  su -s /bin/bash abc -c 'curl -fsSL https://claude.ai/install.sh | bash'
   echo "[01-install-dev-tools] Claude Code install finished"
 fi
 
 # Git identity for commits made from code-server, and a check that gh is
 # authenticated - both idempotent, safe to run every start.
 echo "[01-install-dev-tools] setting git identity..."
-su abc -c "git config --global user.name 'liamj-f'"
-su abc -c "git config --global user.email 'liamjamesfagg+github@gmail.com'"
+su -s /bin/bash abc -c "git config --global user.name 'liamj-f'"
+su -s /bin/bash abc -c "git config --global user.email 'liamjamesfagg+github@gmail.com'"
 echo "[01-install-dev-tools] done"

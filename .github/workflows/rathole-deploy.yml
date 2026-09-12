@@ -145,7 +145,7 @@ jobs:
             key: ${{ steps.node_config.outputs.ssh_key }}
             script: |
               sudo mkdir -p /opt/stacks/${{ env.stack_name }}
-              sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks
+              sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/${{ env.stack_name }}
 
       - name: Copy config to directory
         uses: appleboy/scp-action@v1.0.0

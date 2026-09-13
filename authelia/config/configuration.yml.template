@@ -70,17 +70,12 @@ access_control:
 session:
   secret: '${AUTHELIA_SESSION_SECRET}'
   cookies:
-    # Widened from '14monarch.james-fagg.uk' to the common ancestor so the
-    # same session cookie is valid across both the 14monarch.* and oci.*
-    # subtrees - a sibling-domain cookie wouldn't be sent to either. Still a
-    # domain the auth.14monarch.james-fagg.uk host is a member of, so it's a
-    # valid Domain attribute to set per RFC 6265.
     - name: 'authelia_session'
       domain: 'james-fagg.uk'
       authelia_url: 'https://auth.14monarch.james-fagg.uk'
       same_site: 'lax'
-      expiration: '1 hour'
-      inactivity: '5 minutes'
+      expiration: '2 hours'
+      inactivity: '30 minutes'
       remember_me: '1 month'
   redis:
     host: 'authelia_valkey'

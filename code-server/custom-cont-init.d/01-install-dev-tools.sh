@@ -64,4 +64,5 @@ echo "[01-install-dev-tools] done"
 mkdir -p /config
 cat > /config/.tmux.conf << 'EOF'
 set -g default-shell /bin/bash
+set -g mouse off
 EOF

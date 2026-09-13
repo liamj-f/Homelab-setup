@@ -15,30 +15,43 @@ on:
     inputs:
       host_machine:
         required: false
-        type: string 
+        type: string
         default: 'e7270-server'
       domain:
         required: false
         type: string
         default: '14monarch.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'fail2ban'
   workflow_call:
     inputs:
       host_machine:
         required: false
-        type: string 
+        type: string
         default: 'e7270-server'
       domain:
         required: false
-        type: string  
-        default: '14monarch.james-fagg.uk' 
+        type: string
+        default: '14monarch.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'fail2ban'
 env:
   domain: ${{ inputs.domain || '14monarch.james-fagg.uk' }}
   host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+  stack_name: ${{ inputs.stack_name || 'fail2ban' }}
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        host_machine: [rpi4-server, e7270-server]
     env:
-      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+      host_machine: ${{ matrix.host_machine }}
     concurrency:
       group: homelab-deployments
       cancel-in-progress: false
@@ -50,19 +63,19 @@ jobs:
       - name: Set node config
         id: node_config
         run: |
-          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
+          if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
             echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
+          elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ env.host_machine }}" = "ljfcloud-arm" ]; then
+          elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
             echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
@@ -118,8 +131,8 @@ jobs:
           export OCI_REGION="uk-london-1"
           export OCI_KEY_CONTENT_BASE64
           export OCID_WAF_BLOCKLIST="${{ vars.OCID_WAF_BLOCKLIST }}"
-          envsubst < fail2ban/data/action.d/oci-waf.local.template \
-                  > fail2ban/data/action.d/oci-waf.local
+          envsubst < ${{ env.stack_name }}/data/action.d/oci-waf.local.template \
+                  > ${{ env.stack_name }}/data/action.d/oci-waf.local
 
       - name: Create fail2ban directories on host
         uses: appleboy/ssh-action@v1.2.5
@@ -128,12 +141,12 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            mkdir -p /opt/stacks/fail2ban/data/action.d \
-                      /opt/stacks/fail2ban/data/filter.d \
-                      /opt/stacks/fail2ban/data/jail.d \
-                      /opt/stacks/fail2ban/data/scripts \
-                      /opt/stacks/fail2ban/custom-cont-init.d
-            sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/fail2ban/data/
+            sudo mkdir -p /opt/stacks/${{ env.stack_name }}/data/action.d \
+                      /opt/stacks/${{ env.stack_name }}/data/filter.d \
+                      /opt/stacks/${{ env.stack_name }}/data/jail.d \
+                      /opt/stacks/${{ env.stack_name }}/data/scripts \
+                      /opt/stacks/${{ env.stack_name }}/custom-cont-init.d
+            sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/${{ env.stack_name }}
 
       - name: Copy config files to host
         uses: appleboy/scp-action@v1.0.0
@@ -141,8 +154,8 @@ jobs:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
-          source: "fail2ban/data,fail2ban/custom-cont-init.d"
-          target: /opt/stacks/fail2ban
+          source: "${{ env.stack_name }}/data,${{ env.stack_name }}/custom-cont-init.d"
+          target: /opt/stacks/${{ env.stack_name }}
           strip_components: 1
           overwrite: true
 
@@ -153,10 +166,10 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/
-            sudo chmod -R a+rX /opt/stacks/fail2ban/data/
-            chmod -R +x /opt/stacks/fail2ban/custom-cont-init.d/
-            chmod -R +x /opt/stacks/fail2ban/data/scripts/
+            sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/${{ env.stack_name }}/data/
+            sudo chmod -R a+rX /opt/stacks/${{ env.stack_name }}/data/
+            chmod -R +x /opt/stacks/${{ env.stack_name }}/custom-cont-init.d/
+            chmod -R +x /opt/stacks/${{ env.stack_name }}/data/scripts/
 
       - name: Authenticate to Portainer
         id: auth
@@ -188,7 +201,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="fail2ban" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="${{ env.stack_name }}" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
@@ -228,10 +241,10 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "fail2ban",
+               "Name": "${{ env.stack_name }}",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "fail2ban/fail2ban-compose.yml",
+               "ComposeFile": "${{ env.stack_name }}/${{ env.stack_name }}-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,

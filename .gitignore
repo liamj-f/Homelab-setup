@@ -1,0 +1,3 @@
+# Rendered Authelia config (contains secrets baked in via envsubst at deploy time)
+authelia/config/configuration.yml
+authelia/config/users_database.yml

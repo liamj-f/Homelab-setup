@@ -1,0 +1,111 @@
+---
+theme: 'dark'
+
+server:
+  address: 'tcp://:9091/'
+
+log:
+  level: 'info'
+  format: 'text'
+  file_path: '/config/log/authelia.log'
+  keep_stdout: true
+
+totp:
+  issuer: 'james-fagg.uk'
+
+authentication_backend:
+  file:
+    path: '/config/users_database.yml'
+    search:
+      case_insensitive: true
+    password:
+      algorithm: 'argon2'
+
+identity_providers:
+  oidc:
+    hmac_secret: '${AUTHELIA_OIDC_HMAC_SECRET}'
+    jwks:
+      - key_id: 'main'
+        algorithm: 'RS256'
+        key: "${AUTHELIA_OIDC_ISSUER_PRIVATE_KEY}"
+    clients:
+      - client_id: 'portainer'
+        client_name: 'Portainer'
+        client_secret: '${AUTHELIA_OIDC_PORTAINER_CLIENT_SECRET_HASH}'
+        public: false
+        authorization_policy: 'two_factor'
+        require_pkce: false
+        pkce_challenge_method: ''
+        redirect_uris:
+          - 'https://portainer.14monarch.james-fagg.uk'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'groups'
+          - 'email'
+        response_types:
+          - 'code'
+        grant_types:
+          - 'authorization_code'
+        access_token_signed_response_alg: 'none'
+        userinfo_signed_response_alg: 'none'
+        token_endpoint_auth_method: 'client_secret_post'
+
+access_control:
+  # default_policy only needs to be 'deny' once there's at least one rule below
+  # (Authelia rejects 'deny' with an empty rules list) - Portainer's OIDC login
+  # doesn't go through this at all (see the client's own authorization_policy
+  # above), this only governs domains actually wired to NPM's auth_request.
+  # *.14monarch.james-fagg.uk / *.oci.james-fagg.uk match any number of
+  # subdomain levels but not the bare root - see
+  # https://www.authelia.com/configuration/security/access-control/
+  default_policy: 'deny'
+  rules:
+    - domain:
+        - '*.14monarch.james-fagg.uk'
+        - '*.oci.james-fagg.uk'
+        - '*.james-fagg.uk'
+      policy: 'two_factor'
+
+session:
+  secret: '${AUTHELIA_SESSION_SECRET}'
+  cookies:
+    # Widened from '14monarch.james-fagg.uk' to the common ancestor so the
+    # same session cookie is valid across both the 14monarch.* and oci.*
+    # subtrees - a sibling-domain cookie wouldn't be sent to either. Still a
+    # domain the auth.14monarch.james-fagg.uk host is a member of, so it's a
+    # valid Domain attribute to set per RFC 6265.
+    - name: 'authelia_session'
+      domain: 'james-fagg.uk'
+      authelia_url: 'https://auth.14monarch.james-fagg.uk'
+      same_site: 'lax'
+      expiration: '1 hour'
+      inactivity: '5 minutes'
+      remember_me: '1 month'
+  redis:
+    host: 'authelia_valkey'
+    port: 6379
+
+regulation:
+  modes:
+    - 'user'
+  max_retries: 3
+  find_time: '2 minutes'
+  ban_time: '5 minutes'
+
+storage:
+  encryption_key: '${AUTHELIA_STORAGE_ENCRYPTION_KEY}'
+  local:
+    path: '/config/db.sqlite3'
+
+notifier:
+  disable_startup_check: false
+  smtp:
+    address: 'submissions://smtp.gmail.com:465'
+    username: '${gmail_address}'
+    password: '${gmail_app_password}'
+    sender: 'Authelia <${AUTHELIA_SMTP_SENDER}>'
+
+identity_validation:
+  reset_password:
+    jwt_secret: '${AUTHELIA_JWT_SECRET}'

@@ -12,26 +12,35 @@ on:
     inputs:
       host_machine:
         required: true
-        type: string 
+        type: string
         default: 'ljfcloud-arm'
       domain:
         required: true
         type: string
         default: 'oci.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'oci-cert-updater'
 
   workflow_call:
     inputs:
       host_machine:
         required: true
-        type: string 
+        type: string
         default: 'ljfcloud-arm'
       domain:
         required: true
         type: string
         default: 'oci.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'oci-cert-updater'
 env:
   domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
   host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
+  stack_name: ${{ inputs.stack_name || 'oci-cert-updater' }}
 jobs:
   build-image-and-push:
     name: Build and push images to ghcr.io
@@ -176,7 +185,7 @@ jobs:
  
           # Filter by both Name AND EndpointId
           STACK_ID=$(echo "$STACKS" | jq -r \
-            --arg name "oci-cert-updater" \
+            --arg name "${{ env.stack_name }}" \
             --argjson endpoint_id "${{ steps.endpoint.outputs.endpoint_id }}" \
             '.[] | select(.Name==$name and .EndpointId==$endpoint_id) | .Id')
 
@@ -217,10 +226,10 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "oci-cert-updater",
+               "Name": "${{ env.stack_name }}",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "oci-cert-updater/oci-cert-updater-compose.yml",
+               "ComposeFile": "${{ env.stack_name }}/${{ env.stack_name }}-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,

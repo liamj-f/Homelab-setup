@@ -1,0 +1,9 @@
+[Definition]
+# Based on Authelia's official fail2ban guidance:
+# https://www.authelia.com/overview/security/measures/
+failregex =
+    ^.*Unsuccessful (1FA|TOTP|Duo|WebAuthn|U2F) authentication attempt by user .*remote_ip"?(:|=)"?<HOST>"?.*$
+    ^.*user not found.*path=/api/reset-password/identity/start remote_ip"?(:|=)"?<HOST>"?.*$
+ignoreregex =
+    ^.*level"?(:|=)"?info.*
+    ^.*level"?(:|=)"?warning.*

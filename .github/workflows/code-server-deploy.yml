@@ -1,124 +1,78 @@
-name: Redeploy OCI IP Updater via Portainer GitOps
+
+name: Deploy Code-Server
 on:
+  workflow_dispatch:
+    inputs:
+      host_machine:
+        required: false
+        type: string
+        default: 'rpi4-server'
+      domain:
+        required: false
+        type: string
+        default: 'code.14monarch.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'code-server'
+  workflow_call:
+    inputs:
+      host_machine:
+        required: false
+        type: string
+        default: 'rpi4-server'
+      domain:
+        required: false
+        type: string
+        default: 'code.14monarch.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'code-server'
   push:
     branches:
       - main
       - '**'
     paths:
-      - 'oci-ip-updater/oci-ip-updater-compose.yml'
-      - '.github/workflows/oci-ip-updater-deploy.yml'
-      - 'oci-ip-updater/**'
-  workflow_dispatch:
-    inputs:
-      host_machine:
-        required: true
-        type: string
-        default: 'ljfcloud-arm'
-      domain:
-        required: true
-        type: string
-        default: 'oci.james-fagg.uk'
-      stack_name:
-        required: false
-        type: string
-        default: 'oci-ip-updater'
-
-  workflow_call:
-    inputs:
-      host_machine:
-        required: true
-        type: string
-        default: 'ljfcloud-arm'
-      domain:
-        required: true
-        type: string
-        default: 'oci.james-fagg.uk'
-      stack_name:
-        required: false
-        type: string
-        default: 'oci-ip-updater'
+      - '.github/workflows/code-server-deploy.yml'
+      - 'code-server/**'
 env:
-  domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
-  host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
-  stack_name: ${{ inputs.stack_name || 'oci-ip-updater' }}
+  host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+  domain: ${{ inputs.domain || 'code.14monarch.james-fagg.uk' }}
+  stack_name: ${{ inputs.stack_name || 'code-server' }}
+
 jobs:
-  build-image-and-push:
-    name: Build and push images to ghcr.io
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata oci-ip-updater
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/liamj-f/oci-dynamic-ip-updater
-          tags: |
-            type=sha,prefix=sha-
-            type=raw,value=latest
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build and push oci-ip-updater
-        uses: docker/build-push-action@v7
-        with:
-          context: ./oci-ip-updater
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
   deploy:
-    needs: build-image-and-push
     runs-on: ubuntu-latest
     concurrency:
       group: homelab-deployments
       cancel-in-progress: false
-      queue: max   
+      queue: max
     steps:
-
       - name: Checkout repo
         uses: actions/checkout@v7
-
-      - name: Install WireGuard
-        run: |
-          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
 
       - name: Set node config
         id: node_config
         run: |
-          if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
+          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
             echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
+          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
-            echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
-            echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
           fi
-     
+
+      - name: Install WireGuard
+        run: |
+          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)
+
       - name: Write WireGuard config
         run: |
           cat > wg0.conf << EOF
@@ -154,6 +108,62 @@ jobs:
           done
           sudo wg show
 
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+
+      - name: Ensure ${{ env.stack_name }} config dir is writable
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            sudo mkdir -p /opt/stacks/${{ env.stack_name }}/config /opt/stacks/${{ env.stack_name }}/custom-cont-init.d
+            sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/${{ env.stack_name }}/
+
+      - name: Render config.yml
+        run: |
+          envsubst < ${{ env.stack_name }}/config.yml.template > ${{ env.stack_name }}/config.yml
+
+      - name: Copy rendered config to host
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          source: "${{ env.stack_name }}/config.yml"
+          target: "/opt/stacks/${{ env.stack_name }}/config/"
+          strip_components: 2
+          overwrite: true
+
+      - name: Copy custom-cont-init.d scripts to host
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          source: "${{ env.stack_name }}/custom-cont-init.d"
+          target: "/opt/stacks/${{ env.stack_name }}/custom-cont-init.d/"
+          strip_components: 2
+          overwrite: true
+          # Wipes just this target dir before extracting, so scripts removed
+          # from the repo (like the old 01-install-gh.sh/02-install-tools.sh
+          # split) don't linger on the host and keep re-running alongside
+          # their replacement. Scoped to custom-cont-init.d only - the
+          # sibling config/ dir (persistent /config volume) is untouched.
+          rm: true
+
+      - name: Set permissions on custom-cont-init.d scripts
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            chmod -R +x /opt/stacks/${{ env.stack_name }}/custom-cont-init.d/
+
       - name: Authenticate to Portainer
         id: auth
         run: |
@@ -168,8 +178,6 @@ jobs:
 
       - name: Get Portainer EndpointId
         id: endpoint
-        env:
-          host_machine: ${{ env.host_machine || 'ljfcloud-arm' }}
         run: |
           echo "Looking for endpoint with name: $host_machine"
           RESPONSE=$(curl -s -X GET "http://${{ vars.RPI4_IP }}:83/api/endpoints" \
@@ -182,8 +190,7 @@ jobs:
         run: |
           STACKS=$(curl --fail -s -X GET "http://${{ vars.RPI4_IP }}:83/api/stacks" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
- 
-          # Filter by both Name AND EndpointId
+
           STACK_ID=$(echo "$STACKS" | jq -r \
             --arg name "${{ env.stack_name }}" \
             --argjson endpoint_id "${{ steps.endpoint.outputs.endpoint_id }}" \
@@ -219,8 +226,6 @@ jobs:
       - name: Create Stack from GitHub
         if: ${{ steps.get_stack_id.outputs.stack_id == '0' }}
         run: |
-          OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
-
           echo "Creating stack from GitHub..."
           RESPONSE=$(curl -v -s -S -X POST "http://${{ vars.RPI4_IP }}:83/api/stacks/create/standalone/repository?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
@@ -234,27 +239,10 @@ jobs:
                "AutoUpdate": {
                               "forcePullImage": true,
                               "forceUpdate": true,
-                              "Webhook": "${{ steps.uuid.outputs.uuid }}"                           
+                              "Webhook": "${{ steps.uuid.outputs.uuid }}"
                              },
-                              "Env": [
-                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001,14monarch.tplinkdns.com:2333, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
-                                    {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
-                                    {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
-                                    {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
-                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
-                                    {
-                                    "name":"SECURITY_LIST_ID",
-                                    "value":"${{ vars.OCID_SECURITY_LIST }}"
-                                    },
-                                    {
-                                    "name":"NSG_ID",
-                                    "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
-                                    },
-                                    {
-                                    "name":"WAF_ALLOWLIST_ID",
-                                    "value":"${{ vars.OCID_WAF_ALLOWLIST }}"
-                                    }
-                                    ],
+               "Env": [
+                      ],
                "Prune": true,
                "StackFileVersion": "3"
               }'
@@ -266,8 +254,6 @@ jobs:
       - name: Update Stack Environment Variables
         if: ${{ steps.get_stack_id.outputs.stack_id != '0' }}
         run: |
-            OCI_KEY_BASE64=$(echo "${{ secrets.NETWORKUPDATERSA_API_KEY }}" | base64 -w 0)
-
             RESPONSE=$(curl -s -i -v --max-time 300 -X PUT "http://${{ vars.RPI4_IP }}:83/api/stacks/${{ steps.get_stack_id.outputs.stack_id }}/git/redeploy?endpointId=${{ steps.endpoint.outputs.endpoint_id }}" \
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
@@ -280,33 +266,52 @@ jobs:
                   "PullImage": true,
                   "RepositoryReferenceName": "${{ github.ref }}",
                   "repositoryAuthentication": false,
-                              "Env": [
-                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001,14monarch.tplinkdns.com:2333, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
-                                    {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
-                                    {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
-                                    {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
-                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
-                                    {
-                                    "name":"SECURITY_LIST_ID",
-                                    "value":"${{ vars.OCID_SECURITY_LIST }}"
-                                    },
-                                    {
-                                    "name":"NSG_ID",
-                                    "value":"${{ vars.OCID_HOME_TO_VM_NSG }}"
-                                    },
-                                    {
-                                    "name":"WAF_ALLOWLIST_ID",
-                                    "value":"${{ vars.OCID_WAF_ALLOWLIST }}"
-                                    }
-                                    ],
+                  "Env": [
+                         ],
                   "Prune": false
                 }'  )
 
-              echo "API Response: $RESPONSE" 
-
+              echo "API Response: $RESPONSE"
 
       - name: Bring down VPN
         if: always()
         run: |
           sudo wg-quick down ./wg0.conf
           sudo wg show
+
+  proxy_setup_onprem:
+    uses: ./.github/workflows/proxy_config_onprem.yml
+    secrets: inherit
+    with:
+      domain: ${{ inputs.domain || 'code.14monarch.james-fagg.uk' }}
+      app_host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      forward_port: 99
+      # Unlike auth.14monarch.james-fagg.uk (which must bypass Authelia to
+      # avoid gating its own login page), code-server is a normal protected
+      # service - protect_with_authelia wires in the auth_request/authz
+      # block automatically. Do NOT set advanced_config here as well:
+      # supplying it disables that auto-generated block entirely.
+      protect_with_authelia: true
+
+  proxy_setup_oci:
+    uses: ./.github/workflows/proxy_config_oci.yml
+    secrets: inherit
+    with:
+      domain: ${{ inputs.domain || 'code.14monarch.james-fagg.uk' }}
+      host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+      # See proxy_setup_onprem above.
+      protect_with_authelia: true
+
+  #f2b:
+  #  needs: deploy
+  #  uses: ./.github/workflows/fail2ban-jail-deploy.yml
+  #  # fail2ban-jail-deploy.yml's own job requests actions:write (to trigger
+  #  # fail2ban-redeploy.yml on first-run bootstrap) - must be granted
+  #  # explicitly here or the call is rejected regardless of repo defaults.
+  #  permissions:
+  #    actions: write
+  #    contents: read
+  #  secrets: inherit
+  #  with:
+  #    host_machine: ${{ inputs.host_machine || 'rpi4-server' }}
+  #    stack_name: ${{ inputs.stack_name || 'code-server' }}

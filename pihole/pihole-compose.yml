@@ -66,3 +66,9 @@ services:
       CLIENT_TIMEOUT_SECONDS: 60
       TZ: "Europe/London"
     restart: unless-stopped
+
+volumes:
+  pihole_data:
+    name: pihole_data
+  dnsmasq_data:
+    name: dnsmasq_data  

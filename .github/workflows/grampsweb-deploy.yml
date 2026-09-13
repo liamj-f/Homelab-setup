@@ -15,28 +15,40 @@ on:
     inputs:
       host_machine:
         required: false
-        type: string 
+        type: string
         default: 'e7270-server'
       domain:
         required: false
         type: string
         default: 'familytree.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'grampsweb'
   workflow_call:
     inputs:
       host_machine:
         required: false
-        type: string 
+        type: string
         default: 'e7270-server'
       domain:
         required: false
-        type: string  
-        default: 'familytree.james-fagg.uk' 
+        type: string
+        default: 'familytree.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'grampsweb'
 env:
   host_machine: ${{ inputs.host_machine || 'e7270-server' }}
   domain: ${{ inputs.domain || 'familytree.james-fagg.uk' }}
+  stack_name: ${{ inputs.stack_name || 'grampsweb' }}
 jobs:
   database_create:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     concurrency:
       group: homelab-deployments
       cancel-in-progress: false
@@ -44,7 +56,7 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v7
-      
+
       - name: Set node config
         id: node_config
         run: |
@@ -62,11 +74,6 @@ jobs:
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           fi
      
-      - name: Write SSH key to file
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-
       - name: Install WireGuard
         run: |
           sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
@@ -117,6 +124,37 @@ jobs:
         run: |
           sudo rm /etc/resolv.conf
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+
+      - name: Check postgres container exists
+        id: check_postgres
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          capture_stdout: true
+          script: |
+            if docker inspect postgres >/dev/null 2>&1; then
+              echo "POSTGRES_EXISTS=true"
+            else
+              echo "POSTGRES_EXISTS=false"
+            fi
+
+      # First-run bootstrap: if postgres has never been deployed to this host,
+      # the steps below (pg_isready, psql database/user creation) would fail
+      # against a container that doesn't exist yet. Trigger postgres-redeploy.yml
+      # and wait for it before continuing.
+      - name: Trigger postgres-redeploy if missing
+        if: ${{ !contains(steps.check_postgres.outputs.stdout, 'POSTGRES_EXISTS=true') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "postgres container not found on ${{ env.host_machine }} - triggering postgres-redeploy.yml"
+          gh workflow run postgres-redeploy.yml --ref ${{ github.ref_name }}
+          sleep 10
+          RUN_ID=$(gh run list --workflow=postgres-redeploy.yml --branch ${{ github.ref_name }} --limit 1 --json databaseId -q '.[0].databaseId')
+          echo "Waiting for postgres-redeploy run $RUN_ID to complete..."
+          gh run watch "$RUN_ID" --exit-status
 
       - name: Check postgres is up
         uses: appleboy/ssh-action@v1.2.5
@@ -241,12 +279,6 @@ jobs:
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
 
-      - name: Write SSH key to file
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-
-
       - name: Checkout repo
         uses: actions/checkout@v7
       - name: Install WireGuard
@@ -321,7 +353,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" || echo "[]")
 
           # Filter by both Name AND EndpointId
-          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="grampsweb" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
+          STACK_ID=$(echo "$STACKS" | jq -r '.[] | select(.Name=="${{ env.stack_name }}" and .EndpointId==${{ steps.endpoint.outputs.endpoint_id }}) | .Id')
           
           if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
             echo "Stack not found for this endpoint."
@@ -358,10 +390,10 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "grampsweb",
+               "Name": "${{ env.stack_name }}",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
-               "ComposeFile": "grampsweb/grampsweb-compose.yml",
+               "ComposeFile": "${{ env.stack_name }}/${{ env.stack_name }}-compose.yml",
                "RepositoryAuthentication": false,
                "AutoUpdate": {
                               "forcePullImage": true,
@@ -465,512 +497,33 @@ jobs:
           sudo wg-quick down ./wg0.conf
           sudo wg show
   proxy_setup_onprem:
-    runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
-      queue: max
-    strategy:
-      max-parallel: 1
-      matrix:
-        host_machine: [rpi4-server, e7270-server]
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v7
-
-      - name: Calculate base domain
-        shell: bash
-        run: |
-          rootdomain="${domain#*.}"
-          echo "rootdomain=$rootdomain" >> "$GITHUB_ENV"
-
-      - name: Set node config
-        id: node_config
-        run: |
-          if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
-            echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
-            echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
-            echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
-            echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Set node config
-        id: env_host_config
-        run: |
-          if [ "${{ env.host_machine }}" = "rpi4-server" ]; then
-            echo "env_ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
-            echo "env_ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "env_ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
-          elif [ "${{ env.host_machine }}" = "e7270-server" ]; then
-            echo "env_ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
-            echo "env_ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "env_ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Install WireGuard
-        run: |
-          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)  
-
-      - name: Write SSH key to file
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-
-      - name: Write WireGuard config
-        run: |
-          cat > wg0.conf << EOF
-          [Interface]
-          PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 192.168.2.2/30
-          DNS = ${{ vars.Keepalived_IP }}
-          MTU = 1250
-
-          [Peer]
-          PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
-          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, ${{ vars.IP_LJFCLOUD_ARM }}/32
-          Endpoint = ${{ vars.WG_ENDPOINT }}:51820
-          PersistentKeepalive = 25
-          EOF
-
-      - name: Bring up VPN
-        run: |
-          for i in $(seq 1 5); do
-            echo "Attempt $i/5: bringing up WireGuard..."
-            if sudo wg-quick up ./wg0.conf; then
-              echo "WireGuard up successfully"
-              break
-            fi
-            if [ $i -eq 5 ]; then
-              echo "WireGuard failed after 5 attempts"
-              exit 1
-            fi
-            echo "Failed, waiting 10s before retry..."
-            sudo ip link delete dev wg0 2>/dev/null || true
-            sleep 10
-          done
-          sudo wg show
-
-      - name: Authenticate as nginx user
-        id: token
-        run: |
-          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/tokens" \
-            -H "Content-Type: application/json" \
-            -d '{
-                 "identity":"${{ vars.NGINX_EMAIL }}",
-                 "secret":"${{ secrets.APP_PASSWORD }}"
-                 }')
-        
-          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-        
-      - name: Resolve SSL Certificate ID
-        id: cert
-        run: |
-          cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-            -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
-            jq -r --arg d "*.$rootdomain" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
-
-          if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
-            echo "Found existing cert: $cert_id"
-            echo "cert_id=$cert_id" >> $GITHUB_OUTPUT
-          else
-            echo "No existing cert found."
-            echo "cert_id=" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create Certificate
-        id: create_cert
-        if: ${{ steps.cert.outputs.cert_id == ''}}
-        continue-on-error: true
-        run: |
-          PAYLOAD=$(jq -n \
-            --arg rootdomain "$rootdomain" \
-            --arg key "${{ secrets.PORKBUN_API_KEY }}" \
-            --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
-            '{
-              provider: "letsencrypt",
-              domain_names: ["*." + $rootdomain, $rootdomain],
-              meta: {
-                dns_challenge: true,
-                dns_provider: "porkbun",
-                dns_provider_credentials: ("dns_porkbun_key=" + $key + "\ndns_porkbun_secret=" + $secret),
-                propagation_seconds: 120
-              }
-            }')
-
-          echo "Creating certificate for domains: *.${rootdomain}, ${rootdomain}"
-
-          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -sS \
-            -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-            -d "$PAYLOAD" \
-            -w "\n%{http_code}" || true)
-
-          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-
-          echo "HTTP status: $HTTP_STATUS"
-          echo "$BODY" | sed -E 's/(dns_porkbun_key=)[^ "]+/\1*****/g; s/(dns_porkbun_secret=)[^ "]+/\1*****/g'
-
-          if [[ "$HTTP_STATUS" =~ ^2 ]]; then
-            cert_id=$(echo "$BODY" | jq -r '.id // empty')
-            echo "cert_id=$cert_id" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create or update proxy host
-        if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
-        run: |
-          echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
-          
-          Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
-
-          BODY=$(jq -n \
-              --arg domain "${{ env.domain }}" \
-              --arg host_ip "${{ steps.env_host_config.outputs.env_ssh_host }}" \
-              --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              '{
-                domain_names: [$domain],
-                forward_host: $host_ip,
-                forward_port: 88,
-                forward_scheme: "http",
-                certificate_id: ($cert_id|tonumber),
-                allow_websocket_upgrade: 1,
-                ssl_forced: false,
-                enabled: true,
-                block_exploits: true,
-                meta: { letsencrypt_agree: false, dns_challenge: false }
-              }')            
-
-            if [ -n "$Proxy_ID" ] && [ "$Proxy_ID" != "null" ]; then
-              echo "Updating existing proxy host with ID: $Proxy_ID"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$Proxy_ID" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            else
-              echo "Creating new proxy host for domain: ${{ env.domain }}"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            fi
-
-      - name: Bring down VPN
-        if: always()
-        run: |
-          sudo wg-quick down ./wg0.conf
-          sudo wg show
+    uses: ./.github/workflows/proxy_config_onprem.yml
+    secrets: inherit
+    with:
+      domain: ${{ inputs.domain || 'familytree.james-fagg.uk' }}
+      # deploy's own SSH target is hardcoded to E7270_IP regardless of the
+      # host_machine input, so that's genuinely where this always runs.
+      app_host_machine: 'e7270-server'
+      forward_port: 88
   proxy_setup_oci:
-    env:
-      host_machine: 'ljfcloud-arm'
-    runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
-      queue: max
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v7
-
-      - name: Calculate base domain
-        shell: bash
-        run: |
-          rootdomain="${domain#*.}"
-          echo "rootdomain=$rootdomain" >> "$GITHUB_ENV"
-
-      - name: Set node config
-        id: node_config
-        run: |
-          if [ "${{ env.host_machine }}" = "ljfcloud-arm" ]; then
-            echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
-            echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
-            echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
-            echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
-            echo "EOF_KEY" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Install WireGuard
-        run: |
-          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)            
-
-      - name: Write SSH key to file
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-
-      - name: Write WireGuard config
-        run: |
-          cat > wg0.conf << EOF
-          [Interface]
-          PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 192.168.2.2/30
-          DNS = ${{ vars.Keepalived_IP }}
-          MTU = 1250
-
-          [Peer]
-          PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
-          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, ${{ vars.IP_LJFCLOUD_ARM }}/32
-          Endpoint = ${{ vars.WG_ENDPOINT }}:51820
-          PersistentKeepalive = 25
-          EOF
-
-      - name: Bring up VPN
-        run: |
-          for i in $(seq 1 5); do
-            echo "Attempt $i/5: bringing up WireGuard..."
-            if sudo wg-quick up ./wg0.conf; then
-              echo "WireGuard up successfully"
-              break
-            fi
-            if [ $i -eq 5 ]; then
-              echo "WireGuard failed after 5 attempts"
-              exit 1
-            fi
-            echo "Failed, waiting 10s before retry..."
-            sudo ip link delete dev wg0 2>/dev/null || true
-            sleep 10
-          done
-          sudo wg show
-
-      - name: Authenticate as nginx user
-        id: token
-        run: |
-          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/tokens" \
-            -H "Content-Type: application/json" \
-            -d '{
-                 "identity":"${{ vars.NGINX_EMAIL }}",
-                 "secret":"${{ secrets.APP_PASSWORD }}"
-                 }')
-        
-          TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-        
-      - name: Resolve SSL Certificate ID
-        id: cert
-        run: |
-          cert_id=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-            -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | \
-            jq -r --arg d "*.$rootdomain" '.[] | select(.domain_names[] == $d) | .id' | head -n 1)
-
-          if [ -n "$cert_id" ] && [ "$cert_id" != "null" ]; then
-            echo "Found existing cert: $cert_id"
-            echo "cert_id=$cert_id" >> $GITHUB_OUTPUT
-          else
-            echo "No existing cert found."
-            echo "cert_id=" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create Certificate
-        id: create_cert
-        if: ${{ steps.cert.outputs.cert_id == ''}}
-        continue-on-error: true
-        run: |
-          PAYLOAD=$(jq -n \
-            --arg rootdomain "$rootdomain" \
-            --arg key "${{ secrets.PORKBUN_API_KEY }}" \
-            --arg secret "${{ secrets.PORKBUN_API_SECRET }}" \
-            '{
-              provider: "letsencrypt",
-              domain_names: ["*." + $rootdomain, $rootdomain],
-              meta: {
-                dns_challenge: true,
-                dns_provider: "porkbun",
-                dns_provider_credentials: ("dns_porkbun_key=" + $key + "\ndns_porkbun_secret=" + $secret),
-                propagation_seconds: 120
-              }
-            }')
-
-          echo "Creating certificate for domains: *.${domain}, ${domain}"
-
-          RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -sS \
-            -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/certificates" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-            -d "$PAYLOAD" \
-            -w "\n%{http_code}" || true)
-
-          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-
-          echo "HTTP status: $HTTP_STATUS"
-          echo "$BODY" | sed -E 's/(dns_porkbun_key=)[^ "]+/\1*****/g; s/(dns_porkbun_secret=)[^ "]+/\1*****/g'
-
-          if [[ "$HTTP_STATUS" =~ ^2 ]]; then
-            cert_id=$(echo "$BODY" | jq -r '.id // empty')
-            echo "cert_id=$cert_id" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create or update proxy host
-        if: ${{ steps.cert.outputs.cert_id != '' || steps.create_cert.outputs.cert_id != '' }}
-        run: |
-          echo "Using certificate ID: ${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}"
-          
-          Proxy_ID=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X GET "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" | jq -r --arg d "$domain" '.[]? | select(.domain_names[] == $d) | .id' | head -n 1 )
-
-          BODY=$(jq -n \
-              --arg domain "${{ env.domain }}" \
-              --arg cert_id "${{ steps.cert.outputs.cert_id || steps.create_cert.outputs.cert_id }}" \
-              '{
-                domain_names: [$domain],
-                forward_host: "rathole-server",
-                forward_port: 3000,
-                forward_scheme: "http",
-                certificate_id: ($cert_id|tonumber),
-                allow_websocket_upgrade: 1,
-                ssl_forced: false,
-                enabled: true,
-                block_exploits: true,
-                meta: { letsencrypt_agree: false, dns_challenge: false }
-              }')            
-
-            if [ -n "$Proxy_ID" ] && [ "$Proxy_ID" != "null" ]; then
-              echo "Updating existing proxy host with ID: $Proxy_ID"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X PUT "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts/$Proxy_ID" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            else
-              echo "Creating new proxy host for domain: pgadmin.14monarch.james-fagg.uk"
-              curl --retry 3 --retry-delay 5 --retry-all-errors -s \
-                -X POST "http://${{ steps.node_config.outputs.ssh_host }}:81/api/nginx/proxy-hosts" \
-                -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-                -H "Content-Type: application/json" \
-                -d "$BODY" | jq -r '.id // "error"'
-            fi
-
-      - name: Bring down VPN
-        if: always()
-        run: |
-          sudo wg-quick down ./wg0.conf
-          sudo wg show
+    uses: ./.github/workflows/proxy_config_oci.yml
+    secrets: inherit
+    with:
+      domain: ${{ inputs.domain || 'familytree.james-fagg.uk' }}
+      # deploy's own SSH target is hardcoded to E7270_IP regardless of the
+      # host_machine input, so that's genuinely where this always runs.
+      host_machine: 'e7270-server'
   f2b:
     needs: deploy
-    runs-on: ubuntu-latest
-    concurrency:
-      group: homelab-deployments
-      cancel-in-progress: false
-      queue: max
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v7
-
-      - name: Install WireGuard
-        run: |
-          sudo apt-get install -y wireguard || (sudo apt-get update && sudo apt-get install -y wireguard)
-
-      - name: Write SSH key to file
-        run: |
-          echo "${{ secrets.SSH_KEY_E7270 }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-
-      - name: Write WireGuard config
-        run: |
-          cat > wg0.conf << EOF
-          [Interface]
-          PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
-          Address = 192.168.2.2/30
-          DNS = ${{ vars.Keepalived_IP }}
-          MTU = 1250
-
-          [Peer]
-          PublicKey = ${{ secrets.WG_PUBLIC_KEY }}
-          PresharedKey = ${{ secrets.WG_PRESHARED_KEY }}
-          AllowedIPs = 192.168.0.0/24, ${{ vars.E7270_IP }}/32
-          Endpoint = ${{ vars.WG_ENDPOINT }}:51820
-          PersistentKeepalive = 25
-          EOF
-
-      - name: Bring up VPN
-        run: |
-          for i in $(seq 1 5); do
-            echo "Attempt $i/5: bringing up WireGuard..."
-            if sudo wg-quick up ./wg0.conf; then
-              echo "WireGuard up successfully"
-              break
-            fi
-            if [ $i -eq 5 ]; then
-              echo "WireGuard failed after 5 attempts"
-              exit 1
-            fi
-            echo "Failed, waiting 10s before retry..."
-            sudo ip link delete dev wg0 2>/dev/null || true
-            sleep 10
-          done
-          sudo wg show
-
-      - name: make log directory
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-            host: ${{ vars.E7270_IP }}
-            username: ${{ vars.E7270_USER }}
-            key: ${{ secrets.SSH_KEY_E7270 }}
-            script: |
-              sudo mkdir -p /opt/f2b-logs/grampsweb
-              sudo touch /opt/f2b-logs/grampsweb/access.log
-              sudo chmod 666 /opt/f2b-logs/grampsweb/access.log
-
-      - name: Ensure fail2ban config dirs are writable
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-            host: ${{ vars.E7270_IP }}
-            username: ${{ vars.E7270_USER }}
-            key: ${{ secrets.SSH_KEY_E7270 }}
-            script: |
-              sudo mkdir -p /opt/stacks/fail2ban/data/filter.d /opt/stacks/fail2ban/data/jail.d
-              sudo chown -R ${{ vars.E7270_USER }}:${{ vars.E7270_USER }} /opt/stacks/fail2ban/data/filter.d /opt/stacks/fail2ban/data/jail.d
-
-      - name: Copy f2b filter to host
-        uses: appleboy/scp-action@v1.0.0
-        with:
-            host: ${{ vars.E7270_IP }}
-            username: ${{ vars.E7270_USER }}
-            key: ${{ secrets.SSH_KEY_E7270 }}
-            source: "grampsweb/filter.d/grampsweb.local"
-            target: "/opt/stacks/fail2ban/data/filter.d/"
-            strip_components: 2
-
-      - name: Copy f2b jail to host
-        uses: appleboy/scp-action@v1.0.0
-        with:
-            host: ${{ vars.E7270_IP }}
-            username: ${{ vars.E7270_USER }}
-            key: ${{ secrets.SSH_KEY_E7270 }}
-            source: "grampsweb/jail.d/grampsweb.local"
-            target: "/opt/stacks/fail2ban/data/jail.d/"
-            strip_components: 2
-
-      - name: Reload f2b
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-            host: ${{ vars.E7270_IP }}
-            username: ${{ vars.E7270_USER }}
-            key: ${{ secrets.SSH_KEY_E7270 }}
-            script:
-              docker exec fail2ban fail2ban-client reload
-
-      - name: Bring down VPN
-        if: always()
-        run: |
-          sudo wg-quick down ./wg0.conf
-          sudo wg show
+    uses: ./.github/workflows/fail2ban-jail-deploy.yml
+    # fail2ban-jail-deploy.yml's own job requests actions:write (to trigger
+    # fail2ban-redeploy.yml on first-run bootstrap) - must be granted
+    # explicitly here or the call is rejected regardless of repo defaults.
+    permissions:
+      actions: write
+      contents: read
+    secrets: inherit
+    with:
+      host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+      stack_name: ${{ inputs.stack_name || 'grampsweb' }}
+      log_filename: access.log

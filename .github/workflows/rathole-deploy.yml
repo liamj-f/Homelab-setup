@@ -11,24 +11,33 @@ on:
     inputs:
       host_machine:
         required: true
-        type: string 
+        type: string
       domain:
         required: true
         type: string
-        default: 'oci.james-fagg.uk' 
+        default: 'oci.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'rathole'
   workflow_call:
     inputs:
       host_machine:
         required: true
-        type: string 
+        type: string
       domain:
         required: true
         type: string
-        default: 'oci.james-fagg.uk' 
+        default: 'oci.james-fagg.uk'
+      stack_name:
+        required: false
+        type: string
+        default: 'rathole'
 
 env:
   domain: ${{ inputs.domain || 'oci.james-fagg.uk' }}
   host_machine: ${{ inputs.host_machine || 'ljfcloud-arm' }}
+  stack_name: ${{ inputs.stack_name || 'rathole' }}
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -57,24 +66,24 @@ jobs:
           if [ "${{ matrix.host_machine }}" = "rpi4-server" ]; then
             echo "ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
-            echo "rathole_file=rathole/rathole-client.toml.template" >> $GITHUB_OUTPUT
-            echo "rathole_compose=rathole/rathole-client-compose.yml" >> $GITHUB_OUTPUT
+            echo "rathole_file=${{ env.stack_name }}/rathole-client.toml.template" >> $GITHUB_OUTPUT
+            echo "rathole_compose=${{ env.stack_name }}/rathole-client-compose.yml" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
-            echo "rathole_file=rathole/rathole-client.toml.template" >> $GITHUB_OUTPUT
-            echo "rathole_compose=rathole/rathole-client-compose.yml" >> $GITHUB_OUTPUT            
+            echo "rathole_file=${{ env.stack_name }}/rathole-client.toml.template" >> $GITHUB_OUTPUT
+            echo "rathole_compose=${{ env.stack_name }}/rathole-client-compose.yml" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
             echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.LJFCLOUD_USER }}" >> $GITHUB_OUTPUT
-            echo "rathole_file=rathole/rathole-server.toml.template" >> $GITHUB_OUTPUT
-            echo "rathole_compose=rathole/rathole-server-compose.yml" >> $GITHUB_OUTPUT
+            echo "rathole_file=${{ env.stack_name }}/rathole-server.toml.template" >> $GITHUB_OUTPUT
+            echo "rathole_compose=${{ env.stack_name }}/rathole-server-compose.yml" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
@@ -128,6 +137,43 @@ jobs:
           done
           sudo wg show
 
+      - name: Determine keepalived state
+        # rathole-client only runs on the two on-prem HA nodes - the node
+        # holding the keepalived VIP (MASTER) is the one that should have
+        # its tunnel up, matching what keepalived's own notify.sh does on a
+        # live failover (see keepalived/notify.sh.template). ljfcloud-arm
+        # is the rathole server, not part of the HA pair, so it's skipped.
+        id: keepalived_state
+        if: ${{ matrix.host_machine == 'rpi4-server' || matrix.host_machine == 'e7270-server' }}
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > ssh_key.pem
+          chmod 600 ssh_key.pem
+
+          STATE=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -i ssh_key.pem "${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}" '
+              if docker ps --filter "name=^/keepalived$" --filter "status=running" --format "{{.Names}}" | grep -q keepalived; then
+                if ip addr show | grep -q "${{ vars.KEEPALIVED_IP }}"; then
+                  echo MASTER
+                else
+                  echo BACKUP
+                fi
+              else
+                echo NOT_RUNNING
+              fi
+            ' 2>/dev/null || echo NOT_RUNNING)
+
+          rm -f ssh_key.pem
+          echo "Keepalived state on ${{ matrix.host_machine }} (${{ steps.node_config.outputs.ssh_host }}): $STATE"
+
+          if [ "$STATE" = "BACKUP" ]; then
+            echo "is_master=false" >> $GITHUB_OUTPUT
+          else
+            # Treat MASTER and NOT_RUNNING (keepalived not deployed here
+            # yet) the same as MASTER - fail open so a first-time deploy
+            # doesn't stop rathole-client before keepalived even exists.
+            echo "is_master=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Make rathole directory
         uses: appleboy/ssh-action@v1.2.5
         with:
@@ -135,8 +181,8 @@ jobs:
             username: ${{ steps.node_config.outputs.ssh_user }}
             key: ${{ steps.node_config.outputs.ssh_key }}
             script: |
-              sudo mkdir -p /opt/stacks/rathole 
-              sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks
+              sudo mkdir -p /opt/stacks/${{ env.stack_name }}
+              sudo chown -R ${{ steps.node_config.outputs.ssh_user }}:${{ steps.node_config.outputs.ssh_user }} /opt/stacks/${{ env.stack_name }}
 
       - name: Copy config to directory
         uses: appleboy/scp-action@v1.0.0
@@ -145,7 +191,7 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           source: ${{ steps.render_rathole.outputs.rendered_file }}
-          target: /opt/stacks/rathole
+          target: /opt/stacks/${{ env.stack_name }}
           strip_components: 1
           overwrite: true
           rm: true
@@ -179,7 +225,7 @@ jobs:
  
           # Filter by both Name AND EndpointId
           STACK_ID=$(echo "$STACKS" | jq -r \
-            --arg name "rathole" \
+            --arg name "${{ env.stack_name }}" \
             --argjson endpoint_id "${{ steps.endpoint.outputs.endpoint_id }}" \
             '.[] | select(.Name==$name and .EndpointId==$endpoint_id) | .Id')
 
@@ -220,7 +266,7 @@ jobs:
           -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
           -H "Content-Type: application/json" \
           -d '{
-               "Name": "rathole",
+               "Name": "${{ env.stack_name }}",
                "RepositoryURL": "https://github.com/liamj-f/homelab-setup",
                "RepositoryReferenceName": "${{ github.ref }}",
                "ComposeFile": "${{ steps.node_config.outputs.rathole_compose }}",
@@ -262,7 +308,44 @@ jobs:
                   "Prune": false
                 }'  )
 
-              echo "API Response: $RESPONSE" 
+              echo "API Response: $RESPONSE"
+
+      - name: Stop rathole-client if this node is not keepalived MASTER
+        # The Portainer stack redeploy above brings rathole-client back up
+        # regardless of state, which would undo notify.sh's BACKUP-transition
+        # stop. Re-assert it here so a redeploy can't leave rathole-client
+        # running on a node that isn't holding the VIP.
+        #
+        # The redeploy API call above returns as soon as it's queued, not
+        # once Portainer actually finishes pulling/recreating the
+        # container - a one-shot stop can lose that race and get undone
+        # by the recreate finishing afterwards. Loop until it's been seen
+        # stopped twice in a row instead of stopping just once.
+        if: ${{ steps.keepalived_state.outputs.is_master == 'false' }}
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            stable=0
+            for i in $(seq 1 9); do
+              if [ "$(docker inspect -f '{{.State.Running}}' rathole-client 2>/dev/null)" = "true" ]; then
+                echo "Attempt $i: rathole-client is running, stopping it"
+                docker stop rathole-client || true
+                stable=0
+              else
+                stable=$((stable + 1))
+                echo "Attempt $i: rathole-client is stopped (stable=$stable)"
+                if [ "$stable" -ge 2 ]; then
+                  echo "rathole-client confirmed stopped"
+                  exit 0
+                fi
+              fi
+              sleep 10
+            done
+            echo "rathole-client did not stay stopped after 90s"
+            exit 1
 
       - name: Bring down VPN
         if: always()

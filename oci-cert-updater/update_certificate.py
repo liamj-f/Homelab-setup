@@ -173,11 +173,14 @@ def prune_old_versions(client, keep: int = KEEP_VERSIONS, dry_run: bool = False)
     removal is deferred by OCI to a future time_of_deletion — this only starts that clock.
     """
     try:
+        # Sort client-side rather than via the API's sort_by: the server only accepts
+        # Name/Expirationdate/Timecreated for this call, but this SDK version's own
+        # client-side validation only allows "VERSION_NUMBER" — the two disagree, so
+        # any sort_by value fails one side or the other. Unsorted fetch + local sort
+        # sidesteps that entirely.
         versions = oci.pagination.list_call_get_all_results(
             client.list_certificate_versions,
             OCI_CERT_ID,
-            sort_by="TIMECREATED",
-            sort_order="DESC",
         ).data
     except Exception as e:
         log(f"ERROR: Failed to list certificate versions: {e}")
@@ -190,6 +193,7 @@ def prune_old_versions(client, keep: int = KEEP_VERSIONS, dry_run: bool = False)
         return getattr(v, 'time_of_deletion', None) is not None
 
     eligible = [v for v in versions if not is_current(v) and not already_scheduled(v)]
+    eligible.sort(key=lambda v: v.time_created, reverse=True)
     to_keep, to_remove = eligible[:keep], eligible[keep:]
 
     log(f"Certificate versions: {len(versions)} total, {len(eligible)} eligible for pruning, "

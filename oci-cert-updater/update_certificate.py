@@ -176,7 +176,7 @@ def prune_old_versions(client, keep: int = KEEP_VERSIONS, dry_run: bool = False)
         versions = oci.pagination.list_call_get_all_results(
             client.list_certificate_versions,
             OCI_CERT_ID,
-            sort_by="VERSION_NUMBER",
+            sort_by="TIMECREATED",
             sort_order="DESC",
         ).data
     except Exception as e:

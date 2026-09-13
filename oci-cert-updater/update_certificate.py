@@ -166,6 +166,25 @@ def upload_certificate(client, cert_path: str, dry_run: bool = False):
     log("Certificate updated successfully in OCI.")
 
 
+def wait_for_certificate_active(client, timeout: int = 120, interval: int = 3) -> bool:
+    """Block until the Certificate resource leaves the UPDATING lifecycle state.
+
+    Scheduling a version deletion briefly puts the whole Certificate (not just the version)
+    into UPDATING; firing another management call while it's still UPDATING gets a 409
+    IncorrectState. Poll get_certificate() between calls instead of firing them back-to-back.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            if client.get_certificate(OCI_CERT_ID).data.lifecycle_state != 'UPDATING':
+                return True
+        except Exception as e:
+            log(f"WARN: Failed to poll certificate lifecycle state: {e}")
+        time.sleep(interval)
+    log("WARN: Timed out waiting for certificate to leave UPDATING state.")
+    return False
+
+
 def prune_old_versions(client, keep: int = KEEP_VERSIONS, dry_run: bool = False):
     """Schedule deletion of certificate versions beyond CURRENT + the `keep` most recent previous ones.
 
@@ -204,6 +223,7 @@ def prune_old_versions(client, keep: int = KEEP_VERSIONS, dry_run: bool = False)
             log(f"  - DRY RUN: would schedule deletion of version {v.version_number} "
                 f"(created {v.time_created})")
             continue
+        wait_for_certificate_active(client)
         try:
             client.schedule_certificate_version_deletion(
                 OCI_CERT_ID,

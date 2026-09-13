@@ -8,6 +8,7 @@ services:
     environment:
       - OCI_CERT_ID=${OCI_CERT_ID}
       - CHECK_INTERVAL=${CHECK_INTERVAL:-3600}
+      - KEEP_VERSIONS=${KEEP_VERSIONS:-5}
       - OCI_USER=${OCI_USER}
       - OCI_FINGERPRINT=${OCI_FINGERPRINT}
       - OCI_TENANCY=${OCI_TENANCY}

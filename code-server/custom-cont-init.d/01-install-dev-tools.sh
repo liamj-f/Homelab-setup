@@ -59,3 +59,9 @@ echo "[01-install-dev-tools] setting git identity..."
 su -s /bin/bash abc -c "git config --global user.name 'liamj-f'"
 su -s /bin/bash abc -c "git config --global user.email 'liamjamesfagg+github@gmail.com'"
 echo "[01-install-dev-tools] done"
+
+# Fix tmux so that it defults to /bin/bash 
+mkdir -p /config
+cat > /config/.tmux.conf << 'EOF'
+set -g default-shell /bin/bash
+EOF

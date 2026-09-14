@@ -5,8 +5,9 @@ import sys
 import time
 import hashlib
 import base64
+import argparse
 import oci
-from datetime import datetime
+from datetime import datetime, timedelta
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
@@ -15,6 +16,7 @@ from cryptography.hazmat.backends import default_backend
 OCI_CERT_ID = os.getenv('OCI_CERT_ID')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '3600'))
 CERT_PATH_OVERRIDE = os.getenv('CERT_PATH')  # optional explicit override
+KEEP_VERSIONS = int(os.getenv('KEEP_VERSIONS', '5'))  # previous versions kept, in addition to CURRENT
 
 # OCI credentials
 oci_key_base64 = os.getenv('OCI_KEY_CONTENT_BASE64')
@@ -35,6 +37,17 @@ config = {
 def log(message):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print(f"[{timestamp}] {message}", flush=True)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Upload renewed certs to OCI and prune old versions.")
+    parser.add_argument('--prune-only', action='store_true',
+                         help="Only prune old certificate versions and exit; do not upload.")
+    parser.add_argument('--dry-run', action='store_true',
+                         help="Log what would happen without making changes in OCI.")
+    parser.add_argument('--keep-versions', type=int, default=KEEP_VERSIONS,
+                         help="Previous versions to keep in addition to CURRENT (default: %(default)s).")
+    return parser.parse_args()
 
 
 def get_pem_names(fullchain_path: str) -> set:
@@ -111,17 +124,34 @@ def read_cert_files(cert_path: str):
 
 
 def get_cert_hash(cert_path: str) -> str:
-    """Return SHA256 hash of fullchain.pem + privkey.pem content."""
-    fullchain, _, privkey = read_cert_files(cert_path)
+    """Return SHA256 hash of fullchain.pem content (cert+key are renewed together by certbot,
+    so cert content alone is enough to detect a renewal, and it's directly comparable to
+    get_current_oci_hash())."""
+    fullchain, _, _ = read_cert_files(cert_path)
     h = hashlib.sha256()
     h.update(fullchain.encode())
-    h.update(privkey.encode())
     return h.hexdigest()
 
 
-def upload_certificate(client, cert_path: str):
+def get_current_oci_hash(certs_client) -> str | None:
+    """SHA256 of the fullchain PEM currently CURRENT in OCI, or None if it can't be determined."""
+    try:
+        bundle = certs_client.get_certificate_bundle(certificate_id=OCI_CERT_ID).data
+        h = hashlib.sha256()
+        h.update(bundle.certificate_pem.encode())
+        return h.hexdigest()
+    except Exception as e:
+        log(f"WARN: Could not fetch current OCI cert bundle for comparison: {e}")
+        return None
+
+
+def upload_certificate(client, cert_path: str, dry_run: bool = False):
     """Upload current cert files as a new version in OCI."""
     fullchain, chain, privkey = read_cert_files(cert_path)
+
+    if dry_run:
+        log("DRY RUN: would upload new certificate version to OCI.")
+        return
 
     update_details = oci.certificates_management.models.UpdateCertificateDetails(
         certificate_config=oci.certificates_management.models.UpdateCertificateByImportingConfigDetails(
@@ -136,11 +166,88 @@ def upload_certificate(client, cert_path: str):
     log("Certificate updated successfully in OCI.")
 
 
+def wait_for_certificate_active(client, timeout: int = 120, interval: int = 3) -> bool:
+    """Block until the Certificate resource leaves the UPDATING lifecycle state.
+
+    Scheduling a version deletion briefly puts the whole Certificate (not just the version)
+    into UPDATING; firing another management call while it's still UPDATING gets a 409
+    IncorrectState. Poll get_certificate() between calls instead of firing them back-to-back.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            if client.get_certificate(OCI_CERT_ID).data.lifecycle_state != 'UPDATING':
+                return True
+        except Exception as e:
+            log(f"WARN: Failed to poll certificate lifecycle state: {e}")
+        time.sleep(interval)
+    log("WARN: Timed out waiting for certificate to leave UPDATING state.")
+    return False
+
+
+def prune_old_versions(client, keep: int = KEEP_VERSIONS, dry_run: bool = False):
+    """Schedule deletion of certificate versions beyond CURRENT + the `keep` most recent previous ones.
+
+    Never touches the CURRENT version or a version already pending deletion. A version's actual
+    removal is deferred by OCI to a future time_of_deletion — this only starts that clock.
+    """
+    try:
+        # Sort client-side rather than via the API's sort_by: the server only accepts
+        # Name/Expirationdate/Timecreated for this call, but this SDK version's own
+        # client-side validation only allows "VERSION_NUMBER" — the two disagree, so
+        # any sort_by value fails one side or the other. Unsorted fetch + local sort
+        # sidesteps that entirely.
+        versions = oci.pagination.list_call_get_all_results(
+            client.list_certificate_versions,
+            OCI_CERT_ID,
+        ).data
+    except Exception as e:
+        log(f"ERROR: Failed to list certificate versions: {e}")
+        return
+
+    def is_current(v):
+        return "CURRENT" in (v.stages or [])
+
+    def already_scheduled(v):
+        return getattr(v, 'time_of_deletion', None) is not None
+
+    eligible = [v for v in versions if not is_current(v) and not already_scheduled(v)]
+    eligible.sort(key=lambda v: v.time_created, reverse=True)
+    to_keep, to_remove = eligible[:keep], eligible[keep:]
+
+    log(f"Certificate versions: {len(versions)} total, {len(eligible)} eligible for pruning, "
+        f"keeping {len(to_keep)}, pruning {len(to_remove)}")
+
+    for v in to_remove:
+        if dry_run:
+            log(f"  - DRY RUN: would schedule deletion of version {v.version_number} "
+                f"(created {v.time_created})")
+            continue
+        wait_for_certificate_active(client)
+        try:
+            client.schedule_certificate_version_deletion(
+                OCI_CERT_ID,
+                v.version_number,
+                oci.certificates_management.models.ScheduleCertificateVersionDeletionDetails(
+                    time_of_deletion=datetime.utcnow() + timedelta(days=1),  # OCI-enforced minimum window
+                ),
+            )
+            log(f"  - Scheduled deletion of version {v.version_number} (created {v.time_created})")
+        except Exception as e:
+            log(f"WARN: Failed to schedule deletion for version {v.version_number}: {e}")
+            # keep going — one bad version must not block pruning the rest
+
+
 def main():
+    args = parse_args()
+
     log("=== OCI Certificate Updater Starting ===")
     log(f"OCI Cert ID: {OCI_CERT_ID}")
     log(f"Check interval: {CHECK_INTERVAL}s")
+    log(f"Keep versions (previous, excl. CURRENT): {args.keep_versions}")
     log(f"Region: {config['region']}")
+    if args.dry_run:
+        log("DRY RUN — no changes will be made in OCI.")
 
     if not OCI_CERT_ID:
         log("ERROR: OCI_CERT_ID not set!")
@@ -152,21 +259,30 @@ def main():
 
     try:
         client = oci.certificates_management.CertificatesManagementClient(config)
-        log("OCI client initialised successfully.")
+        certs_client = oci.certificates.CertificatesClient(config)
+        log("OCI clients initialised successfully.")
     except Exception as e:
         log(f"ERROR: Failed to initialise OCI client: {e}")
         sys.exit(1)
 
+    if args.prune_only:
+        log("--prune-only: pruning old certificate versions and exiting (no upload attempted).")
+        prune_old_versions(client, keep=args.keep_versions, dry_run=args.dry_run)
+        return
+
     cert_path = find_cert_path(client)
     log(f"Cert path: {cert_path}")
 
-    # Get baseline hash
     try:
         current_hash = get_cert_hash(cert_path)
-        log(f"Baseline cert hash: {current_hash[:12]}...")
-        # Upload on first run to ensure OCI is in sync
-        log("Uploading cert on startup to ensure OCI is in sync...")
-        upload_certificate(client, cert_path)
+        log(f"Local cert hash: {current_hash[:12]}...")
+        oci_hash = get_current_oci_hash(certs_client)
+        if oci_hash is None or oci_hash != current_hash:
+            log("Local cert differs from (or unknown vs) OCI CURRENT version — uploading...")
+            upload_certificate(client, cert_path, dry_run=args.dry_run)
+            prune_old_versions(client, keep=args.keep_versions, dry_run=args.dry_run)
+        else:
+            log("Local cert matches OCI CURRENT version — skipping startup upload.")
     except Exception as e:
         log(f"ERROR: Failed on startup: {e}")
         sys.exit(1)
@@ -177,7 +293,8 @@ def main():
             new_hash = get_cert_hash(cert_path)
             if new_hash != current_hash:
                 log(f"Cert change detected (hash: {new_hash[:12]}...). Uploading to OCI...")
-                upload_certificate(client, cert_path)
+                upload_certificate(client, cert_path, dry_run=args.dry_run)
+                prune_old_versions(client, keep=args.keep_versions, dry_run=args.dry_run)
                 current_hash = new_hash
             else:
                 log("Cert unchanged, skipping upload.")

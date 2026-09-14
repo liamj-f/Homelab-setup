@@ -82,7 +82,6 @@ jobs:
 
   deploy:
     needs: build-image-and-push
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     concurrency:
       group: homelab-deployments

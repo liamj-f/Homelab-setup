@@ -334,8 +334,7 @@ jobs:
                                   "local": true
                                 },
                       "upstreams": [
-                                    "1.1.1.1",
-                                    "8.8.8.8"
+                                    "127.0.0.1#5335"
                                     ],
                       "interface": "eth0", 
                       "listeningMode": "single",

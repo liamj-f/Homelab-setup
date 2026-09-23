@@ -34,6 +34,25 @@ services:
 #    networks:
 #      - nginx_network
         
+  # Recursive resolver Pi-hole uses as its upstream. Pi-hole runs with
+  # network_mode: host so it can't resolve Docker DNS names, and this container
+  # can't share the host network without clashing with Pi-hole on port 53.
+  # Instead it's published on loopback only and Pi-hole targets 127.0.0.1#5335.
+  unbound:
+    image: klutchell/unbound-docker:1.26.1
+    container_name: unbound
+    restart: unless-stopped
+    healthcheck:
+      # Use the drill wrapper binary to reduce the exit codes to 0 or 1 for healthchecks
+      test: ['CMD', 'drill-hc', '@127.0.0.1', 'dnssec.works']
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 30s
+    ports:
+      - "127.0.0.1:5335:53/tcp"
+      - "127.0.0.1:5335:53/udp"
+
   nebula-sync:
     image: ghcr.io/lovelaze/nebula-sync:v0.11.2
     depends_on:

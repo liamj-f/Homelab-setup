@@ -39,7 +39,7 @@ services:
   # can't share the host network without clashing with Pi-hole on port 53.
   # Instead it's published on loopback only and Pi-hole targets 127.0.0.1#5335.
   unbound:
-    image: klutchell/unbound-docker:1.26.1
+    image: klutchell/unbound:1.26.1
     container_name: unbound
     restart: unless-stopped
     healthcheck:

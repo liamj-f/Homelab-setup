@@ -49,6 +49,12 @@ jobs:
       cancel-in-progress: false
       queue: max
     strategy:
+      # Don't let one host's leg failing cancel the other's. This matters
+      # beyond just "the other host still gets deployed": the nebula-sync
+      # pause/resume steps below are self-healing across legs (each leg
+      # pauses/resumes the OTHER host's nebula-sync too), which only works
+      # if a failed leg doesn't prevent the surviving leg from running.
+      fail-fast: false
       matrix:
         host_machine: [rpi4-server, e7270-server]
       max-parallel: 1
@@ -498,24 +504,44 @@ jobs:
       - name: Create Bypass Group in Pihole
         if: steps.bypass_group.outputs.group_id == ''
         run: |
-            RESPONSE=$(curl -s --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+            GROUP_ID=""
+            for i in $(seq 1 5); do
+              RESPONSE=$(curl -s --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+                -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+                -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+                -H 'accept: application/json' \
+                -H 'content-type: application/json' \
+                -d '{"name":"bypass","comment":"Bypass group - no blocklists","enabled":true}')
+              echo "Attempt $i/5 response: $RESPONSE"
+
+              RAW=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
               -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
               -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-              -H 'accept: application/json' \
-              -H 'content-type: application/json' \
-              -d '{"name":"bypass","comment":"Bypass group - no blocklists","enabled":true}')
-            echo "Response: $RESPONSE"
-          
-            RAW=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
-            -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
-            -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-            -H 'accept: application/json')
-             echo "Raw response: $RAW"
-            GROUP_ID=$(echo "$RAW" | jq -r '(.groups // [])[] | select(.name == "bypass") | .id')
+              -H 'accept: application/json')
+              echo "Attempt $i/5 raw response: $RAW"
+              GROUP_ID=$(echo "$RAW" | jq -r '(.groups // [])[] | select(.name == "bypass") | .id')
+
+              if [ -n "$GROUP_ID" ]; then
+                echo "Bypass group created (id $GROUP_ID)"
+                break
+              fi
+
+              # Right after "Update Gravity via API" swaps in the freshly
+              # rebuilt gravity.db, Pi-hole's API can briefly report it as a
+              # readonly database (its own DB handle hasn't reopened against
+              # the new file yet) - retry past that window instead of
+              # treating the first attempt as a permanent failure.
+              echo "Bypass group not created yet (attempt $i/5), retrying in 5s..."
+              sleep 5
+            done
             echo "group_id=$GROUP_ID" >> $GITHUB_ENV
 
       - name: Add Phone to Bypass Group
         run: |
+          if [ -z "$group_id" ]; then
+            echo "::warning::Bypass group id unavailable - skipping phone bypass assignment"
+            exit 0
+          fi
           PAYLOAD=$(jq -n --argjson group_id "$group_id" '{
               client: "B8:A8:25:5E:17:7A",
               comment: "HJ-F phone - bypass group",

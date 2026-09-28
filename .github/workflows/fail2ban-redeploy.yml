@@ -259,6 +259,10 @@ jobs:
                                     {
                                     "name":"WAF_BLOCKLIST_ID",
                                     "value":"${{ vars.OCID_WAF_BLOCKLIST }}"
+                                    },
+                                    {
+                                    "name":"NEXTCLOUD_LOG_MOUNT",
+                                    "value":"${{ matrix.host_machine == 'e7270-server' && '/mnt/Nextcloud/nextcloud.log' || '/dev/null' }}"
                                     }
                        ],
                "Prune": true,
@@ -290,7 +294,11 @@ jobs:
                                     {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
                                     {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
                                     {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
-                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"}
+                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
+                                    {
+                                    "name":"NEXTCLOUD_LOG_MOUNT",
+                                    "value":"${{ matrix.host_machine == 'e7270-server' && '/mnt/Nextcloud/nextcloud.log' || '/dev/null' }}"
+                                    }
                                       ],
                   "Prune": true
                   }'  )

@@ -159,6 +159,19 @@ jobs:
           echo "::add-mask::$HASH"
           echo "hash=$HASH" >> $GITHUB_OUTPUT
 
+      - name: Hash pgAdmin OIDC client secret
+        id: hash_pgadmin_oidc_secret
+        env:
+          PGADMIN_OIDC_CLIENT_SECRET: ${{ secrets.PGADMIN_OIDC_CLIENT_SECRET }}
+        run: |
+          HASH=$(docker run --rm authelia/authelia:latest authelia crypto hash generate pbkdf2 --variant sha512 --password "$PGADMIN_OIDC_CLIENT_SECRET" | sed -n 's/^Digest: //p')
+          if [ -z "$HASH" ]; then
+            echo "::error::Failed to generate pgAdmin OIDC client secret hash"
+            exit 1
+          fi
+          echo "::add-mask::$HASH"
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+
       - name: Render configuration.yml
         env:
           AUTHELIA_SESSION_SECRET: ${{ secrets.AUTHELIA_SESSION_SECRET }}
@@ -170,6 +183,7 @@ jobs:
           AUTHELIA_OIDC_HMAC_SECRET: ${{ secrets.AUTHELIA_OIDC_HMAC_SECRET }}
           AUTHELIA_OIDC_ISSUER_PRIVATE_KEY: ${{ secrets.AUTHELIA_OIDC_ISSUER_PRIVATE_KEY }}
           AUTHELIA_OIDC_PORTAINER_CLIENT_SECRET_HASH: ${{ steps.hash_oidc_secret.outputs.hash }}
+          AUTHELIA_OIDC_PGADMIN_CLIENT_SECRET_HASH: ${{ steps.hash_pgadmin_oidc_secret.outputs.hash }}
         run: |
           envsubst < ${{ env.stack_name }}/config/configuration.yml.template > ${{ env.stack_name }}/config/configuration.yml
 

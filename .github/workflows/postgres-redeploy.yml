@@ -125,13 +125,60 @@ jobs:
             sudo mkdir -p /opt/stacks/${{ env.stack_name }}/data
             sudo chown -R 999:999 /opt/stacks/${{ env.stack_name }}/data
 
+      # Portainer's own OIDC toggle can safely flip AuthenticationMethod live
+      # because it always keeps a local-admin bypass. pgAdmin's OAuth2 config
+      # has no equivalent lockout risk (AUTHENTICATION_SOURCES always keeps
+      # 'internal' alongside 'oauth2' - see config_local_oauth2.py.template),
+      # so this check exists only to avoid offering a dead SSO button on the
+      # login page when Authelia isn't actually up, mirroring
+      # portainer-deploy.yml's "Check Authelia health" step.
+      - name: Check Authelia health
+        id: check_authelia
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ vars.RPI4_IP }}
+          username: ${{ vars.RPI4_USER }}
+          key: ${{ secrets.SSH_KEY_RPI4 }}
+          capture_stdout: true
+          script: |
+            HEALTH=$(docker inspect --format '{{.State.Health.Status}}' authelia 2>/dev/null || echo "missing")
+            if [ "$HEALTH" = "healthy" ]; then
+              echo "AUTHELIA_HEALTHY=true"
+            else
+              echo "AUTHELIA_HEALTHY=false"
+            fi
+
+      # pgAdmin is the OAuth2 client authenticating itself to Authelia's token
+      # endpoint, so - unlike authelia-deploy.yml's hashed copy for Authelia's
+      # own client record - it needs the plaintext secret here, just masked.
+      - name: Prepare pgAdmin OIDC client secret
+        id: pgadmin_oidc_secret
+        if: ${{ contains(steps.check_authelia.outputs.stdout, 'AUTHELIA_HEALTHY=true') }}
+        env:
+          PGADMIN_OIDC_CLIENT_SECRET: ${{ secrets.PGADMIN_OIDC_CLIENT_SECRET }}
+        run: |
+          echo "::add-mask::$PGADMIN_OIDC_CLIENT_SECRET"
+          echo "secret=$PGADMIN_OIDC_CLIENT_SECRET" >> $GITHUB_OUTPUT
+
+      - name: Render pgAdmin config_local.py
+        env:
+          AUTHELIA_OIDC_PGADMIN_CLIENT_SECRET: ${{ steps.pgadmin_oidc_secret.outputs.secret }}
+        run: |
+          if [ "${{ contains(steps.check_authelia.outputs.stdout, 'AUTHELIA_HEALTHY=true') }}" = "true" ]; then
+            echo "Authelia is healthy - rendering pgAdmin config_local.py with OAuth2 enabled"
+            envsubst < postgres/config_local_oauth2.py.template > postgres/config_local.py
+          else
+            echo "Authelia not healthy - rendering pgAdmin config_local.py with internal auth only"
+            cp postgres/config_local_internal.py.template postgres/config_local.py
+          fi
+
       - name: Copy pgAdmin config to host
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ steps.node_config.outputs.ssh_host }}
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
-          source: postgres/servers.json
+          source: postgres/servers.json,postgres/config_local.py
           target: /opt/stacks/pgadmin/
           strip_components: 1
 
@@ -415,3 +462,20 @@ jobs:
       # deploy's own matrix is hardcoded to [e7270-server] regardless of the
       # host_machine input, so that's genuinely where this always runs.
       host_machine: 'e7270-server'
+  fail2ban_setup:
+    needs: deploy
+    uses: ./.github/workflows/fail2ban-jail-deploy.yml
+    # fail2ban-jail-deploy.yml's own job requests actions:write (to trigger
+    # fail2ban-redeploy.yml on first run) - secrets: inherit alone doesn't
+    # carry permissions, so this still needs granting explicitly here too.
+    permissions:
+      actions: write
+      contents: read
+    secrets: inherit
+    with:
+      # pgAdmin itself only ever runs on e7270-server (deploy's own matrix is
+      # hardcoded to it), so that's the only host whose local NPM traffic
+      # ever reaches it.
+      host_machine: 'e7270-server'
+      stack_name: 'pgadmin'
+      log_filename: 'access.log'

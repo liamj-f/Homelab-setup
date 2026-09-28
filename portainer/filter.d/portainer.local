@@ -1,0 +1,8 @@
+[Definition]
+# Portainer CE's own container logs never include the client IP (that's a
+# Business Edition-only feature - see nginx/http_top.conf's f2b_login
+# log_format), so this reads NPM's access log instead. Portainer's own API
+# already returns 422 for bad credentials on /api/auth and 200 (with a JWT)
+# on success - nginx just records whatever status Portainer gave it.
+failregex = ^<HOST>,?\s+-\s+\[.*\]\s+"POST /api/auth HTTP/1\.\d" 422
+ignoreregex =

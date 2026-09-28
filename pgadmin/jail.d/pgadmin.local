@@ -1,0 +1,8 @@
+[pgadmin]
+enabled   = true
+filter    = pgadmin
+action    = oci-waf
+logpath   = /remotelogs/pgadmin/access.log
+maxretry  = 5
+findtime  = 600
+bantime   = 86400

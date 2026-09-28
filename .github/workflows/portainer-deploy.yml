@@ -285,6 +285,22 @@ jobs:
             exit 1
           fi
 
+      # NPM (nginx) needs this directory to exist and be writable before it
+      # can write portainer/access.log into it - it won't create missing
+      # parent dirs itself. Runs on both on-prem NPM instances since
+      # keepalived can float which one is actually serving traffic; only
+      # ljfcloud-arm's NPM (not covered here) is out of fail2ban's reach
+      # entirely, same as every other existing jail.
+      - name: Ensure NPM f2b log directory exists
+        if: ${{ matrix.host_machine == 'rpi4-server' || matrix.host_machine == 'e7270-server' }}
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            sudo mkdir -p /opt/f2b-logs/nginx-proxy-manager/portainer
+
       - name: Bring down VPN
         if: always()
         run: |
@@ -301,6 +317,27 @@ jobs:
       # rpi4-server (e7270/ljfcloud-arm in the deploy matrix are agents).
       app_host_machine: 'rpi4-server'
       forward_port: 83
+      # Portainer CE's own logs never carry the client IP (that's Business
+      # Edition-only), so this replaces NPM's default per-host access log
+      # with one that also captures it, for fail2ban - see
+      # portainer/filter.d/portainer.local. NPM's own "View Log" for this
+      # host will read empty as a result; fail2ban's copy is the real record
+      # now. Mirrors proxy_config_onprem.yml's own Authelia auth_request
+      # block for the parts unrelated to logging (WebSocket headers etc.,
+      # needed for Portainer's docker exec/attach console).
+      advanced_config: |
+        location / {
+          access_log /data/logs/portainer/access.log f2b_login;
+          proxy_set_header X-Forwarded-Host $host;
+          proxy_set_header X-Forwarded-Proto https;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection $http_connection;
+          proxy_http_version 1.1;
+          proxy_pass_request_headers on;
+          include conf.d/include/proxy.conf;
+          proxy_read_timeout 3600s;
+          proxy_send_timeout 3600s;
+        }
   proxy_setup_oci:
     # This step adds nginx1, nginx2 and nginx.14monarch.james-fagg.uk to the OCI nginx.
     needs: deploy
@@ -313,4 +350,32 @@ jobs:
       # regardless of the host_machine input.
       host_machine: 'rpi4-server'
       protect_with_authelia: false
+  # Deployed to both on-prem NPM instances, not just rpi4-server (where
+  # Portainer's UI itself runs) - keepalived can float which node is
+  # actually serving portainer.14monarch.james-fagg.uk at any moment, so a
+  # login attempt's access log entry can land on either one. Bans still go
+  # through the shared oci-waf blocklist either way, so either instance
+  # catching the pattern protects both.
+  fail2ban_setup_rpi4:
+    needs: [deploy, proxy_setup_onprem]
+    uses: ./.github/workflows/fail2ban-jail-deploy.yml
+    permissions:
+      actions: write
+      contents: read
+    secrets: inherit
+    with:
+      host_machine: 'rpi4-server'
+      stack_name: 'portainer'
+      log_filename: 'access.log'
+  fail2ban_setup_e7270:
+    needs: [deploy, proxy_setup_onprem]
+    uses: ./.github/workflows/fail2ban-jail-deploy.yml
+    permissions:
+      actions: write
+      contents: read
+    secrets: inherit
+    with:
+      host_machine: 'e7270-server'
+      stack_name: 'portainer'
+      log_filename: 'access.log'
 

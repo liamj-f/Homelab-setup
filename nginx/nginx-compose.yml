@@ -15,6 +15,11 @@ services:
     volumes:
       - nginx_data:/data
       - nginx_letsencrypt:/etc/letsencrypt
+      # Exposes NPM's own logs dir on the host for fail2ban (mounted
+      # read-only as /remotelogs in fail2ban/fail2ban-compose.yml). Shadows
+      # whatever NPM had already written to /data/logs from inside the
+      # nginx_data volume - fine, it's just rotated access logs.
+      - /opt/f2b-logs/nginx-proxy-manager:/data/logs
     networks:
       - nginx_network
     healthcheck:

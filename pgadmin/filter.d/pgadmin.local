@@ -1,0 +1,6 @@
+[Definition]
+# pgAdmin's flask-security login view re-renders the form (HTTP 200) on bad
+# credentials and only redirects (302) on success, so there's no 4xx to key
+# off - restrict to POST specifically since GET /login is also a 200.
+failregex = ^\S+\s+<HOST>,?\s+.*"POST /login HTTP/1\.\d" 200
+ignoreregex =

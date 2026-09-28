@@ -49,6 +49,12 @@ jobs:
       cancel-in-progress: false
       queue: max
     strategy:
+      # Don't let one host's leg failing cancel the other's. This matters
+      # beyond just "the other host still gets deployed": the nebula-sync
+      # pause/resume steps below are self-healing across legs (each leg
+      # pauses/resumes the OTHER host's nebula-sync too), which only works
+      # if a failed leg doesn't prevent the surviving leg from running.
+      fail-fast: false
       matrix:
         host_machine: [rpi4-server, e7270-server]
       max-parallel: 1
@@ -70,6 +76,10 @@ jobs:
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
+            echo "other_ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
+            echo "other_ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
             echo "default_dhcp_active=false" >> $GITHUB_OUTPUT
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
@@ -77,6 +87,10 @@ jobs:
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_E7270 }}" >> $GITHUB_OUTPUT
+            echo "EOF_KEY" >> $GITHUB_OUTPUT
+            echo "other_ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
+            echo "other_ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
+            echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "ljfcloud-arm" ]; then
             echo "ssh_host=${{ vars.IP_LJFCLOUD_ARM }}" >> $GITHUB_OUTPUT
@@ -164,6 +178,52 @@ jobs:
               echo "dhcp_active=${{ steps.node_config.outputs.default_dhcp_active }}" >> $GITHUB_OUTPUT
               ;;
           esac
+
+      - name: Record nebula-sync container ID before redeploy
+        # Baseline for the "Stop nebula-sync" step below, so it can detect a
+        # genuine Portainer recreate instead of guessing from a timeout.
+        if: ${{ steps.dhcp_state.outputs.dhcp_active == 'false' }}
+        id: nebula_sync_before
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          capture_stdout: true
+          script: |
+            docker inspect -f '{{.Id}}' nebula-sync 2>/dev/null || true
+
+      - name: Pause nebula-sync on this host before reconfiguring Pi-hole
+        # Whatever this node's role, its own nebula-sync (if it's somehow
+        # still running) writes to the same gravity.db the API calls below
+        # are about to mutate directly. Pause it defensively - it either
+        # comes back running via this leg's own redeploy (if MASTER), or
+        # stays stopped via the "Stop nebula-sync" step later (if BACKUP).
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            docker stop nebula-sync || true
+
+      - name: Pause nebula-sync on the other host before reconfiguring Pi-hole
+        # The other host's nebula-sync (if it's the current MASTER) syncs
+        # ITS Pi-hole outward into this one, including a gravity rebuild
+        # (RUN_GRAVITY) on its own cron schedule - unrelated to this
+        # workflow's timing. If that lands while the steps below are
+        # directly mutating this host's gravity.db via the Pi-hole API,
+        # both writers can corrupt it (this is what produced the
+        # "no such table: info" errors). Pause it for the duration of this
+        # leg's reconfiguration; "Resume nebula-sync on the other host"
+        # below brings it back once this leg is done.
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.other_ssh_host }}
+          username: ${{ steps.node_config.outputs.other_ssh_user }}
+          key: ${{ steps.node_config.outputs.other_ssh_key }}
+          script: |
+            docker stop nebula-sync || true
 
       - name: Override system DNS resolver
         run: |
@@ -305,6 +365,54 @@ jobs:
 
             echo "API Response: $RESPONSE" 
 
+      - name: Stop nebula-sync if this node is not keepalived MASTER
+        # The Portainer stack redeploy above brings every service in the
+        # compose file back up regardless of state, which would undo
+        # notify.sh's BACKUP-transition stop (see keepalived/notify.sh.template).
+        # Re-assert it here so a redeploy can't leave nebula-sync running
+        # on a node that isn't holding the VIP.
+        #
+        # The redeploy API call above returns as soon as it's queued, not
+        # once Portainer actually finishes recreating the container, and
+        # nebula-sync's own depends_on: pihole condition: service_healthy
+        # means it can sit not-yet-started for a while after that - which
+        # reads identically to "already stopped". Rather than guess how
+        # long that takes, wait for positive proof the redeploy landed (the
+        # container's ID changing from what "Record nebula-sync container ID
+        # before redeploy" saw beforehand), then stop it immediately.
+        if: ${{ steps.dhcp_state.outputs.dhcp_active == 'false' }}
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            BEFORE_ID="${{ steps.nebula_sync_before.outputs.stdout }}"
+            echo "Container ID before redeploy: '${BEFORE_ID:-<none>}'"
+
+            for i in $(seq 1 18); do
+              CURRENT_ID=$(docker inspect -f '{{.Id}}' nebula-sync 2>/dev/null || true)
+              if [ -n "$CURRENT_ID" ] && [ "$CURRENT_ID" != "$BEFORE_ID" ]; then
+                echo "Attempt $i: redeploy landed (container $CURRENT_ID), stopping it"
+                docker stop nebula-sync || true
+                echo "nebula-sync stopped after redeploy"
+                exit 0
+              fi
+              echo "Attempt $i: redeploy not detected yet (id unchanged: '${CURRENT_ID:-<none>}')"
+              sleep 10
+            done
+
+            echo "Redeploy recreate not detected after 180s - falling back to a direct state check"
+            if [ "$(docker inspect -f '{{.State.Running}}' nebula-sync 2>/dev/null)" = "true" ]; then
+              docker stop nebula-sync || true
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' nebula-sync 2>/dev/null)" = "true" ]; then
+              echo "nebula-sync is still running - giving up"
+              exit 1
+            fi
+            echo "nebula-sync confirmed stopped (fallback path)"
+
+
       - name: Pihole Api Auth
         id: pihole_auth
         run: |
@@ -334,8 +442,7 @@ jobs:
                                   "local": true
                                 },
                       "upstreams": [
-                                    "1.1.1.1",
-                                    "8.8.8.8"
+                                    "127.0.0.1#5335"
                                     ],
                       "interface": "eth0", 
                       "listeningMode": "single",
@@ -440,28 +547,49 @@ jobs:
           echo "Raw response: $RAW"
           GROUP_ID=$(echo "$RAW" | jq -r '(.groups // [])[] | select(.name == "bypass") | .id')
           echo "group_id=$GROUP_ID" >> $GITHUB_ENV
+          echo "group_id=$GROUP_ID" >> $GITHUB_OUTPUT
 
       - name: Create Bypass Group in Pihole
         if: steps.bypass_group.outputs.group_id == ''
         run: |
-            RESPONSE=$(curl -s --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+            GROUP_ID=""
+            for i in $(seq 1 5); do
+              RESPONSE=$(curl -s --retry 3 --retry-delay 5 --retry-all-errors -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
+                -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
+                -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
+                -H 'accept: application/json' \
+                -H 'content-type: application/json' \
+                -d '{"name":"bypass","comment":"Bypass group - no blocklists","enabled":true}')
+              echo "Attempt $i/5 response: $RESPONSE"
+
+              RAW=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
               -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
               -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-              -H 'accept: application/json' \
-              -H 'content-type: application/json' \
-              -d '{"name":"bypass","comment":"Bypass group - no blocklists","enabled":true}')
-            echo "Response: $RESPONSE"
-          
-            RAW=$(curl -s "http://${{ steps.node_config.outputs.ssh_host }}:82/api/groups" \
-            -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
-            -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
-            -H 'accept: application/json')
-             echo "Raw response: $RAW"
-            GROUP_ID=$(echo "$RAW" | jq -r '(.groups // [])[] | select(.name == "bypass") | .id')
+              -H 'accept: application/json')
+              echo "Attempt $i/5 raw response: $RAW"
+              GROUP_ID=$(echo "$RAW" | jq -r '(.groups // [])[] | select(.name == "bypass") | .id')
+
+              if [ -n "$GROUP_ID" ]; then
+                echo "Bypass group created (id $GROUP_ID)"
+                break
+              fi
+
+              # Right after "Update Gravity via API" swaps in the freshly
+              # rebuilt gravity.db, Pi-hole's API can briefly report it as a
+              # readonly database (its own DB handle hasn't reopened against
+              # the new file yet) - retry past that window instead of
+              # treating the first attempt as a permanent failure.
+              echo "Bypass group not created yet (attempt $i/5), retrying in 5s..."
+              sleep 5
+            done
             echo "group_id=$GROUP_ID" >> $GITHUB_ENV
 
       - name: Add Phone to Bypass Group
         run: |
+          if [ -z "$group_id" ]; then
+            echo "::warning::Bypass group id unavailable - skipping phone bypass assignment"
+            exit 0
+          fi
           PAYLOAD=$(jq -n --argjson group_id "$group_id" '{
               client: "B8:A8:25:5E:17:7A",
               comment: "HJ-F phone - bypass group",
@@ -480,43 +608,22 @@ jobs:
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
 
-      - name: Stop nebula-sync if this node is not keepalived MASTER
-        # The Portainer stack redeploy above brings every service in the
-        # compose file back up regardless of state, which would undo
-        # notify.sh's BACKUP-transition stop (see keepalived/notify.sh.template).
-        # Re-assert it here so a redeploy can't leave nebula-sync running
-        # on a node that isn't holding the VIP.
-        #
-        # The redeploy API call above returns as soon as it's queued, not
-        # once Portainer actually finishes pulling/recreating the
-        # container - a one-shot stop can lose that race and get undone
-        # by the recreate finishing afterwards. Loop until it's been seen
-        # stopped twice in a row instead of stopping just once.
+
+      - name: Resume nebula-sync on the other host if it's the keepalived MASTER
+        # Undoes "Pause nebula-sync on the other host" above, now that this
+        # leg's own Pi-hole reconfiguration is finished. Only relevant when
+        # the OTHER host is the MASTER (this node's own dhcp_active is
+        # false) - if this node is the MASTER, the other host is BACKUP and
+        # should stay stopped, which the paired leg's own "Stop nebula-sync"
+        # step (run against ITS OWN host) already guarantees.
         if: ${{ steps.dhcp_state.outputs.dhcp_active == 'false' }}
         uses: appleboy/ssh-action@v1.2.5
         with:
-          host: ${{ steps.node_config.outputs.ssh_host }}
-          username: ${{ steps.node_config.outputs.ssh_user }}
-          key: ${{ steps.node_config.outputs.ssh_key }}
+          host: ${{ steps.node_config.outputs.other_ssh_host }}
+          username: ${{ steps.node_config.outputs.other_ssh_user }}
+          key: ${{ steps.node_config.outputs.other_ssh_key }}
           script: |
-            stable=0
-            for i in $(seq 1 9); do
-              if [ "$(docker inspect -f '{{.State.Running}}' nebula-sync 2>/dev/null)" = "true" ]; then
-                echo "Attempt $i: nebula-sync is running, stopping it"
-                docker stop nebula-sync || true
-                stable=0
-              else
-                stable=$((stable + 1))
-                echo "Attempt $i: nebula-sync is stopped (stable=$stable)"
-                if [ "$stable" -ge 2 ]; then
-                  echo "nebula-sync confirmed stopped"
-                  exit 0
-                fi
-              fi
-              sleep 10
-            done
-            echo "nebula-sync did not stay stopped after 90s"
-            exit 1
+            docker start nebula-sync || true
 
       - name: Copy DHCP toggle script to DHCP-active node
         # Only on the node Pi-hole's own dhcp.active was set true for above,

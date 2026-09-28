@@ -359,6 +359,15 @@ jobs:
       # it won't create missing parent dirs itself. Only rpi4/e7270 run NPM
       # instances fail2ban actually watches (same as ljfcloud-arm being out
       # of reach for every other existing jail).
+      #
+      # Also pre-creates the log FILE itself (not just the directory):
+      # fail2ban-client reload hard-fails its *entire* reload (breaking
+      # every other pipeline's f2b step, not just this one) if a jail's
+      # logpath doesn't exist yet. NPM only creates that file once it's
+      # actually reloaded with the advanced_config below, which can lose a
+      # race against another pipeline's fail2ban reload on first rollout.
+      # Pre-touching it here closes that window permanently - nginx just
+      # appends to the existing file on every reload after this.
       - name: Ensure NPM f2b log directory exists
         if: ${{ matrix.host_machine == 'rpi4-server' || matrix.host_machine == 'e7270-server' }}
         uses: appleboy/ssh-action@v1.2.5
@@ -368,6 +377,8 @@ jobs:
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
             sudo mkdir -p /opt/f2b-logs/nginx-proxy-manager/nginx
+            sudo touch /opt/f2b-logs/nginx-proxy-manager/nginx/access.log
+            sudo chmod 666 /opt/f2b-logs/nginx-proxy-manager/nginx/access.log
 
       - name: Bring down VPN
         if: always()

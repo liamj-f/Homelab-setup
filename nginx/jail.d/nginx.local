@@ -1,0 +1,8 @@
+[nginx]
+enabled   = true
+filter    = nginx
+action    = oci-waf
+logpath   = /remotelogs/nginx-proxy-manager/nginx/access.log
+maxretry  = 5
+findtime  = 600
+bantime   = 86400

@@ -1,0 +1,4 @@
+# Rendered by .github/workflows/postgres-redeploy.yml when Authelia isn't
+# healthy - keeps the OAuth2 button off the login page rather than offering
+# a dead SSO provider. See config_local_oauth2.py.template for the OIDC form.
+AUTHENTICATION_SOURCES = ['internal']

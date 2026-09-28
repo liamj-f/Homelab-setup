@@ -422,6 +422,23 @@ jobs:
           script: |
             sudo docker exec -u www-data nextcloud php occ files:scan --all
 
+      # fail2ban/fail2ban-compose.yml bind-mounts this exact path as a
+      # single file. If it doesn't exist yet when fail2ban starts, Docker
+      # silently creates it as an empty directory instead of a file -
+      # permanently blocking Nextcloud from ever opening its own log there.
+      # chmod 666 matches fail2ban-jail-deploy.yml's own log-file
+      # convention, needed since Nextcloud's container writes as www-data,
+      # not this SSH user.
+      - name: Ensure nextcloud.log exists
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ vars.E7270_IP }}
+          username: ${{ vars.E7270_USER }}
+          password: ${{ secrets.E7270_PASSWORD }}
+          script: |
+            sudo touch /mnt/Nextcloud/nextcloud.log
+            sudo chmod 666 /mnt/Nextcloud/nextcloud.log
+
       - name: Bring down VPN
         run: |
           sudo wg-quick down ./wg0.conf
@@ -439,3 +456,21 @@ jobs:
     with:
       domain: ${{ inputs.domain || 'nextcloud.14monarch.james-fagg.uk' }}
       host_machine: ${{ inputs.host_machine || 'e7270-server' }}
+  fail2ban_setup:
+    needs: deploy
+    uses: ./.github/workflows/fail2ban-jail-deploy.yml
+    # fail2ban-jail-deploy.yml's own job requests actions:write (to trigger
+    # fail2ban-redeploy.yml on first-run bootstrap) - must be granted
+    # explicitly here or the call is rejected regardless of repo defaults.
+    permissions:
+      actions: write
+      contents: read
+    secrets: inherit
+    with:
+      # Nextcloud itself only ever runs on e7270-server (deploy's own matrix
+      # is hardcoded to it). nextcloud.log is read from /mnt/Nextcloud
+      # directly (see fail2ban/fail2ban-compose.yml) rather than the
+      # /opt/f2b-logs/nextcloud path this step provisions - that path/file
+      # is created but unused, harmless.
+      host_machine: 'e7270-server'
+      stack_name: 'nextcloud'

@@ -171,6 +171,27 @@ jobs:
             chmod -R +x /opt/stacks/${{ env.stack_name }}/custom-cont-init.d/
             chmod -R +x /opt/stacks/${{ env.stack_name }}/data/scripts/
 
+      # fail2ban-compose.yml bind-mounts this exact path as a single file
+      # (via NEXTCLOUD_LOG_MOUNT, set below in the stack Env). If it doesn't
+      # exist yet when this container is created, Docker silently creates it
+      # as an empty directory instead of a file - permanently blocking
+      # Nextcloud from ever opening its own log there. nextcloud-redeploy.yml
+      # already guards this for its own deploy order, but in a DR rebuild
+      # fail2ban is the more likely one to land first on a fresh e7270, so
+      # this needs its own copy of the same guard rather than assuming
+      # Nextcloud already ran once.
+      - name: Ensure nextcloud.log exists before mounting it
+        if: ${{ matrix.host_machine == 'e7270-server' }}
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            sudo mkdir -p /mnt/Nextcloud
+            sudo touch /mnt/Nextcloud/nextcloud.log
+            sudo chmod 666 /mnt/Nextcloud/nextcloud.log
+
       - name: Authenticate to Portainer
         id: auth
         run: |
@@ -259,6 +280,10 @@ jobs:
                                     {
                                     "name":"WAF_BLOCKLIST_ID",
                                     "value":"${{ vars.OCID_WAF_BLOCKLIST }}"
+                                    },
+                                    {
+                                    "name":"NEXTCLOUD_LOG_MOUNT",
+                                    "value":"${{ matrix.host_machine == 'e7270-server' && '/mnt/Nextcloud/nextcloud.log' || '/dev/null' }}"
                                     }
                        ],
                "Prune": true,
@@ -290,7 +315,11 @@ jobs:
                                     {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
                                     {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
                                     {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},
-                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"}
+                                    {"name":"OCI_KEY_CONTENT_BASE64", "value":"'"$OCI_KEY_BASE64"'"},
+                                    {
+                                    "name":"NEXTCLOUD_LOG_MOUNT",
+                                    "value":"${{ matrix.host_machine == 'e7270-server' && '/mnt/Nextcloud/nextcloud.log' || '/dev/null' }}"
+                                    }
                                       ],
                   "Prune": true
                   }'  )

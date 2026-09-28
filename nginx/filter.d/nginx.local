@@ -1,0 +1,9 @@
+[Definition]
+# NPM's own admin login (POST /api/tokens) throws AuthError on bad
+# credentials or an unknown email, which its error handler maps to HTTP 400
+# (verified against backend/internal/token.js, backend/lib/error.js and
+# backend/app.js in NginxProxyManager/nginx-proxy-manager - res.status(err.status || 500),
+# AuthError.status = 400). GET /tokens (refresh) and POST /tokens/2fa are
+# separate endpoints, so this only matches a fresh POST login attempt.
+failregex = ^<HOST>,?\s+-\s+\[.*\]\s+"POST /api/tokens HTTP/1\.\d" 400
+ignoreregex =

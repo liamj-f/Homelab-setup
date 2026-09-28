@@ -1,0 +1,23 @@
+# Rendered by .github/workflows/postgres-redeploy.yml only when Authelia is
+# healthy - see config_local_internal.py.template for the fallback used
+# otherwise. pgAdmin has no OAUTH2_CONFIG env var (individual
+# PGADMIN_CONFIG_OAUTH2_* vars are ignored - RM #7175), so this is mounted
+# straight into /pgadmin4/config_local.py instead.
+AUTHENTICATION_SOURCES = ['oauth2', 'internal']
+OAUTH2_AUTO_CREATE_USER = True
+OAUTH2_CONFIG = [{
+    'OAUTH2_NAME': 'authelia',
+    'OAUTH2_DISPLAY_NAME': 'Authelia',
+    'OAUTH2_CLIENT_ID': 'pgadmin',
+    'OAUTH2_CLIENT_SECRET': '${AUTHELIA_OIDC_PGADMIN_CLIENT_SECRET}',
+    'OAUTH2_API_BASE_URL': 'https://auth.14monarch.james-fagg.uk',
+    'OAUTH2_AUTHORIZATION_URL': 'https://auth.14monarch.james-fagg.uk/api/oidc/authorization',
+    'OAUTH2_TOKEN_URL': 'https://auth.14monarch.james-fagg.uk/api/oidc/token',
+    'OAUTH2_USERINFO_ENDPOINT': 'https://auth.14monarch.james-fagg.uk/api/oidc/userinfo',
+    'OAUTH2_SERVER_METADATA_URL': 'https://auth.14monarch.james-fagg.uk/.well-known/openid-configuration',
+    'OAUTH2_SCOPE': 'openid email profile',
+    'OAUTH2_USERNAME_CLAIM': 'email',
+    'OAUTH2_ICON': 'fa-shield',
+    'OAUTH2_CHALLENGE_METHOD': 'S256',
+    'OAUTH2_RESPONSE_TYPE': 'code',
+}]

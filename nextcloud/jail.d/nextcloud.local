@@ -1,0 +1,8 @@
+[nextcloud]
+enabled   = true
+filter    = nextcloud
+action    = oci-waf
+logpath   = /remotelogs/nextcloud/nextcloud.log
+maxretry  = 3
+findtime  = 43200
+bantime   = 86400

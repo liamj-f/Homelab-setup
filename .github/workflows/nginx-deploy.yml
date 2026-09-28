@@ -354,6 +354,32 @@ jobs:
 
               echo $RESPONSE
 
+      # NPM needs this directory to exist and be writable before it can
+      # write nginx/access.log into it for the NPM-admin-panel jail below -
+      # it won't create missing parent dirs itself. Only rpi4/e7270 run NPM
+      # instances fail2ban actually watches (same as ljfcloud-arm being out
+      # of reach for every other existing jail).
+      #
+      # Also pre-creates the log FILE itself (not just the directory):
+      # fail2ban-client reload hard-fails its *entire* reload (breaking
+      # every other pipeline's f2b step, not just this one) if a jail's
+      # logpath doesn't exist yet. NPM only creates that file once it's
+      # actually reloaded with the advanced_config below, which can lose a
+      # race against another pipeline's fail2ban reload on first rollout.
+      # Pre-touching it here closes that window permanently - nginx just
+      # appends to the existing file on every reload after this.
+      - name: Ensure NPM f2b log directory exists
+        if: ${{ matrix.host_machine == 'rpi4-server' || matrix.host_machine == 'e7270-server' }}
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          script: |
+            sudo mkdir -p /opt/f2b-logs/nginx-proxy-manager/nginx
+            sudo touch /opt/f2b-logs/nginx-proxy-manager/nginx/access.log
+            sudo chmod 666 /opt/f2b-logs/nginx-proxy-manager/nginx/access.log
+
       - name: Bring down VPN
         if: always()
         run: |
@@ -369,6 +395,25 @@ jobs:
       forward_host: ${{ vars.KEEPALIVED_IP }}
       forward_port: 81
       mesh_prefix: 'nginx'
+      # NPM's own admin login (POST /api/tokens) has no IP-aware logging of
+      # its own, same underlying problem as Portainer CE - see
+      # nginx/filter.d/nginx.local. Applies to the main domain AND both
+      # nginx1./nginx2. mesh hosts, since mesh_prefix reuses this same
+      # advanced_config for all three. NPM's own "View Log" for these hosts
+      # will read empty as a result - fail2ban's copy is the real record.
+      advanced_config: |
+        location / {
+          access_log /data/logs/nginx/access.log f2b_login;
+          proxy_set_header X-Forwarded-Host $host;
+          proxy_set_header X-Forwarded-Proto https;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection $http_connection;
+          proxy_http_version 1.1;
+          proxy_pass_request_headers on;
+          include conf.d/include/proxy.conf;
+          proxy_read_timeout 3600s;
+          proxy_send_timeout 3600s;
+        }
   proxy_setup_oci:
     # This step adds nginx1, nginx2 and nginx.14monarch.james-fagg.uk to the OCI nginx.
     needs: deploy
@@ -394,7 +439,33 @@ jobs:
       forward_host: '127.0.0.1'
       forward_port: 81
 
-
+  # Deployed to both on-prem NPM instances - keepalived can float which node
+  # is actually serving nginx.14monarch.james-fagg.uk (and each node always
+  # answers its own nginx1./nginx2. mesh domain directly), so an admin-login
+  # attempt can land on either one's access log. Bans still go through the
+  # shared oci-waf blocklist either way.
+  fail2ban_setup_rpi4:
+    needs: [deploy, proxy_setup_onprem]
+    uses: ./.github/workflows/fail2ban-jail-deploy.yml
+    permissions:
+      actions: write
+      contents: read
+    secrets: inherit
+    with:
+      host_machine: 'rpi4-server'
+      stack_name: 'nginx'
+      log_filename: 'access.log'
+  fail2ban_setup_e7270:
+    needs: [deploy, proxy_setup_onprem]
+    uses: ./.github/workflows/fail2ban-jail-deploy.yml
+    permissions:
+      actions: write
+      contents: read
+    secrets: inherit
+    with:
+      host_machine: 'e7270-server'
+      stack_name: 'nginx'
+      log_filename: 'access.log'
 
 
 

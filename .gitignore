@@ -1,3 +1,7 @@
 # Rendered Authelia config (contains secrets baked in via envsubst at deploy time)
 authelia/config/configuration.yml
 authelia/config/users_database.yml
+
+# Rendered pgAdmin config_local.py (contains the plaintext OIDC client secret
+# via envsubst at deploy time - see postgres/config_local_*.py.template)
+postgres/config_local.py

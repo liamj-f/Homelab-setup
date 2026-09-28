@@ -30,11 +30,19 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: "True"
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      # Failed /login attempts re-render the form (HTTP 200) rather than
+      # returning 4xx, so the f2b filter matches on method+path+status - see
+      # pgadmin/filter.d/pgadmin.local. x-forwarded-for is set by NPM
+      # (nginx/http_top.conf) the same way avalon/grampsweb already rely on.
+      GUNICORN_ACCESS_LOGFILE: /var/log/pgadmin/access.log
+      GUNICORN_CMD_ARGS: --access-logformat='%(h)s %({x-forwarded-for}i)s %(t)s %(r)s %(s)s'
     healthcheck:
       test: ["CMD", "wget", "-O", "-", "http://localhost:80/misc/ping"]
     volumes:
       - pgadmin_data:/var/lib/pgadmin
       - /opt/stacks/pgadmin/servers.json:/pgadmin4/servers.json
+      - /opt/stacks/pgadmin/config_local.py:/pgadmin4/config_local.py
+      - /opt/f2b-logs/pgadmin:/var/log/pgadmin
     networks:
       - db_network
 

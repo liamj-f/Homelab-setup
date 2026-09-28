@@ -23,6 +23,16 @@ services:
       - /opt/stacks/fail2ban/custom-cont-init.d:/custom-cont-init.d:ro
       - /var/log:/var/log:ro
       - /opt/f2b-logs:/remotelogs:ro
+      # nextcloud.log lives on the already-mounted /mnt/Nextcloud data drive
+      # (nextcloud/nextcloud-compose.yml), not under /opt/f2b-logs like every
+      # other service's log - mounted as a single file (not the whole drive)
+      # to avoid handing fail2ban the entire user-data tree. This same
+      # compose file deploys identically to both rpi4-server and
+      # e7270-server (fail2ban-redeploy.yml's matrix), but /mnt/Nextcloud
+      # only exists on e7270 (where Nextcloud actually runs) - fail2ban-
+      # redeploy.yml sets NEXTCLOUD_LOG_MOUNT to /dev/null on rpi4-server so
+      # this resolves to an always-empty, always-valid no-op there instead.
+      - ${NEXTCLOUD_LOG_MOUNT:-/dev/null}:/remotelogs/nextcloud/nextcloud.log:ro
     networks:
       - nginx_network
 

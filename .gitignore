@@ -1,3 +1,10 @@
 # Rendered Authelia config (contains secrets baked in via envsubst at deploy time)
 authelia/config/configuration.yml
 authelia/config/users_database.yml
+
+# Terraform state is handled out-of-band (fetched/decrypted from, and
+# encrypted+committed to, the terraform-state branch by the CI workflow) —
+# never commit the plaintext file itself.
+Terraform/terraform.tfstate*
+Terraform/*.tfstate*
+Terraform/.terraform/

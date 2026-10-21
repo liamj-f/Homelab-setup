@@ -237,7 +237,8 @@ jobs:
                               "Webhook": "${{ steps.uuid.outputs.uuid }}"                           
                              },
                               "Env": [
-                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001,14monarch.tplinkdns.com:2333, 14monarch.tplinkdns.com:80-90, ${{ vars.work_ip }}:80-90"},
+                                    {"name":"LIST_ITEMS", "value":"14monarch.tplinkdns.com:22, 14monarch.tplinkdns.com:9001,14monarch.tplinkdns.com:2333,
+                                    dns.com:80-90, ${{ vars.work_ip }}:80-90"},
                                     {"name":"OCI_USER",        "value":"${{ vars.OCID_NETWORK_UPDATER_SA_USER }}"},
                                     {"name":"OCI_FINGERPRINT",  "value":"${{ vars.OCID_NETWORK_UPDATER_SA_FINGERPRINT }}"},
                                     {"name":"OCI_TENANCY",      "value":"${{ vars.OCID_TENANT }}"},

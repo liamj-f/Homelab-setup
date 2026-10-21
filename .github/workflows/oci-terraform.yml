@@ -1,0 +1,313 @@
+name: Terraform (Oracle Cloud)
+
+# State lives encrypted on the `terraform-state` orphan branch (see the
+# "decrypt"/"encrypt" steps below) rather than in a cloud backend. Three
+# actions share this one workflow:
+#   plan       - default. Read-only. Runs automatically on push/PR.
+#   apply      - deploys the plan. Manual dispatch only, requires typed confirm.
+#   rediscover - rebuilds state from what's actually live in OCI via resource
+#                discovery, and commits the result. Manual dispatch only,
+#                requires typed confirm. Use when state has drifted or on
+#                first-ever setup (no terraform-state branch exists yet).
+
+on:
+  push:
+    branches:
+      - terraform
+    paths:
+      - 'Terraform/**'
+      - '.github/workflows/oci-terraform.yml'
+  pull_request:
+    paths:
+      - 'Terraform/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'What to run'
+        type: choice
+        required: true
+        default: plan
+        options:
+          - plan
+          - apply
+          - rediscover
+      confirm:
+        description: 'For apply/rediscover only: type the action name again to confirm'
+        required: false
+        type: string
+      target_branch:
+        description: 'rediscover only: branch to push proposed .tf changes to (for you to open a PR from manually). Leave blank to auto-create one (rediscover/<timestamp>). An existing branch name pushes an update to it instead of creating a new one.'
+        required: false
+        type: string
+
+concurrency:
+  group: terraform-oci-state
+  cancel-in-progress: false
+
+permissions:
+  contents: write # needed to push updated state to the terraform-state branch, and to push the rediscover branch
+
+env:
+  ACTION: ${{ github.event_name == 'workflow_dispatch' && inputs.action || 'plan' }}
+  OCI_REGION: "uk-london-1"
+
+jobs:
+  guard:
+    name: Guard destructive actions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require typed confirmation for apply/rediscover
+        run: |
+          if [ "${{ env.ACTION }}" != "plan" ] && [ "${{ inputs.confirm }}" != "${{ env.ACTION }}" ]; then
+            echo "::error::Refusing to run '${{ env.ACTION }}' without confirmation. Re-run workflow_dispatch with confirm='${{ env.ACTION }}' to proceed."
+            exit 1
+          fi
+
+  terraform:
+    name: terraform ${{ github.event_name == 'workflow_dispatch' && inputs.action || 'plan' }}
+    needs: guard
+    runs-on: ubuntu-latest
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_user_ocid: ${{ vars.OCID_TERRAFORM_SA_USER }}
+      TF_VAR_fingerprint: ${{ vars.OCID_TERRAFORM_SA_FINGERPRINT }}
+      TF_VAR_private_key: ${{ secrets.TERRAFORM_SA_API_KEY }}
+      TF_VAR_oci_account_email: ${{ vars.GMAIL_ADDRESS }}
+      TF_VAR_homelab_email: ${{ vars.HOMELAB_EMAIL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - name: Resolve current home IP
+        run: |
+          HOME_IP=$(getent hosts "${{ vars.WG_ENDPOINT }}" | awk '{print $1}' | head -n1)
+          if [ -z "$HOME_IP" ]; then
+            echo "::error::Could not resolve ${{ vars.WG_ENDPOINT }} to an IP"
+            exit 1
+          fi
+          echo "Resolved ${{ vars.WG_ENDPOINT }} -> $HOME_IP"
+          echo "TF_VAR_home_ip=${HOME_IP}/32" >> "$GITHUB_ENV"
+
+      - name: Fetch and decrypt existing state
+        run: |
+          if git ls-remote --exit-code --heads origin terraform-state >/dev/null 2>&1; then
+            git fetch --quiet origin terraform-state
+            git show FETCH_HEAD:terraform.tfstate.enc > /tmp/terraform.tfstate.enc
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
+              -in /tmp/terraform.tfstate.enc \
+              -out Terraform/terraform.tfstate \
+              -pass pass:"${{ secrets.TERRAFORM_STATE_ENCRYPTION_KEY }}"
+            echo "Decrypted existing state from terraform-state branch."
+          else
+            echo "No terraform-state branch yet — starting from empty state."
+          fi
+
+      - name: Terraform init
+        working-directory: Terraform
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        if: env.ACTION != 'rediscover'
+        working-directory: Terraform
+        run: terraform validate
+
+      - name: Terraform plan
+        if: env.ACTION == 'plan'
+        working-directory: Terraform
+        run: |
+          set -o pipefail
+          terraform plan -input=false -no-color -lock-timeout=120s | tee plan.txt
+
+      - name: Publish plan to job summary
+        if: env.ACTION == 'plan'
+        working-directory: Terraform
+        run: |
+          {
+            echo '## Terraform Plan — Oracle Cloud'
+            echo '```'
+            cat plan.txt 2>/dev/null || echo '(no plan output captured)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Terraform apply
+        if: env.ACTION == 'apply'
+        working-directory: Terraform
+        run: terraform apply -input=false -auto-approve -no-color -lock-timeout=120s
+
+      - name: Rediscover live resources into state
+        if: env.ACTION == 'rediscover'
+        run: |
+          set -e
+          umask 077
+          printf '%s' "${{ secrets.TERRAFORM_SA_API_KEY }}" > "$RUNNER_TEMP/oci_api_key.pem"
+          export TF_VAR_private_key_path="$RUNNER_TEMP/oci_api_key.pem"
+
+          mkdir -p /tmp/discovery
+          cd /tmp/discovery
+          cat > versions.tf <<'EOF'
+          terraform {
+            required_providers {
+              oci = {
+                source  = "oracle/oci"
+                version = ">= 5.0.0"
+              }
+            }
+          }
+          EOF
+          terraform init -input=false
+          BIN=$(find .terraform/providers -type f -name 'terraform-provider-oci_v*' | head -n1)
+          if [ -z "$BIN" ]; then
+            echo "::error::Could not locate the downloaded terraform-provider-oci binary"
+            exit 1
+          fi
+          cp "$BIN" ./terraform-provider-oci
+          chmod +x ./terraform-provider-oci
+
+          mkdir -p export
+          TF_VAR_tenancy_ocid="${{ vars.OCID_TENANT }}" \
+          TF_VAR_region="${{ env.OCI_REGION }}" \
+          ./terraform-provider-oci -command=export \
+            -compartment_id="${{ vars.OCID_COMPARTMENT_HOMELABPRD }}" \
+            -output_path="$(pwd)/export" \
+            -generate_state \
+            -parallelism=8
+
+          # Discovery re-scans live reality regardless of what's in the .tf
+          # files, so resources deliberately dropped from config (Oracle's
+          # own vendor/system-managed objects, and license_manager_configuration
+          # which we don't use) would otherwise silently reappear in state
+          # here and show up as "to be destroyed" on the next plan.
+          jq '
+            .resources |= map(select(
+              ((.type == "oci_os_management_hub_software_source") or
+               (.type == "oci_os_management_hub_profile") or
+               (.type == "oci_identity_tag_namespace" and .name == "export_Oracle-Tags") or
+               (.type == "oci_identity_tag" and (.name == "export_CreatedBy" or .name == "export_CreatedOn")) or
+               (.type == "oci_identity_tag_default" and (.name == "export_tag_default" or .name == "export_tag_default_1")) or
+               (.type == "oci_cloud_guard_security_recipe" and .name == "export_Maximum-Security-Recipe---20200914") or
+               (.type == "oci_license_manager_configuration") or
+               (.type == "oci_identity_domains_app") or
+               (.type == "oci_identity_domains_app_role") or
+               (.type == "oci_identity_domains_identity_provider") or
+               (.type == "oci_identity_domains_oauth_client_certificate") or
+               (.type == "oci_identity_domains_grant"))
+              | not
+            ))
+          ' export/terraform.tfstate > export/terraform.tfstate.filtered
+
+          cp export/terraform.tfstate.filtered "$GITHUB_WORKSPACE/Terraform/terraform.tfstate"
+
+      - name: Filter and apply conventions to discovered .tf files
+        if: env.ACTION == 'rediscover'
+        run: |
+          set -e
+          cd /tmp/discovery/export
+
+          # Same vendor/system-managed exclusions as the state filter above,
+          # applied to the HCL this time, so the proposed config change
+          # doesn't reintroduce resources we deliberately dropped.
+          sed -i \
+            -e '/^resource oci_os_management_hub_software_source /,/^}/d' \
+            -e '/^resource oci_os_management_hub_profile /,/^}/d' \
+            -e '/^resource oci_identity_tag_namespace export_Oracle-Tags /,/^}/d' \
+            -e '/^resource oci_identity_tag export_CreatedBy /,/^}/d' \
+            -e '/^resource oci_identity_tag export_CreatedOn /,/^}/d' \
+            -e '/^resource oci_identity_tag_default export_tag_default /,/^}/d' \
+            -e '/^resource oci_identity_tag_default export_tag_default_1 /,/^}/d' \
+            -e '/^resource oci_cloud_guard_security_recipe /,/^}/d' \
+            -e '/^resource oci_license_manager_configuration /,/^}/d' \
+            -e '/^resource oci_identity_domains_app /,/^}/d' \
+            -e '/^resource oci_identity_domains_app_role /,/^}/d' \
+            -e '/^resource oci_identity_domains_identity_provider /,/^}/d' \
+            -e '/^resource oci_identity_domains_oauth_client_certificate /,/^}/d' \
+            -e '/^resource oci_identity_domains_grant /,/^}/d' \
+            *.tf
+
+          # Same literal -> variable substitutions as the manual cleanup pass.
+          sed -i 's/"default\/${{ vars.GMAIL_ADDRESS }}"/"default\/${var.oci_account_email}"/g' *.tf
+          sed -i 's/"${{ vars.GMAIL_ADDRESS }}"/var.oci_account_email/g' *.tf
+          sed -i 's/"${{ vars.HOMELAB_EMAIL }}"/var.homelab_email/g' *.tf
+          sed -i "s#\"${TF_VAR_home_ip}\"#var.home_ip#g" *.tf
+          sed -i -E "s#compartment_id([[:space:]]*)=([[:space:]]*)\"${{ vars.OCID_COMPARTMENT_HOMELABPRD }}\"#compartment_id\1=\2var.compartment_ocid#g" *.tf
+
+      - name: Push rediscovered .tf changes to a branch
+        if: env.ACTION == 'rediscover'
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          TARGET_BRANCH="${{ inputs.target_branch }}"
+
+          if [ -n "$TARGET_BRANCH" ] && git ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/dev/null 2>&1; then
+            git fetch --quiet origin "$TARGET_BRANCH"
+            git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          else
+            TARGET_BRANCH="${TARGET_BRANCH:-rediscover/$(date +%Y%m%d-%H%M%S)}"
+            git checkout -B "$TARGET_BRANCH"
+          fi
+
+          cd Terraform
+          find . -maxdepth 1 -name '*.tf' \
+            ! -name 'provider.tf' ! -name 'versions.tf' ! -name 'auth.tf' ! -name 'redacted_values.tf' ! -name 'vars.tf' \
+            -delete
+          for f in /tmp/discovery/export/*.tf; do
+            base=$(basename "$f")
+            case "$base" in
+              provider.tf|versions.tf|auth.tf|redacted_values.tf|vars.tf) continue ;;
+            esac
+            cp "$f" "./$base"
+          done
+          cd ..
+
+          git add Terraform/*.tf
+          if git diff --cached --quiet; then
+            echo "No config changes discovered — nothing to push."
+            exit 0
+          fi
+
+          git commit -m "Rediscover: sync Terraform config with live OCI state (run ${{ github.run_id }})"
+          git push -u origin "$TARGET_BRANCH"
+          echo "::notice::Pushed rediscovered config to '$TARGET_BRANCH'. Open a PR from it manually when ready."
+
+      - name: Encrypt and commit state to terraform-state branch
+        if: always() && (env.ACTION == 'apply' || env.ACTION == 'rediscover')
+        run: |
+          set -e
+          STATE_FILE="Terraform/terraform.tfstate"
+          if [ ! -f "$STATE_FILE" ]; then
+            echo "No state file produced, nothing to commit."
+            exit 0
+          fi
+
+          WORKDIR=$(mktemp -d)
+          git clone --quiet "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "$WORKDIR"
+          cd "$WORKDIR"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin terraform-state >/dev/null 2>&1; then
+            git checkout terraform-state
+          else
+            git checkout --orphan terraform-state
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt \
+            -in "$GITHUB_WORKSPACE/$STATE_FILE" \
+            -out terraform.tfstate.enc \
+            -pass pass:"${{ secrets.TERRAFORM_STATE_ENCRYPTION_KEY }}"
+
+          git add terraform.tfstate.enc
+          if git diff --cached --quiet; then
+            echo "State unchanged, nothing to commit."
+          else
+            git commit -m "Update terraform state (${{ env.ACTION }}, run ${{ github.run_id }})"
+            git push origin terraform-state
+          fi

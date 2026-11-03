@@ -54,7 +54,8 @@ jobs:
           
       - name: Write WireGuard config
         run: |
-          cat > wg0.conf << EOF
+          sudo install -d -m 700 /etc/wireguard
+          sudo tee /etc/wireguard/wg0.conf > /dev/null << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
           Address = 192.168.2.2/30
@@ -68,10 +69,11 @@ jobs:
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF
+          sudo chmod 600 /etc/wireguard/wg0.conf
           
       - name: Bring up VPN on runner
         run: |
-          sudo wg-quick up ./wg0.conf
+          sudo wg-quick up wg0
           sudo wg show  
 
       - name: Override system DNS resolver on runner
@@ -219,5 +221,5 @@ jobs:
       - name: Bring down VPN
         if: always()
         run: |
-          sudo wg-quick down ./wg0.conf
+          sudo wg-quick down wg0
           sudo wg show   

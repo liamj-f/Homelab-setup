@@ -67,7 +67,7 @@ resource oci_core_subnet export_ljf-cloud-snet1 {
     "Oracle-Tags.CreatedBy" = "default/${var.oci_account_email}"
     "Oracle-Tags.CreatedOn" = "2026-01-31T23:19:41.435Z"
   }
-  dhcp_options_id = oci_core_vcn.export_ljf-cloud-net1.default_dhcp_options_id
+  dhcp_options_id = oci_core_default_dhcp_options.export_Default-DHCP-Options-for-ljf-cloud-net1.id
   display_name    = "ljf-cloud-snet1"
   dns_label       = "subnet01312319"
   freeform_tags = {
@@ -82,7 +82,7 @@ resource oci_core_subnet export_ljf-cloud-snet1 {
   prohibit_public_ip_on_vnic = "false"
   route_table_id             = oci_core_vcn.export_ljf-cloud-net1.default_route_table_id
   security_list_ids = [
-    oci_core_vcn.export_ljf-cloud-net1.default_security_list_id,
+    oci_core_default_security_list.export_Default-Security-List-for-ljf-cloud-net1.id,
   ]
   vcn_id = oci_core_vcn.export_ljf-cloud-net1.id
 }
@@ -236,7 +236,7 @@ resource oci_core_default_route_table export_Default-Route-Table-for-ljf-cloud-n
     #description = <<Optional value not found in discovery>>
     destination       = "0.0.0.0/0"
     destination_type  = "CIDR_BLOCK"
-    network_entity_id = "ocid1.internetgateway.oc1.uk-london-1.aaaaaaaabizejmilbalnn6nvtzij2cfizhb7d6vm66uqjvtnqckdsmqji6wa"
+    network_entity_id = oci_core_internet_gateway.export_Internet-Gateway-ljf-cloud-net1.id
     route_type        = "STATIC"
   }
 }
@@ -513,5 +513,210 @@ resource oci_core_instance export_LJF-Cloud-ARM-VM {
   }
   state = "RUNNING"
   #update_operation_constraint = <<Optional value not found in discovery>>
+}
+
+
+resource oci_core_default_dhcp_options export_Default-DHCP-Options-for-ljf-cloud-net1 {
+  compartment_id = var.compartment_ocid
+  defined_tags = {
+    "Oracle-Tags.CreatedBy" = "default/${var.oci_account_email}"
+    "Oracle-Tags.CreatedOn" = "2026-01-31T23:19:39.551Z"
+  }
+  display_name     = "Default DHCP Options for ljf-cloud-net1"
+  domain_name_type = "CUSTOM_DOMAIN"
+  freeform_tags = {
+  }
+  manage_default_resource_id = oci_core_vcn.export_ljf-cloud-net1.default_dhcp_options_id
+  options {
+    custom_dns_servers = [
+    ]
+    #search_domain_names = <<Optional value not found in discovery>>
+    server_type = "VcnLocalPlusInternet"
+    type        = "DomainNameServer"
+  }
+  options {
+    #custom_dns_servers = <<Optional value not found in discovery>>
+    search_domain_names = [
+      "vcn01312319.oraclevcn.com",
+    ]
+    #server_type = <<Optional value not found in discovery>>
+    type = "SearchDomain"
+  }
+}
+
+
+resource oci_core_internet_gateway export_Internet-Gateway-ljf-cloud-net1 {
+  compartment_id = var.compartment_ocid
+  defined_tags = {
+    "Oracle-Tags.CreatedBy" = "default/${var.oci_account_email}"
+    "Oracle-Tags.CreatedOn" = "2026-01-31T23:19:40.397Z"
+  }
+  display_name = "Internet Gateway ljf-cloud-net1"
+  enabled      = "true"
+  freeform_tags = {
+  }
+  #route_table_id = <<Optional value not found in discovery>>
+  vcn_id = oci_core_vcn.export_ljf-cloud-net1.id
+}
+
+
+resource oci_core_default_security_list export_Default-Security-List-for-ljf-cloud-net1 {
+  compartment_id = var.compartment_ocid
+  defined_tags = {
+    "Oracle-Tags.CreatedBy" = "default/${var.oci_account_email}"
+    "Oracle-Tags.CreatedOn" = "2026-01-31T23:19:39.551Z"
+  }
+  display_name = "Default Security List for ljf-cloud-net1"
+  egress_security_rules {
+    #description = <<Optional value not found in discovery>>
+    destination      = "0.0.0.0/0"
+    destination_type = "CIDR_BLOCK"
+    #icmp_options = <<Optional value not found in discovery>>
+    protocol  = "all"
+    stateless = "false"
+    #tcp_options = <<Optional value not found in discovery>>
+    #udp_options = <<Optional value not found in discovery>>
+  }
+  egress_security_rules {
+    #description = <<Optional value not found in discovery>>
+    destination      = "10.0.0.0/24"
+    destination_type = "CIDR_BLOCK"
+    #icmp_options = <<Optional value not found in discovery>>
+    protocol  = "6"
+    stateless = "false"
+    tcp_options {
+      max = "80"
+      min = "80"
+      #source_port_range = <<Optional value not found in discovery>>
+    }
+    #udp_options = <<Optional value not found in discovery>>
+  }
+  egress_security_rules {
+    #description = <<Optional value not found in discovery>>
+    destination      = "10.0.0.0/24"
+    destination_type = "CIDR_BLOCK"
+    #icmp_options = <<Optional value not found in discovery>>
+    protocol  = "6"
+    stateless = "false"
+    tcp_options {
+      max = "80"
+      min = "80"
+      #source_port_range = <<Optional value not found in discovery>>
+    }
+    #udp_options = <<Optional value not found in discovery>>
+  }
+  freeform_tags = {
+  }
+  ingress_security_rules {
+    #description = <<Optional value not found in discovery>>
+    icmp_options {
+      code = "4"
+      type = "3"
+    }
+    protocol    = "1"
+    source      = "0.0.0.0/0"
+    source_type = "CIDR_BLOCK"
+    stateless   = "false"
+    #tcp_options = <<Optional value not found in discovery>>
+    #udp_options = <<Optional value not found in discovery>>
+  }
+  ingress_security_rules {
+    #description = <<Optional value not found in discovery>>
+    icmp_options {
+      code = "-1"
+      type = "3"
+    }
+    protocol    = "1"
+    source      = "10.0.0.0/16"
+    source_type = "CIDR_BLOCK"
+    stateless   = "false"
+    #tcp_options = <<Optional value not found in discovery>>
+    #udp_options = <<Optional value not found in discovery>>
+  }
+  ingress_security_rules {
+    #description = <<Optional value not found in discovery>>
+    #icmp_options = <<Optional value not found in discovery>>
+    protocol    = "6"
+    source      = "10.0.0.0/24"
+    source_type = "CIDR_BLOCK"
+    stateless   = "false"
+    tcp_options {
+      max = "80"
+      min = "80"
+      #source_port_range = <<Optional value not found in discovery>>
+    }
+    #udp_options = <<Optional value not found in discovery>>
+  }
+  ingress_security_rules {
+    description = "14monarch.tplinkdns.com:22"
+    #icmp_options = <<Optional value not found in discovery>>
+    protocol    = "6"
+    source      = var.home_ip
+    source_type = "CIDR_BLOCK"
+    stateless   = "false"
+    tcp_options {
+      max = "22"
+      min = "22"
+      #source_port_range = <<Optional value not found in discovery>>
+    }
+    #udp_options = <<Optional value not found in discovery>>
+  }
+  ingress_security_rules {
+    description = "14monarch.tplinkdns.com:9001"
+    #icmp_options = <<Optional value not found in discovery>>
+    protocol    = "6"
+    source      = var.home_ip
+    source_type = "CIDR_BLOCK"
+    stateless   = "false"
+    tcp_options {
+      max = "9001"
+      min = "9001"
+      #source_port_range = <<Optional value not found in discovery>>
+    }
+    #udp_options = <<Optional value not found in discovery>>
+  }
+  ingress_security_rules {
+    description = "14monarch.tplinkdns.com:2333"
+    #icmp_options = <<Optional value not found in discovery>>
+    protocol    = "6"
+    source      = var.home_ip
+    source_type = "CIDR_BLOCK"
+    stateless   = "false"
+    tcp_options {
+      max = "2333"
+      min = "2333"
+      #source_port_range = <<Optional value not found in discovery>>
+    }
+    #udp_options = <<Optional value not found in discovery>>
+  }
+  ingress_security_rules {
+    description = "14monarch.tplinkdns.com:80-90"
+    #icmp_options = <<Optional value not found in discovery>>
+    protocol    = "6"
+    source      = var.home_ip
+    source_type = "CIDR_BLOCK"
+    stateless   = "false"
+    tcp_options {
+      max = "90"
+      min = "80"
+      #source_port_range = <<Optional value not found in discovery>>
+    }
+    #udp_options = <<Optional value not found in discovery>>
+  }
+  ingress_security_rules {
+    description = "82.71.195.5:80-90"
+    #icmp_options = <<Optional value not found in discovery>>
+    protocol    = "6"
+    source      = "82.71.195.5/32"
+    source_type = "CIDR_BLOCK"
+    stateless   = "false"
+    tcp_options {
+      max = "90"
+      min = "80"
+      #source_port_range = <<Optional value not found in discovery>>
+    }
+    #udp_options = <<Optional value not found in discovery>>
+  }
+  manage_default_resource_id = oci_core_vcn.export_ljf-cloud-net1.default_security_list_id
 }
 

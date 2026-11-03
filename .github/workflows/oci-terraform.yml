@@ -258,7 +258,7 @@ jobs:
           sed -i "s#\"${TF_VAR_home_ip}\"#var.home_ip#g" *.tf
           sed -i -E "s#compartment_id([[:space:]]*)=([[:space:]]*)\"${{ vars.OCID_COMPARTMENT_HOMELABPRD }}\"#compartment_id\1=\2var.compartment_ocid#g" *.tf
 
-      - name: Push rediscovered .tf changes to a branch
+      - name: Create branch for rediscovered .tf changes
         if: env.ACTION == 'rediscover'
         run: |
           set -e
@@ -275,6 +275,12 @@ jobs:
             git checkout -B "$TARGET_BRANCH"
           fi
 
+          echo "TARGET_BRANCH=$TARGET_BRANCH" >> "$GITHUB_ENV"
+
+      - name: Commit rediscovered .tf changes, one commit per file
+        if: env.ACTION == 'rediscover'
+        run: |
+          set -e
           cd Terraform
           find . -maxdepth 1 -name '*.tf' \
             ! -name 'provider.tf' ! -name 'versions.tf' ! -name 'auth.tf' ! -name 'redacted_values.tf' ! -name 'vars.tf' \
@@ -288,15 +294,23 @@ jobs:
           done
           cd ..
 
-          git add Terraform/*.tf
-          if git diff --cached --quiet; then
+          # One commit per changed file, so the branch's history (and
+          # GitHub's per-commit diff view) lets you review file-by-file
+          # instead of one large mixed commit.
+          mapfile -t CHANGED_FILES < <(git status --porcelain -- Terraform/*.tf | awk '{print $2}')
+
+          if [ "${#CHANGED_FILES[@]}" -eq 0 ]; then
             echo "No config changes discovered — nothing to push."
             exit 0
           fi
 
-          git commit -m "Rediscover: sync Terraform config with live OCI state (run ${{ github.run_id }})"
+          for f in "${CHANGED_FILES[@]}"; do
+            git add "$f"
+            git commit -m "Rediscover: update $(basename "$f") (run ${{ github.run_id }})"
+          done
+
           git push -u origin "$TARGET_BRANCH"
-          echo "::notice::Pushed rediscovered config to '$TARGET_BRANCH'. Open a PR from it manually when ready."
+          echo "::notice::Pushed ${#CHANGED_FILES[@]} commit(s) to '$TARGET_BRANCH'. Open a PR from it manually when ready."
 
       - name: Encrypt and commit state to terraform-state branch
         if: always() && (env.ACTION == 'apply' || env.ACTION == 'rediscover')

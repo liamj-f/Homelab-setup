@@ -4,7 +4,8 @@ LABEL maintainer="LJF Cloud"
 LABEL description="Automatically updates OCI Security List with dynamic IP"
 
 # Install dependencies
-RUN pip install --no-cache-dir oci-cli
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Create app directory
 WORKDIR /app

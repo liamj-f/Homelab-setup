@@ -99,9 +99,9 @@ resource oci_load_balancer_listener export_ljfcloud-vcn-lb_ljf-cloud-vcn-ssl-lis
   ]
   ssl_configuration {
     certificate_ids = [
-      oci_certificates_management_certificate.export_james-fagg-uk_3.id,
+      "ocid1.certificate.oc1.uk-london-1.amaaaaaaetpwusqafuc3voptjt327cgd6psh73h75yuffcpjpnxmwlmq3soq",
     ]
-    certificate_name       = "*.14monarch.james-fagg.uk"
+    certificate_name       =
     cipher_suite_name      = "oci-compatible-ssl-cipher-suite-v1"
     has_session_resumption = "true"
     protocols = [

@@ -27,7 +27,7 @@ resource oci_identity_policy export_Tenant-Admin-Policy {
   compartment_id = var.compartment_ocid
   defined_tags = {
   }
-  description = "Tenant Admin Policy"could you 
+  description = "Tenant Admin Policy"
   freeform_tags = {
   }
   name = "Tenant Admin Policy"

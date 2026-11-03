@@ -91,7 +91,8 @@ jobs:
 
       - name: Write WireGuard config
         run: |
-          cat > wg0.conf << EOF
+          sudo install -d -m 700 /etc/wireguard
+          sudo tee /etc/wireguard/wg0.conf > /dev/null << EOF
           [Interface]
           PrivateKey = ${{ secrets.WG_PRIVATE_KEY }}
           Address = 192.168.2.2/30
@@ -105,6 +106,7 @@ jobs:
           Endpoint = ${{ vars.WG_ENDPOINT }}:51820
           PersistentKeepalive = 25
           EOF
+          sudo chmod 600 /etc/wireguard/wg0.conf
 
       - name: Render Rathole config
         id: render_rathole
@@ -123,7 +125,7 @@ jobs:
         run: |
           for i in $(seq 1 5); do
             echo "Attempt $i/5: bringing up WireGuard..."
-            if sudo wg-quick up ./wg0.conf; then
+            if sudo wg-quick up wg0; then
               echo "WireGuard up successfully"
               break
             fi
@@ -350,6 +352,6 @@ jobs:
       - name: Bring down VPN
         if: always()
         run: |
-          sudo wg-quick down ./wg0.conf
+          sudo wg-quick down wg0
           sudo wg show
 

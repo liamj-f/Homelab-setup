@@ -1,19 +1,32 @@
 version: 2
 updates:
   - package-ecosystem: "pip"
-    directory: "/"
+    directories:
+      - "/**"
     schedule:
       interval: "weekly"
+    commit-message:
+      prefix: "chore(pip)"
+
+  - package-ecosystem: "docker"
+    directories:
+      - "/**"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(docker)"
 
   - package-ecosystem: "docker-compose"
-    directory: "/"
+    directories:
+      - "/**"
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "chore(docker-compose)"
 
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/**"
     schedule:
       interval: "weekly"
     commit-message:

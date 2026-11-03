@@ -181,6 +181,14 @@ jobs:
           # quirks for unrelated services). That doesn't mean the whole run
           # failed, so don't let `set -e` treat it as fatal: check for real
           # output instead of trusting the exit code.
+          #
+          # certificates_management is explicitly excluded: the tool voids
+          # an ENTIRE step's results if any sibling call within it errors,
+          # and ListCaBundles (a feature we don't use) 404s every time —
+          # wiping out the real certificate discovery alongside it even
+          # though that call itself succeeds. Excluding it stops the wasted
+          # attempt, but doesn't put the certificate into state by itself —
+          # that still needs a one-time `terraform import`.
           set +e
           TF_VAR_tenancy_ocid="${{ vars.OCID_TENANT }}" \
           TF_VAR_region="${{ env.OCI_REGION }}" \
@@ -188,7 +196,8 @@ jobs:
             -compartment_id="${{ vars.OCID_COMPARTMENT_HOMELABPRD }}" \
             -output_path="$(pwd)/export" \
             -generate_state \
-            -parallelism=8
+            -parallelism=8 \
+            -exclude_services=certificates_management
           EXPORT_EXIT=$?
           set -e
 

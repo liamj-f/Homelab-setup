@@ -174,6 +174,14 @@ jobs:
           chmod +x ./terraform-provider-oci
 
           mkdir -p export
+
+          # The export tool probes a huge default service catalog and exits
+          # non-zero whenever ANY service errors — including ones that just
+          # don't apply here (not enabled, not authorized, or plain SDK/API
+          # quirks for unrelated services). That doesn't mean the whole run
+          # failed, so don't let `set -e` treat it as fatal: check for real
+          # output instead of trusting the exit code.
+          set +e
           TF_VAR_tenancy_ocid="${{ vars.OCID_TENANT }}" \
           TF_VAR_region="${{ env.OCI_REGION }}" \
           ./terraform-provider-oci -command=export \
@@ -181,6 +189,16 @@ jobs:
             -output_path="$(pwd)/export" \
             -generate_state \
             -parallelism=8
+          EXPORT_EXIT=$?
+          set -e
+
+          if [ ! -s export/terraform.tfstate ]; then
+            echo "::error::Resource discovery produced no state file (exit $EXPORT_EXIT) — see the per-service errors logged above."
+            exit 1
+          fi
+          if [ "$EXPORT_EXIT" -ne 0 ]; then
+            echo "::warning::Resource discovery exited $EXPORT_EXIT but did produce output — likely just inapplicable services erroring, not a real failure. Continuing, but check the log above for anything that looks like a real resource of yours."
+          fi
 
           # Discovery re-scans live reality regardless of what's in the .tf
           # files, so resources deliberately dropped from config (Oracle's

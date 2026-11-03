@@ -33,6 +33,7 @@ on:
     branches:
       - main
       - '**'
+      - '!dependabot/**'
     paths:
       - '.github/workflows/avalon-deploy.yml'
       - 'avalon/**'

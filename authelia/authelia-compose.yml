@@ -34,7 +34,7 @@ services:
 
   authelia_valkey:
     container_name: authelia_valkey
-    image: ghcr.io/valkey-io/valkey:9.1.0-alpine
+    image: ghcr.io/valkey-io/valkey:9.1.3-alpine
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]

@@ -54,7 +54,7 @@ services:
       - "127.0.0.1:5335:53/udp"
 
   nebula-sync:
-    image: ghcr.io/lovelaze/nebula-sync:v0.11.2
+    image: ghcr.io/lovelaze/nebula-sync:v0.11.3
     depends_on:
       pihole:
         condition: service_healthy

@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   pihole:
-    image: pihole/pihole:2026.05.0
+    image: pihole/pihole:2026.10.1
     container_name: pihole
     hostname: ${HOSTNAME}
     restart: unless-stopped

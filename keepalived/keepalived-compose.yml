@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   keepalived:
-    image: osixia/keepalived:2.3.4
+    image: osixia/keepalived:2.4.3
     container_name: keepalived
     network_mode: host
     restart: unless-stopped

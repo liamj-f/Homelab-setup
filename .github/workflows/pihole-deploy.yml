@@ -323,6 +323,7 @@ jobs:
             --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
             --arg secondary_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
             --arg hostname "${{ matrix.host_machine }}" \
+            --arg keepalived_ip "${{ vars.KEEPALIVED_IP }}" \
             --arg stack_name "${{ env.stack_name }}" \
             '{
             Name: $stack_name,
@@ -340,7 +341,8 @@ jobs:
                 {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
                 {name: "PRIMARY_IP",          value: $primary_ip},
                 {name: "SECONDARY_IP",        value: $secondary_ip},
-                {name: "HOSTNAME",            value: $hostname}
+                {name: "HOSTNAME",            value: $hostname},
+                {name: "KEEPALIVED_IP",       value: $keepalived_ip}
               ],
             Prune: true,
             StackFileVersion: "3"
@@ -364,6 +366,7 @@ jobs:
             --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
             --arg secondary_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
             --arg hostname "${{ matrix.host_machine }}" \
+            --arg keepalived_ip "${{ vars.KEEPALIVED_IP }}" \
             '{
               AutoUpdate: {
                     ForcePullImage: true,
@@ -377,7 +380,8 @@ jobs:
                 {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
                 {name: "PRIMARY_IP",          value: $primary_ip},
                 {name: "SECONDARY_IP",        value: $secondary_ip},
-                {name: "HOSTNAME",            value: $hostname}
+                {name: "HOSTNAME",            value: $hostname},
+                {name: "KEEPALIVED_IP",       value: $keepalived_ip}
               ],
               Prune: true
               }')
@@ -525,15 +529,14 @@ jobs:
                                 "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},rpi0-server,infinite",
                                 "3c:6a:a7:87:f4:0b,${{ vars.E7270_IP }},e7270-server,infinite"
                                  ]
-                          },
-                  "misc": {
-                          "dnsmasq_lines": ["dhcp-option=6,${{ vars.KEEPALIVED_IP }}"]
-                          }  
+                          }
                     }
                 }
           EOF
                                     
-          curl --retry 3 --retry-delay 5 --retry-all-errors -X PATCH "http://${{ steps.node_config.outputs.ssh_host }}:82/api/config" \
+          # --fail-with-body: Pi-hole answers a rejected config with HTTP 400, which
+          # plain curl treats as success - it silently applied nothing.
+          curl --fail-with-body --retry 3 --retry-delay 5 --retry-all-errors -X PATCH "http://${{ steps.node_config.outputs.ssh_host }}:82/api/config" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \

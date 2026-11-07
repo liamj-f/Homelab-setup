@@ -184,37 +184,18 @@ jobs:
               ;;
           esac
 
-      - name: Pre-pull stack images and record Pi-hole container ID
-        # Portainer's redeploy tears the stack down BEFORE pulling. If the pull
-        # then fails (e.g. this node is the keepalived MASTER and resolves DNS
-        # via its own, now-removed, Pi-hole) the node is left with no Pi-hole
-        # at all. Pull here first, while the old stack is still serving: a
-        # failure stops the job with nothing torn down, and the redeploy below
-        # uses the local images (PullImage: false).
-        id: prepull
-        run: |
-          echo "${{ steps.node_config.outputs.ssh_key }}" > ssh_key.pem
-          chmod 600 ssh_key.pem
-          IMAGES=$(grep -E '^[[:space:]]*image:' ${{ env.stack_name }}/${{ env.stack_name }}-compose.yml | awk '{print $2}' | tr -d "\"'")
-          echo "Images: $IMAGES"
-          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ssh_key.pem ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}"
-          for img in $IMAGES; do
-            ok=false
-            for i in 1 2 3; do
-              if $SSH "docker pull -q $img"; then ok=true; break; fi
-              echo "Pull of $img failed (attempt $i/3), retrying in 10s..."
-              sleep 10
-            done
-            if [ "$ok" != true ]; then
-              rm -f ssh_key.pem
-              echo "::error::Could not pull $img - not redeploying, existing stack left running"
-              exit 1
-            fi
-          done
-          PIHOLE_ID=$($SSH "docker inspect -f '{{.Id}}' pihole 2>/dev/null" || true)
-          rm -f ssh_key.pem
-          echo "Pi-hole container before redeploy: ${PIHOLE_ID:-<none>}"
-          echo "pihole_id=$PIHOLE_ID" >> $GITHUB_OUTPUT
+      - name: Record Pi-hole container ID before redeploy
+        # Baseline for "Wait for redeployed Pi-hole to be healthy", so it can
+        # tell the new container apart from the one being replaced.
+        id: pihole_before
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          capture_stdout: true
+          script: |
+            docker inspect -f '{{.Id}}' pihole 2>/dev/null || true
 
       - name: Record nebula-sync container ID before redeploy
         # Best-effort: nebula-sync may not exist (e.g. fresh/removed stack); never fail the deploy over it
@@ -389,7 +370,7 @@ jobs:
                     ForceUpdate: true,
                     Webhook: $webhook
                     },
-              PullImage: false, # images pre-pulled above, see "Pre-pull stack images"
+              PullImage: true,
               RepositoryReferenceName: $ref,
               repositoryAuthentication: false,
               Env: [
@@ -459,12 +440,12 @@ jobs:
       - name: Wait for redeployed Pi-hole to be healthy
         # The redeploy API returns as soon as Portainer queues the job, not when
         # it is done - a fixed sleep raced the teardown. Wait for proof: a new
-        # pihole container ID (vs "Pre-pull stack images") that reports healthy.
+        # pihole container ID (vs "Record Pi-hole container ID") that reports healthy.
         run: |
           echo "${{ steps.node_config.outputs.ssh_key }}" > ssh_key.pem
           chmod 600 ssh_key.pem
           SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ssh_key.pem ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}"
-          BEFORE_ID="${{ steps.prepull.outputs.pihole_id }}"
+          BEFORE_ID=$(echo "${{ steps.pihole_before.outputs.stdout }}" | tr -d '[:space:]')
           for i in $(seq 1 60); do
             STATE=$($SSH "docker inspect -f '{{.Id}} {{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' pihole 2>/dev/null" || true)
             ID=${STATE%% *}; HEALTH=${STATE#* }

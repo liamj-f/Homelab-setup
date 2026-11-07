@@ -144,6 +144,11 @@ jobs:
           done
           sudo wg show
 
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+
       - name: Determine DHCP-active node from keepalived state
         # The MASTER (the node currently holding the keepalived VIP) is the
         # one that should have DHCP active - matching what keepalived's own
@@ -248,11 +253,6 @@ jobs:
           key: ${{ steps.node_config.outputs.other_ssh_key }}
           script: |
             docker stop nebula-sync || true
-
-      - name: Override system DNS resolver
-        run: |
-          sudo rm /etc/resolv.conf
-          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
       - name: Authenticate to Portainer
         id: auth

@@ -184,6 +184,38 @@ jobs:
               ;;
           esac
 
+      - name: Pre-pull stack images and record Pi-hole container ID
+        # Portainer's redeploy tears the stack down BEFORE pulling. If the pull
+        # then fails (e.g. this node is the keepalived MASTER and resolves DNS
+        # via its own, now-removed, Pi-hole) the node is left with no Pi-hole
+        # at all. Pull here first, while the old stack is still serving: a
+        # failure stops the job with nothing torn down, and the redeploy below
+        # uses the local images (PullImage: false).
+        id: prepull
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > ssh_key.pem
+          chmod 600 ssh_key.pem
+          IMAGES=$(grep -E '^[[:space:]]*image:' ${{ env.stack_name }}/${{ env.stack_name }}-compose.yml | awk '{print $2}' | tr -d "\"'")
+          echo "Images: $IMAGES"
+          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ssh_key.pem ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}"
+          for img in $IMAGES; do
+            ok=false
+            for i in 1 2 3; do
+              if $SSH "docker pull -q $img"; then ok=true; break; fi
+              echo "Pull of $img failed (attempt $i/3), retrying in 10s..."
+              sleep 10
+            done
+            if [ "$ok" != true ]; then
+              rm -f ssh_key.pem
+              echo "::error::Could not pull $img - not redeploying, existing stack left running"
+              exit 1
+            fi
+          done
+          PIHOLE_ID=$($SSH "docker inspect -f '{{.Id}}' pihole 2>/dev/null" || true)
+          rm -f ssh_key.pem
+          echo "Pi-hole container before redeploy: ${PIHOLE_ID:-<none>}"
+          echo "pihole_id=$PIHOLE_ID" >> $GITHUB_OUTPUT
+
       - name: Record nebula-sync container ID before redeploy
         # Best-effort: nebula-sync may not exist (e.g. fresh/removed stack); never fail the deploy over it
         continue-on-error: true
@@ -357,7 +389,7 @@ jobs:
                     ForceUpdate: true,
                     Webhook: $webhook
                     },
-              PullImage: true,
+              PullImage: false, # images pre-pulled above, see "Pre-pull stack images"
               RepositoryReferenceName: $ref,
               repositoryAuthentication: false,
               Env: [
@@ -424,10 +456,33 @@ jobs:
             echo "nebula-sync confirmed stopped (fallback path)"
 
 
+      - name: Wait for redeployed Pi-hole to be healthy
+        # The redeploy API returns as soon as Portainer queues the job, not when
+        # it is done - a fixed sleep raced the teardown. Wait for proof: a new
+        # pihole container ID (vs "Pre-pull stack images") that reports healthy.
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > ssh_key.pem
+          chmod 600 ssh_key.pem
+          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ssh_key.pem ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}"
+          BEFORE_ID="${{ steps.prepull.outputs.pihole_id }}"
+          for i in $(seq 1 60); do
+            STATE=$($SSH "docker inspect -f '{{.Id}} {{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' pihole 2>/dev/null" || true)
+            ID=${STATE%% *}; HEALTH=${STATE#* }
+            if [ -n "$ID" ] && [ "$ID" != "$BEFORE_ID" ] && [ "$HEALTH" = "healthy" ]; then
+              echo "Attempt $i: new Pi-hole container $ID is healthy"
+              rm -f ssh_key.pem
+              exit 0
+            fi
+            echo "Attempt $i/60: waiting (container: ${ID:-<none>}, state: ${HEALTH:-<none>})"
+            sleep 5
+          done
+          rm -f ssh_key.pem
+          echo "::error::Redeployed Pi-hole not healthy after 5 minutes"
+          exit 1
+
       - name: Pihole Api Auth
         id: pihole_auth
         run: |
-          sleep 20
           RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \
               -H "Content-Type: application/json" \
               -d '{

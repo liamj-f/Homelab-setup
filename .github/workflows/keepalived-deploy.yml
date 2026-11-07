@@ -188,8 +188,12 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            chmod a+rx /opt/stacks/${{ env.stack_name }}/notify.sh
-            chmod a+rx /opt/stacks/${{ env.stack_name }}/install-ssh-client-startup.sh
+            # keepalived runs with enable_script_security + script_user root: it
+            # silently disables any script not owned by root or writable by a
+            # non-root user ("Unsafe permissions found ... - disabling"), which
+            # meant notify.sh (DHCP handover on failover) never ran.
+            sudo chown root:root /opt/stacks/${{ env.stack_name }}/notify.sh /opt/stacks/${{ env.stack_name }}/install-ssh-client-startup.sh
+            sudo chmod 755 /opt/stacks/${{ env.stack_name }}/notify.sh /opt/stacks/${{ env.stack_name }}/install-ssh-client-startup.sh
             chmod 600 /opt/stacks/${{ env.stack_name }}/ssh_key
             ls -la /opt/stacks/${{ env.stack_name }}/
 

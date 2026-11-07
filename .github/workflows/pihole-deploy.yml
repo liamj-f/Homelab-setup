@@ -72,6 +72,8 @@ jobs:
             echo "other_ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             # Used only as a fallback if keepalived's live state can't be read (see "Determine DHCP-active node" step)
             echo "default_dhcp_active=true" >> $GITHUB_OUTPUT
+            # NIC Pi-hole listens on (listeningMode: single) - must match keepalived-deploy.yml
+            echo "pihole_interface=eth0" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
@@ -82,6 +84,7 @@ jobs:
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
             echo "default_dhcp_active=false" >> $GITHUB_OUTPUT
+            echo "pihole_interface=wlp1s0" >> $GITHUB_OUTPUT
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "other_ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
@@ -182,6 +185,8 @@ jobs:
           esac
 
       - name: Record nebula-sync container ID before redeploy
+        # Best-effort: nebula-sync may not exist (e.g. fresh/removed stack); never fail the deploy over it
+        continue-on-error: true
         # Baseline for the "Stop nebula-sync" step below, so it can detect a
         # genuine Portainer recreate instead of guessing from a timeout.
         if: ${{ steps.dhcp_state.outputs.dhcp_active == 'false' }}
@@ -196,6 +201,8 @@ jobs:
             docker inspect -f '{{.Id}}' nebula-sync 2>/dev/null || true
 
       - name: Pause nebula-sync on this host before reconfiguring Pi-hole
+        # Best-effort: nebula-sync may not exist (e.g. fresh/removed stack); never fail the deploy over it
+        continue-on-error: true
         # Whatever this node's role, its own nebula-sync (if it's somehow
         # still running) writes to the same gravity.db the API calls below
         # are about to mutate directly. Pause it defensively - it either
@@ -210,6 +217,8 @@ jobs:
             docker stop nebula-sync || true
 
       - name: Pause nebula-sync on the other host before reconfiguring Pi-hole
+        # Best-effort: nebula-sync may not exist (e.g. fresh/removed stack); never fail the deploy over it
+        continue-on-error: true
         # The other host's nebula-sync (if it's the current MASTER) syncs
         # ITS Pi-hole outward into this one, including a gravity rebuild
         # (RUN_GRAVITY) on its own cron schedule - unrelated to this
@@ -446,7 +455,7 @@ jobs:
                       "upstreams": [
                                     "127.0.0.1#5335"
                                     ],
-                      "interface": "eth0", 
+                      "interface": "${{ steps.node_config.outputs.pihole_interface }}",
                       "listeningMode": "single",
                       "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
                       "hosts":[
@@ -612,6 +621,8 @@ jobs:
 
 
       - name: Resume nebula-sync on the other host if it's the keepalived MASTER
+        # Best-effort: nebula-sync may not exist (e.g. fresh/removed stack); never fail the deploy over it
+        continue-on-error: true
         # Undoes "Pause nebula-sync on the other host" above, now that this
         # leg's own Pi-hole reconfiguration is finished. Only relevant when
         # the OTHER host is the MASTER (this node's own dhcp_active is

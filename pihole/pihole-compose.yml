@@ -21,6 +21,9 @@ services:
       TZ: 'Europe/London'
       FTLCONF_webserver_api_password: ${PIHOLE_WEBPASSWORD}
       FTLCONF_webserver_port: 82
+      # Hand out the keepalived VIP as DNS server via DHCP. Pi-hole 2026.10+ refuses
+      # misc.dnsmasq_lines over the API, so it has to be set here.
+      FTLCONF_misc_dnsmasq_lines: "dhcp-option=6,${KEEPALIVED_IP}"
 #      FTLCONF_misc_etc_dnsmasq_d: true
     cap_add:
       - NET_ADMIN

@@ -72,6 +72,8 @@ jobs:
             echo "other_ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             # Used only as a fallback if keepalived's live state can't be read (see "Determine DHCP-active node" step)
             echo "default_dhcp_active=true" >> $GITHUB_OUTPUT
+            # NIC Pi-hole listens on (listeningMode: single) - must match keepalived-deploy.yml
+            echo "pihole_interface=eth0" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.RPI4_USER }}" >> $GITHUB_OUTPUT
             echo "ssh_key<<EOF_KEY" >> $GITHUB_OUTPUT
             echo "${{ secrets.SSH_KEY_RPI4 }}" >> $GITHUB_OUTPUT
@@ -82,6 +84,7 @@ jobs:
             echo "EOF_KEY" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.host_machine }}" = "e7270-server" ]; then
             echo "default_dhcp_active=false" >> $GITHUB_OUTPUT
+            echo "pihole_interface=wlp1s0" >> $GITHUB_OUTPUT
             echo "ssh_host=${{ vars.E7270_IP }}" >> $GITHUB_OUTPUT
             echo "other_ssh_host=${{ vars.RPI4_IP }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ vars.E7270_USER }}" >> $GITHUB_OUTPUT
@@ -141,6 +144,11 @@ jobs:
           done
           sudo wg show
 
+      - name: Override system DNS resolver
+        run: |
+          sudo rm /etc/resolv.conf
+          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+
       - name: Determine DHCP-active node from keepalived state
         # The MASTER (the node currently holding the keepalived VIP) is the
         # one that should have DHCP active - matching what keepalived's own
@@ -181,7 +189,22 @@ jobs:
               ;;
           esac
 
+      - name: Record Pi-hole container ID before redeploy
+        # Baseline for "Wait for redeployed Pi-hole to be healthy", so it can
+        # tell the new container apart from the one being replaced.
+        id: pihole_before
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ steps.node_config.outputs.ssh_host }}
+          username: ${{ steps.node_config.outputs.ssh_user }}
+          key: ${{ steps.node_config.outputs.ssh_key }}
+          capture_stdout: true
+          script: |
+            docker inspect -f '{{.Id}}' pihole 2>/dev/null || true
+
       - name: Record nebula-sync container ID before redeploy
+        # Best-effort: nebula-sync may not exist (e.g. fresh/removed stack); never fail the deploy over it
+        continue-on-error: true
         # Baseline for the "Stop nebula-sync" step below, so it can detect a
         # genuine Portainer recreate instead of guessing from a timeout.
         if: ${{ steps.dhcp_state.outputs.dhcp_active == 'false' }}
@@ -196,6 +219,8 @@ jobs:
             docker inspect -f '{{.Id}}' nebula-sync 2>/dev/null || true
 
       - name: Pause nebula-sync on this host before reconfiguring Pi-hole
+        # Best-effort: nebula-sync may not exist (e.g. fresh/removed stack); never fail the deploy over it
+        continue-on-error: true
         # Whatever this node's role, its own nebula-sync (if it's somehow
         # still running) writes to the same gravity.db the API calls below
         # are about to mutate directly. Pause it defensively - it either
@@ -210,6 +235,8 @@ jobs:
             docker stop nebula-sync || true
 
       - name: Pause nebula-sync on the other host before reconfiguring Pi-hole
+        # Best-effort: nebula-sync may not exist (e.g. fresh/removed stack); never fail the deploy over it
+        continue-on-error: true
         # The other host's nebula-sync (if it's the current MASTER) syncs
         # ITS Pi-hole outward into this one, including a gravity rebuild
         # (RUN_GRAVITY) on its own cron schedule - unrelated to this
@@ -226,11 +253,6 @@ jobs:
           key: ${{ steps.node_config.outputs.other_ssh_key }}
           script: |
             docker stop nebula-sync || true
-
-      - name: Override system DNS resolver
-        run: |
-          sudo rm /etc/resolv.conf
-          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
 
       - name: Authenticate to Portainer
         id: auth
@@ -301,6 +323,7 @@ jobs:
             --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
             --arg secondary_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
             --arg hostname "${{ matrix.host_machine }}" \
+            --arg keepalived_ip "${{ vars.KEEPALIVED_IP }}" \
             --arg stack_name "${{ env.stack_name }}" \
             '{
             Name: $stack_name,
@@ -318,7 +341,8 @@ jobs:
                 {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
                 {name: "PRIMARY_IP",          value: $primary_ip},
                 {name: "SECONDARY_IP",        value: $secondary_ip},
-                {name: "HOSTNAME",            value: $hostname}
+                {name: "HOSTNAME",            value: $hostname},
+                {name: "KEEPALIVED_IP",       value: $keepalived_ip}
               ],
             Prune: true,
             StackFileVersion: "3"
@@ -342,6 +366,7 @@ jobs:
             --arg primary_ip "${{ steps.node_config.outputs.ssh_host }}" \
             --arg secondary_ip "${{ steps.node_config.outputs.other_ssh_host }}" \
             --arg hostname "${{ matrix.host_machine }}" \
+            --arg keepalived_ip "${{ vars.KEEPALIVED_IP }}" \
             '{
               AutoUpdate: {
                     ForcePullImage: true,
@@ -355,7 +380,8 @@ jobs:
                 {name: "PIHOLE_WEBPASSWORD",  value: $app_password},
                 {name: "PRIMARY_IP",          value: $primary_ip},
                 {name: "SECONDARY_IP",        value: $secondary_ip},
-                {name: "HOSTNAME",            value: $hostname}
+                {name: "HOSTNAME",            value: $hostname},
+                {name: "KEEPALIVED_IP",       value: $keepalived_ip}
               ],
               Prune: true
               }')
@@ -389,7 +415,8 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            BEFORE_ID="${{ steps.nebula_sync_before.outputs.stdout }}"
+            # capture_stdout also contains ssh-action's "Successfully executed" banner - keep only the container ID
+            BEFORE_ID=$(printf '%s' "${{ steps.nebula_sync_before.outputs.stdout }}" | grep -oE '[0-9a-f]{64}' | head -n1)
             echo "Container ID before redeploy: '${BEFORE_ID:-<none>}'"
 
             for i in $(seq 1 18); do
@@ -415,10 +442,35 @@ jobs:
             echo "nebula-sync confirmed stopped (fallback path)"
 
 
+      - name: Wait for redeployed Pi-hole to be healthy
+        # The redeploy API returns as soon as Portainer queues the job, not when
+        # it is done - a fixed sleep raced the teardown. Wait for proof: a new
+        # pihole container ID (vs "Record Pi-hole container ID") that reports healthy.
+        run: |
+          echo "${{ steps.node_config.outputs.ssh_key }}" > ssh_key.pem
+          chmod 600 ssh_key.pem
+          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ssh_key.pem ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}"
+          # capture_stdout also contains ssh-action's "Successfully executed" banner - keep only the container ID
+          BEFORE_ID=$(printf '%s' "${{ steps.pihole_before.outputs.stdout }}" | grep -oE '[0-9a-f]{64}' | head -n1 || true)
+          echo "Pi-hole container before redeploy: ${BEFORE_ID:-<none>}"
+          for i in $(seq 1 60); do
+            STATE=$($SSH "docker inspect -f '{{.Id}} {{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' pihole 2>/dev/null" || true)
+            ID=${STATE%% *}; HEALTH=${STATE#* }
+            if [ -n "$ID" ] && [ "$ID" != "$BEFORE_ID" ] && [ "$HEALTH" = "healthy" ]; then
+              echo "Attempt $i: new Pi-hole container $ID is healthy"
+              rm -f ssh_key.pem
+              exit 0
+            fi
+            echo "Attempt $i/60: waiting (container: ${ID:-<none>}, state: ${HEALTH:-<none>})"
+            sleep 5
+          done
+          rm -f ssh_key.pem
+          echo "::error::Redeployed Pi-hole not healthy after 5 minutes"
+          exit 1
+
       - name: Pihole Api Auth
         id: pihole_auth
         run: |
-          sleep 20
           RESPONSE=$(curl --retry 3 --retry-delay 5 --retry-all-errors -s -X POST "http://${{ steps.node_config.outputs.ssh_host }}:82/api/auth" \
               -H "Content-Type: application/json" \
               -d '{
@@ -446,7 +498,7 @@ jobs:
                       "upstreams": [
                                     "127.0.0.1#5335"
                                     ],
-                      "interface": "eth0", 
+                      "interface": "${{ steps.node_config.outputs.pihole_interface }}",
                       "listeningMode": "single",
                       "revServers":["true,192.168.0.0/24,192.168.0.1,local"],
                       "hosts":[
@@ -480,15 +532,14 @@ jobs:
                                 "b8:27:eb:3a:5d:2a,${{ vars.RPI0_IP }},rpi0-server,infinite",
                                 "3c:6a:a7:87:f4:0b,${{ vars.E7270_IP }},e7270-server,infinite"
                                  ]
-                          },
-                  "misc": {
-                          "dnsmasq_lines": ["dhcp-option=6,${{ vars.KEEPALIVED_IP }}"]
-                          }  
+                          }
                     }
                 }
           EOF
                                     
-          curl --retry 3 --retry-delay 5 --retry-all-errors -X PATCH "http://${{ steps.node_config.outputs.ssh_host }}:82/api/config" \
+          # --fail-with-body: Pi-hole answers a rejected config with HTTP 400, which
+          # plain curl treats as success - it silently applied nothing.
+          curl --fail-with-body --retry 3 --retry-delay 5 --retry-all-errors -X PATCH "http://${{ steps.node_config.outputs.ssh_host }}:82/api/config" \
           -H "X-FTL-SID: ${{ steps.pihole_auth.outputs.sid }}" \
           -H "X-FTL-CSRF: ${{ steps.pihole_auth.outputs.csrf }}" \
           -H 'accept: application/json' \
@@ -612,6 +663,8 @@ jobs:
 
 
       - name: Resume nebula-sync on the other host if it's the keepalived MASTER
+        # Best-effort: nebula-sync may not exist (e.g. fresh/removed stack); never fail the deploy over it
+        continue-on-error: true
         # Undoes "Pause nebula-sync on the other host" above, now that this
         # leg's own Pi-hole reconfiguration is finished. Only relevant when
         # the OTHER host is the MASTER (this node's own dhcp_active is

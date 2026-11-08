@@ -415,7 +415,8 @@ jobs:
           username: ${{ steps.node_config.outputs.ssh_user }}
           key: ${{ steps.node_config.outputs.ssh_key }}
           script: |
-            BEFORE_ID="${{ steps.nebula_sync_before.outputs.stdout }}"
+            # capture_stdout also contains ssh-action's "Successfully executed" banner - keep only the container ID
+            BEFORE_ID=$(printf '%s' "${{ steps.nebula_sync_before.outputs.stdout }}" | grep -oE '[0-9a-f]{64}' | head -n1)
             echo "Container ID before redeploy: '${BEFORE_ID:-<none>}'"
 
             for i in $(seq 1 18); do
@@ -449,7 +450,9 @@ jobs:
           echo "${{ steps.node_config.outputs.ssh_key }}" > ssh_key.pem
           chmod 600 ssh_key.pem
           SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ssh_key.pem ${{ steps.node_config.outputs.ssh_user }}@${{ steps.node_config.outputs.ssh_host }}"
-          BEFORE_ID=$(echo "${{ steps.pihole_before.outputs.stdout }}" | tr -d '[:space:]')
+          # capture_stdout also contains ssh-action's "Successfully executed" banner - keep only the container ID
+          BEFORE_ID=$(printf '%s' "${{ steps.pihole_before.outputs.stdout }}" | grep -oE '[0-9a-f]{64}' | head -n1 || true)
+          echo "Pi-hole container before redeploy: ${BEFORE_ID:-<none>}"
           for i in $(seq 1 60); do
             STATE=$($SSH "docker inspect -f '{{.Id}} {{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' pihole 2>/dev/null" || true)
             ID=${STATE%% *}; HEALTH=${STATE#* }

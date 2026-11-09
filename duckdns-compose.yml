@@ -1,7 +1,7 @@
 version: "3"
 services:
   duckdns:
-    image: lscr.io/linuxserver/duckdns:latest
+    image: lscr.io/linuxserver/duckdns:aad9dc1f-ls96
     container_name: duckdns
     network_mode: host # optional, needed for IPv6 detection
     environment:

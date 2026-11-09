@@ -155,7 +155,7 @@ jobs:
                "Prune": true
               }'
       - name: Deploy new user
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.RPI4_IP }}
           username: ${{ vars.RPI4_USER }}

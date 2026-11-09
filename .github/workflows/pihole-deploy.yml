@@ -33,6 +33,7 @@ on:
     branches:
       - main
       - '**'
+      - '!dependabot/**'
     paths:
       - '.github/workflows/pihole-deploy.yml'
       - 'pihole/**'

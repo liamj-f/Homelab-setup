@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 LABEL maintainer="LJF Cloud"
 LABEL description="Uploads renewed NPM certificates to OCI Certificates Service"

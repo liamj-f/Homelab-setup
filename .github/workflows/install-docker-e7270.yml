@@ -17,11 +17,11 @@ on:
       domain:
         required: true
         type: string
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/install-docker-e7270.yml'  
+#  push:
+#    branches:
+#      - main
+#    paths:
+#      - '.github/workflows/install-docker-e7270.yml'  
 
 jobs:
   install_docker_and_add_to_portainer:
@@ -58,7 +58,7 @@ jobs:
           ssh-keyscan -H ${{ vars.E7270_IP }} >> ~/.ssh/known_hosts
           
       - name: Configure passwordless sudo
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
          host: ${{ vars.E7270_IP }}
          username: ${{ vars.E7270_USER }}
@@ -68,7 +68,7 @@ jobs:
            echo "${{ secrets.E7270_PASSWORD }}" | sudo -S chmod 0440 /etc/sudoers.d/${{ vars.E7270_USER }}
          
       - name: Uninstall old Docker
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.E7270_IP }}
           username: ${{ vars.E7270_USER }}
@@ -79,7 +79,7 @@ jobs:
             done
 
       - name: Add Docker repository
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.E7270_IP }}
           username: ${{ vars.E7270_USER }}
@@ -101,7 +101,7 @@ jobs:
             EOF
 
       - name: Install Docker packages
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.E7270_IP }}
           username: ${{ vars.E7270_USER }}
@@ -110,7 +110,7 @@ jobs:
             sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
       - name: Configure Docker DNS
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.E7270_IP }}
           username: ${{ vars.E7270_USER }}
@@ -127,7 +127,7 @@ jobs:
             sudo systemctl restart docker
             
       - name: Ensure Docker is running
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.E7270_IP }}
           username: ${{ vars.E7270_USER }}
@@ -137,7 +137,7 @@ jobs:
             sudo systemctl status docker --no-pager
 
       - name: add user to docker group
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.E7270_IP }}
           username: ${{ vars.E7270_USER }}
@@ -150,7 +150,7 @@ jobs:
           envsubst < portainer-agent-compose.yml > portainer-agent-compose-rendered.yml
 
       - name: Copy rendered compose file from runner to E7270
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ vars.E7270_IP }}
           username: ${{ vars.E7270_USER }}
@@ -161,7 +161,7 @@ jobs:
           
       - name: Deploy Portainer agent on E7270
         id: deploy_portainer
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.E7270_IP }}
           username: ${{ vars.E7270_USER }}

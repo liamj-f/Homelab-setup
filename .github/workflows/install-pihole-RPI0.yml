@@ -34,7 +34,7 @@ jobs:
           echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
           
       - name: Install PiHole on RPI0
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.RPI0_IP }}
           username: ${{ vars.RPI0_USER }}
@@ -55,7 +55,7 @@ jobs:
             sudo bash /tmp/pihole-install.sh --unattended
 
       - name: Set interfaces
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.RPI0_IP }}
           username: ${{ vars.RPI0_USER }}
@@ -65,7 +65,7 @@ jobs:
             sudo pihole-FTL --config dns.listeningMode "SINGLE"
             
       - name: Set pihole webpassword
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.RPI0_IP }}
           username: ${{ vars.RPI0_USER }}
@@ -74,7 +74,7 @@ jobs:
                   sudo pihole setpassword "${{ secrets.APP_PASSWORD }}"
                   
       - name: Configure custom web port
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.RPI0_IP }}
           username: ${{ vars.RPI0_USER }}
@@ -115,7 +115,7 @@ jobs:
           envsubst < pihole/pihole_dhcp_failover.py.template > pihole/pihole_dhcp_failover_rendered.py
 
       - name: Copy Failover script
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ vars.RPI0_IP }}
           username: ${{ vars.RPI0_USER }}
@@ -128,7 +128,7 @@ jobs:
           strip_components: 1
 
       - name: Run Failover Script on RPI0
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.RPI0_IP }}
           username: ${{ vars.RPI0_USER }}

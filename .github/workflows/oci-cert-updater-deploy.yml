@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - '**'
+      - '!dependabot/**'
     paths:
       - 'oci-cert-updater/oci-cert-updater-compose.yml'
       - '.github/workflows/oci-cert-updater-deploy.yml'

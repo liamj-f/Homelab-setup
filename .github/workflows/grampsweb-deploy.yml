@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - '**'
+      - '!dependabot/**'
     paths:
       - 'grampsweb/**'
       - '.github/workflows/grampsweb-deploy.yml'

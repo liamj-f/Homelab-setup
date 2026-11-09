@@ -33,6 +33,7 @@ on:
     branches:
       - main
       - '**'
+      - '!dependabot/**'
     paths:
       - '.github/workflows/authelia-deploy.yml'
       - 'authelia/**'
@@ -112,7 +113,7 @@ jobs:
 
       # wg-quick's DNS= pushes the runner's resolver to the internal
       # Keepalived IP, which can't (reliably) resolve public names. The
-      # steps below pull authelia/authelia:latest from Docker Hub to hash
+      # steps below pull authelia/authelia:4.39.28 from Docker Hub to hash
       # secrets locally, so restore public DNS while keeping the tunnel up
       # for the internal (by-IP) traffic.
       - name: Override system DNS resolver
@@ -153,7 +154,7 @@ jobs:
         env:
           PORTAINER_OIDC_CLIENT_SECRET: ${{ secrets.PORTAINER_OIDC_CLIENT_SECRET }}
         run: |
-          HASH=$(docker run --rm authelia/authelia:latest authelia crypto hash generate pbkdf2 --variant sha512 --password "$PORTAINER_OIDC_CLIENT_SECRET" | sed -n 's/^Digest: //p')
+          HASH=$(docker run --rm authelia/authelia:4.39.28 authelia crypto hash generate pbkdf2 --variant sha512 --password "$PORTAINER_OIDC_CLIENT_SECRET" | sed -n 's/^Digest: //p')
           if [ -z "$HASH" ]; then
             echo "::error::Failed to generate Portainer OIDC client secret hash"
             exit 1
@@ -166,7 +167,7 @@ jobs:
         env:
           PGADMIN_OIDC_CLIENT_SECRET: ${{ secrets.PGADMIN_OIDC_CLIENT_SECRET }}
         run: |
-          HASH=$(docker run --rm authelia/authelia:latest authelia crypto hash generate pbkdf2 --variant sha512 --password "$PGADMIN_OIDC_CLIENT_SECRET" | sed -n 's/^Digest: //p')
+          HASH=$(docker run --rm authelia/authelia:4.39.28 authelia crypto hash generate pbkdf2 --variant sha512 --password "$PGADMIN_OIDC_CLIENT_SECRET" | sed -n 's/^Digest: //p')
           if [ -z "$HASH" ]; then
             echo "::error::Failed to generate pgAdmin OIDC client secret hash"
             exit 1
@@ -194,7 +195,7 @@ jobs:
         env:
           APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
         run: |
-          HASH=$(docker run --rm authelia/authelia:latest authelia crypto hash generate argon2 --password "$APP_PASSWORD" | sed -n 's/^Digest: //p')
+          HASH=$(docker run --rm authelia/authelia:4.39.28 authelia crypto hash generate argon2 --password "$APP_PASSWORD" | sed -n 's/^Digest: //p')
           if [ -z "$HASH" ]; then
             echo "::error::Failed to generate Authelia password hash"
             exit 1

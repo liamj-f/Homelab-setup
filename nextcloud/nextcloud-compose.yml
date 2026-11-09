@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   nextcloud:
-    image: nextcloud:latest
+    image: nextcloud:35.0.2
     container_name: nextcloud
     restart: unless-stopped
     ports:

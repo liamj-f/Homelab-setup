@@ -17,11 +17,11 @@ on:
       domain:
         required: true
         type: string
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/install-docker-e7270.yml'  
+#  push:
+#    branches:
+#      - main
+#    paths:
+#      - '.github/workflows/install-docker-e7270.yml'  
 
 jobs:
   install_docker_and_add_to_portainer:

@@ -33,6 +33,7 @@ on:
     branches:
       - main
       - '**'
+      - '!dependabot/**'
     paths:
       - '.github/workflows/authelia-deploy.yml'
       - 'authelia/**'

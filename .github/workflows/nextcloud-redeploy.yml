@@ -7,6 +7,7 @@ on:
     branches:
       - main
       - '**'
+      - '!dependabot/**'
     paths:
       - 'nextcloud-compose.yml'
       - '.github/workflows/nextcloud-redeploy.yml'

@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - '**'
+      - '!dependabot/**'
     paths:
       - 'rathole/**'
       - '.github/workflows/rathole-deploy.yml'

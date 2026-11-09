@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - '**'
+      - '!dependabot/**'
     paths:
       - 'fail2ban/**'
       - '.github/workflows/fail2ban-redeploy.yml'

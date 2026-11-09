@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - '**'
+      - '!dependabot/**'
     paths:
       - 'oci-ip-updater/oci-ip-updater-compose.yml'
       - '.github/workflows/oci-ip-updater-deploy.yml'

@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - '**'
+      - '!dependabot/**'
     paths:
       - 'portainer/**'
       - '.github/workflows/portainer-deploy.yml'

@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.15-slim
 
 LABEL maintainer="LJF Cloud"
 LABEL description="Automatically updates OCI Security List with dynamic IP"
